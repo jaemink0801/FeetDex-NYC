@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T174842';
+  var BAKED = '20260508T175412';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1042,51 +1042,93 @@ function sweep(freqStart, freqEnd, duration, type = 'sine', gainVal = 0.18, star
 
 // ── Firework helper ───────────────────────────────────────────────────────────
 
-// One launch + burst pair. `t` is the absolute start time in the AudioContext.
-// Whistle: a triangle wave that sweeps upward over ~280ms then cuts off.
-// Burst:   a brief filtered-noise crackle (~180ms) right after the whistle
-//          peaks, optionally with a secondary tonal "boom" mixed in.
+// One launch + burst pair shaped like an actual fireworks shell:
+//   1. Long ascending WHISTLE with vibrato — the bottle-rocket rising
+//      ~450ms, pitch sweeping ~600 → ~2200 Hz, modulated by a 6 Hz LFO so
+//      it sounds like "fwheeeee-eeee-eee" rather than a synth ramp.
+//   2. Sharp BANG — a low transient thud + bright impulse noise, peaking
+//      hard then decaying fast (~120ms).
+//   3. Long CRACKLE TAIL — broadband filtered-noise sizzle (~600ms) with
+//      randomly-spaced metallic "ping" tones sprinkled on top, so it
+//      reads as actual sparks falling rather than a single noise burst.
 function _firework(c, t) {
-  // Whistle (rising pitch — the "fwheeeet" before a shell bursts)
-  const whFreq0 = 380 + Math.random() * 280;
-  const whFreq1 = whFreq0 + 600 + Math.random() * 600;
-  const wOsc = c.createOscillator(); wOsc.type = 'triangle';
-  wOsc.frequency.setValueAtTime(whFreq0, t);
-  wOsc.frequency.exponentialRampToValueAtTime(whFreq1, t + 0.28);
+  // ── 1. WHISTLE (rising rocket) ──
+  const whF0 = 540 + Math.random() * 220;
+  const whF1 = whF0 + 1500 + Math.random() * 700;
+  const whDur = 0.42;
+  const wOsc = c.createOscillator(); wOsc.type = 'sine';
+  wOsc.frequency.setValueAtTime(whF0, t);
+  wOsc.frequency.exponentialRampToValueAtTime(whF1, t + whDur);
+
+  // 6 Hz vibrato — gives the whistle the wobbly "fwheeee" quality.
+  const vibratoLFO  = c.createOscillator(); vibratoLFO.type = 'sine';
+  vibratoLFO.frequency.value = 6;
+  const vibratoGain = c.createGain(); vibratoGain.gain.value = 24; // ±24 Hz
+  vibratoLFO.connect(vibratoGain); vibratoGain.connect(wOsc.frequency);
+
   const wGain = c.createGain();
   wGain.gain.setValueAtTime(0.0001, t);
-  wGain.gain.linearRampToValueAtTime(0.18, t + 0.05);
-  wGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.30);
+  wGain.gain.linearRampToValueAtTime(0.20, t + 0.06);
+  wGain.gain.linearRampToValueAtTime(0.16, t + whDur - 0.02);
+  wGain.gain.exponentialRampToValueAtTime(0.0001, t + whDur);
   wOsc.connect(wGain); wGain.connect(masterGain);
-  wOsc.start(t); wOsc.stop(t + 0.32);
+  wOsc.start(t); wOsc.stop(t + whDur + 0.02);
+  vibratoLFO.start(t); vibratoLFO.stop(t + whDur + 0.02);
 
-  // Burst (crackle)
-  const burstAt = t + 0.30;
-  const burstDur = 0.20 + Math.random() * 0.18;
-  const bufLen = Math.floor(c.sampleRate * burstDur);
+  // ── 2. BANG (impulse + low thud) ──
+  const bangAt = t + whDur;
+  const thud = c.createOscillator(); thud.type = 'sine';
+  thud.frequency.setValueAtTime(140, bangAt);
+  thud.frequency.exponentialRampToValueAtTime(40, bangAt + 0.18);
+  const thudG = c.createGain();
+  thudG.gain.setValueAtTime(0.45, bangAt);
+  thudG.gain.exponentialRampToValueAtTime(0.0001, bangAt + 0.20);
+  thud.connect(thudG); thudG.connect(masterGain);
+  thud.start(bangAt); thud.stop(bangAt + 0.22);
+
+  // Bright crack
+  const crackLen = Math.floor(c.sampleRate * 0.05);
+  const crackBuf = c.createBuffer(1, crackLen, c.sampleRate);
+  const crackData = crackBuf.getChannelData(0);
+  for (let i = 0; i < crackLen; i++) {
+    crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 1.2);
+  }
+  const crackSrc = c.createBufferSource(); crackSrc.buffer = crackBuf;
+  const crackHP  = c.createBiquadFilter(); crackHP.type = 'highpass'; crackHP.frequency.value = 1500;
+  const crackG   = c.createGain(); crackG.gain.value = 0.55;
+  crackSrc.connect(crackHP); crackHP.connect(crackG); crackG.connect(masterGain);
+  crackSrc.start(bangAt); crackSrc.stop(bangAt + 0.06);
+
+  // ── 3. CRACKLE TAIL (sizzle + sparkle pings) ──
+  const tailDur = 0.55 + Math.random() * 0.25;
+  const bufLen = Math.floor(c.sampleRate * tailDur);
   const buf = c.createBuffer(1, bufLen, c.sampleRate);
   const data = buf.getChannelData(0);
   for (let i = 0; i < bufLen; i++) {
-    const env = Math.pow(1 - i / bufLen, 1.6);
-    data[i] = (Math.random() * 2 - 1) * env;
+    const env = Math.pow(1 - i / bufLen, 1.4);
+    // Granular noise — short bursts give a "popcorn" crackle texture
+    const grain = (Math.floor(i / 90) % 4 === 0) ? 1 : 0.45;
+    data[i] = (Math.random() * 2 - 1) * env * grain;
   }
-  const src = c.createBufferSource(); src.buffer = buf;
-  const hp  = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
-  const bp  = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200 + Math.random() * 1400; bp.Q.value = 0.9;
-  const bGain = c.createGain(); bGain.gain.value = 0.32;
-  src.connect(hp); hp.connect(bp); bp.connect(bGain); bGain.connect(masterGain);
-  src.start(burstAt); src.stop(burstAt + burstDur + 0.05);
+  const tailSrc = c.createBufferSource(); tailSrc.buffer = buf;
+  const tailHP  = c.createBiquadFilter(); tailHP.type = 'highpass'; tailHP.frequency.value = 1100;
+  const tailG   = c.createGain(); tailG.gain.value = 0.28;
+  tailSrc.connect(tailHP); tailHP.connect(tailG); tailG.connect(masterGain);
+  tailSrc.start(bangAt); tailSrc.stop(bangAt + tailDur + 0.05);
 
-  // Optional low boom — gives the bigger shells a thump
-  if (Math.random() < 0.5) {
-    const boom = c.createOscillator(); boom.type = 'sine';
-    boom.frequency.setValueAtTime(110 + Math.random() * 40, burstAt);
-    boom.frequency.exponentialRampToValueAtTime(55, burstAt + 0.25);
-    const bg = c.createGain();
-    bg.gain.setValueAtTime(0.22, burstAt);
-    bg.gain.exponentialRampToValueAtTime(0.0001, burstAt + 0.30);
-    boom.connect(bg); bg.connect(masterGain);
-    boom.start(burstAt); boom.stop(burstAt + 0.32);
+  // Sparkle pings — randomly-timed high tones over the tail decay
+  const pingCount = 4 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < pingCount; i++) {
+    const pAt = bangAt + 0.05 + Math.random() * (tailDur - 0.1);
+    const pF = 2400 + Math.random() * 2800;
+    const ping = c.createOscillator(); ping.type = 'sine';
+    ping.frequency.value = pF;
+    const pG = c.createGain();
+    pG.gain.setValueAtTime(0.0001, pAt);
+    pG.gain.linearRampToValueAtTime(0.10, pAt + 0.005);
+    pG.gain.exponentialRampToValueAtTime(0.0001, pAt + 0.06);
+    ping.connect(pG); pG.connect(masterGain);
+    ping.start(pAt); ping.stop(pAt + 0.07);
   }
 }
 
@@ -1151,9 +1193,12 @@ const Audio = {
   fireworks(duration = 5.4) {
     const c = getCtx();
     const t0 = c.currentTime;
-    const popCount = Math.max(8, Math.round(duration * 2.6));
+    // ~1 shell every 0.85s. Each shell is whistle (~420ms) + bang + tail
+    // (~600ms) so spacing them out lets the whistle and bang be heard
+    // distinctly rather than blurring into noise.
+    const popCount = Math.max(4, Math.round(duration / 0.85));
     for (let i = 0; i < popCount; i++) {
-      const at = t0 + (i * (duration / popCount)) + Math.random() * 0.22;
+      const at = t0 + (i * (duration / popCount)) + Math.random() * 0.28;
       _firework(c, at);
     }
   },
@@ -1868,22 +1913,17 @@ class Player {
     this._legShoes = [];     // cached for cosmetic recolor
 
     const pantMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a28 });
-    const shirtMat = new THREE.MeshLambertMaterial({ color: 0x444466 });
     const skinMat  = new THREE.MeshLambertMaterial({ color: 0xcca888 });
     // Player starts barefoot — same skin tone. Buying and equipping a
     // collected foot through Fleet Feet recolors this.
     this._defaultShoeMat = new THREE.MeshLambertMaterial({ color: 0xcca888 });
 
-    // Torso (waist → upper chest). Visible when the player tilts the
-    // camera down so they see "their body," not legs floating in space.
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.50, 0.22), shirtMat);
-    torso.position.set(0, 1.20, 0);
-    this._legs.add(torso);
-
-    // Pelvis — small block bridging torso and hips so legs visibly
-    // connect to the body rather than dangling free.
-    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.10, 0.20), pantMat);
-    pelvis.position.set(0, 0.93, 0);
+    // Lower belly / waistline only — small block that bridges the legs
+    // into a single "body." A full torso filled the entire downward view
+    // when the camera pitched down (camera sits inside the chest), so we
+    // skip the chest and keep just the pelvis seam where the legs connect.
+    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.18), pantMat);
+    pelvis.position.set(0, 0.92, 0);
     this._legs.add(pelvis);
 
     for (const side of [-1, 1]) {
@@ -4101,12 +4141,15 @@ class InteractionSystem {
 // ── ui.js ─────────────────────────────────────────────
 
 
-// Simple 2D top-down foot silhouette: oval sole + 5 round toes (big toe
-// noticeably larger). Color is parameterized so each falling foot can pick
-// from a varied palette of skin tones plus brighter celebratory colors.
+// 2D top-down foot silhouette. The body uses a path with proper sole
+// curvature — wide at the ball of the foot near the toes, narrowing
+// through the arch in the middle, widening again at the heel. Combined
+// with the 5 round toes (big toe larger) it reads as a real foot sole.
 function _footSVG(color) {
   return `<svg viewBox="0 0 30 50" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
-    <ellipse cx="15" cy="32" rx="11" ry="16" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+    <path
+      d="M 9.5,12 C 5,14 4,18 5,22 C 6,26 8,28 7,32 C 5.5,36 5,42 8,46 C 11,49 19,49 22,46 C 25,42 24.5,36 23,32 C 22,28 24,26 25,22 C 26,18 25,14 20.5,12 Z"
+      fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
     <circle cx="9"  cy="11" r="4.5" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
     <circle cx="14" cy="7"  r="3.0" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
     <circle cx="18" cy="6"  r="2.6" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
@@ -11394,12 +11437,10 @@ function _drawDynamicMap() {
   dynCtx.rotate(-player.yaw);
   dynCtx.fillStyle = '#44ff88';
   dynCtx.beginPath();
-  // Tip at (0,0) — the player's actual position. Triangle extends BACKWARD
-  // from the tip so the player marker doesn't visually cover whatever
-  // they're standing in front of.
-  dynCtx.moveTo(0, 0);
-  dynCtx.lineTo(13, 30);
-  dynCtx.lineTo(-13, 30);
+  // Triangle centered around the player's position (centroid ≈ origin).
+  dynCtx.moveTo(0, -18);
+  dynCtx.lineTo(13, 16);
+  dynCtx.lineTo(-13, 16);
   dynCtx.closePath();
   dynCtx.fill();
   dynCtx.strokeStyle = 'rgba(0,0,0,0.8)';
@@ -11703,8 +11744,8 @@ function _drawMinimap(elapsed) {
   _mmCtx.translate(px, pz);
   _mmCtx.rotate(-player.yaw);
   _mmCtx.fillStyle = '#44ff88';
-  // Tip at (0,0) is the player's exact position — base extends behind.
-  _mmCtx.beginPath(); _mmCtx.moveTo(0, 0); _mmCtx.lineTo(5, 13); _mmCtx.lineTo(-5, 13); _mmCtx.closePath(); _mmCtx.fill();
+  // Triangle centered around the player's position (centroid ≈ origin).
+  _mmCtx.beginPath(); _mmCtx.moveTo(0, -7); _mmCtx.lineTo(5, 6); _mmCtx.lineTo(-5, 6); _mmCtx.closePath(); _mmCtx.fill();
   _mmCtx.strokeStyle = 'rgba(0,0,0,0.7)';
   _mmCtx.lineWidth = 1.2;
   _mmCtx.stroke();
