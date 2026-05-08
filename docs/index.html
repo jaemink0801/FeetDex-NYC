@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T015454';
+  var BAKED = '20260508T020729';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1040,6 +1040,56 @@ function sweep(freqStart, freqEnd, duration, type = 'sine', gainVal = 0.18, star
   osc.stop(t + duration + 0.01);
 }
 
+// ── Firework helper ───────────────────────────────────────────────────────────
+
+// One launch + burst pair. `t` is the absolute start time in the AudioContext.
+// Whistle: a triangle wave that sweeps upward over ~280ms then cuts off.
+// Burst:   a brief filtered-noise crackle (~180ms) right after the whistle
+//          peaks, optionally with a secondary tonal "boom" mixed in.
+function _firework(c, t) {
+  // Whistle (rising pitch — the "fwheeeet" before a shell bursts)
+  const whFreq0 = 380 + Math.random() * 280;
+  const whFreq1 = whFreq0 + 600 + Math.random() * 600;
+  const wOsc = c.createOscillator(); wOsc.type = 'triangle';
+  wOsc.frequency.setValueAtTime(whFreq0, t);
+  wOsc.frequency.exponentialRampToValueAtTime(whFreq1, t + 0.28);
+  const wGain = c.createGain();
+  wGain.gain.setValueAtTime(0.0001, t);
+  wGain.gain.linearRampToValueAtTime(0.18, t + 0.05);
+  wGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.30);
+  wOsc.connect(wGain); wGain.connect(masterGain);
+  wOsc.start(t); wOsc.stop(t + 0.32);
+
+  // Burst (crackle)
+  const burstAt = t + 0.30;
+  const burstDur = 0.20 + Math.random() * 0.18;
+  const bufLen = Math.floor(c.sampleRate * burstDur);
+  const buf = c.createBuffer(1, bufLen, c.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) {
+    const env = Math.pow(1 - i / bufLen, 1.6);
+    data[i] = (Math.random() * 2 - 1) * env;
+  }
+  const src = c.createBufferSource(); src.buffer = buf;
+  const hp  = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 700;
+  const bp  = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2200 + Math.random() * 1400; bp.Q.value = 0.9;
+  const bGain = c.createGain(); bGain.gain.value = 0.32;
+  src.connect(hp); hp.connect(bp); bp.connect(bGain); bGain.connect(masterGain);
+  src.start(burstAt); src.stop(burstAt + burstDur + 0.05);
+
+  // Optional low boom — gives the bigger shells a thump
+  if (Math.random() < 0.5) {
+    const boom = c.createOscillator(); boom.type = 'sine';
+    boom.frequency.setValueAtTime(110 + Math.random() * 40, burstAt);
+    boom.frequency.exponentialRampToValueAtTime(55, burstAt + 0.25);
+    const bg = c.createGain();
+    bg.gain.setValueAtTime(0.22, burstAt);
+    bg.gain.exponentialRampToValueAtTime(0.0001, burstAt + 0.30);
+    boom.connect(bg); bg.connect(masterGain);
+    boom.start(burstAt); boom.stop(burstAt + 0.32);
+  }
+}
+
 // ── Exported sound functions ──────────────────────────────────────────────────
 
 const Audio = {
@@ -1094,29 +1144,19 @@ const Audio = {
     tone(f * 2,    0.11, 'triangle', 0.12);
   },
 
-  // Rain / shower sound for the celebratory feet rain. Filtered white-noise
-  // burst with a soft fade-in/out over `duration` seconds.
+  // Fireworks sound for celebrations. Stages 6-12 individual "pops" over
+  // the duration: each pop is a quick whistle (pitch sweep) followed by a
+  // short noisy crackle, like a firework shell launching and bursting.
+  // The whole thing is mixed under masterGain so it respects the user's
+  // volume setting.
   rainShower(duration = 3.5) {
     const c = getCtx();
-    const t = c.currentTime;
-    const bufLen = Math.floor(c.sampleRate * duration);
-    const buf = c.createBuffer(1, bufLen, c.sampleRate);
-    const data = buf.getChannelData(0);
-    const fadeSamples = Math.floor(c.sampleRate * 0.3);
-    for (let i = 0; i < bufLen; i++) {
-      const env = Math.min(1, i / fadeSamples) * Math.min(1, (bufLen - i) / fadeSamples);
-      // Slight density modulation for "patter" texture
-      const wobble = 0.85 + 0.15 * Math.sin(i * 0.0007);
-      data[i] = (Math.random() * 2 - 1) * env * wobble;
+    const t0 = c.currentTime;
+    const popCount = Math.max(5, Math.round(duration * 2.4));
+    for (let i = 0; i < popCount; i++) {
+      const at = t0 + (i * (duration / popCount)) + Math.random() * 0.18;
+      _firework(c, at);
     }
-    const src    = c.createBufferSource(); src.buffer = buf;
-    const hp     = c.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 900;
-    const peaker = c.createBiquadFilter(); peaker.type = 'peaking'; peaker.frequency.value = 4500; peaker.Q.value = 1.5; peaker.gain.value = 4;
-    const g      = c.createGain(); g.gain.value = 0.22;
-    src.connect(hp); hp.connect(peaker); peaker.connect(g); g.connect(masterGain);
-    src.start(t); src.stop(t + duration + 0.1);
-    // Soft splash thud at start
-    tone(80, 0.25, 'sine', 0.18, 0);
   },
 
   gameWin() {
@@ -3741,16 +3781,54 @@ class InteractionSystem {
 // ── ui.js ─────────────────────────────────────────────
 
 
-// Inline 2D foot silhouette used by the celebration rain. Stored once at
-// module scope so spawnFeetRain doesn't rebuild the same string per drop.
-const FOOT_SVG = `<svg viewBox="0 0 60 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
-  <path d="M 30 95 C 12 95, 5 78, 8 58 C 10 44, 14 32, 18 24 L 18 18 C 18 11, 22 7, 28 7 L 32 7 C 38 7, 42 13, 40 19 C 44 25, 50 38, 52 52 C 54 72, 50 95, 30 95 Z" fill="#ffd6b3" stroke="#7a4626" stroke-width="2.2"/>
-  <circle cx="28" cy="9"  r="6"   fill="#ffd6b3" stroke="#7a4626" stroke-width="2"/>
-  <circle cx="20" cy="13" r="4.4" fill="#ffd6b3" stroke="#7a4626" stroke-width="2"/>
-  <circle cx="14" cy="19" r="3.6" fill="#ffd6b3" stroke="#7a4626" stroke-width="2"/>
-  <circle cx="10" cy="26" r="3.0" fill="#ffd6b3" stroke="#7a4626" stroke-width="2"/>
-  <circle cx="9"  cy="33" r="2.5" fill="#ffd6b3" stroke="#7a4626" stroke-width="2"/>
-  <ellipse cx="30" cy="55" rx="9" ry="14" fill="#f5b894" opacity="0.5"/>
+// Pixelated 2D foot — a top-down sole made of square pixels. Renders the
+// same on every system (no emoji font dependency) and reads as a foot at
+// any size. shape-rendering:crispEdges keeps the pixels sharp.
+const FOOT_SVG = `<svg viewBox="0 0 8 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" style="width:100%;height:100%;display:block;">
+  <g fill="#ffc99a">
+    <rect x="2" y="3" width="1" height="1"/>
+    <rect x="3" y="3" width="1" height="1"/>
+    <rect x="4" y="3" width="1" height="1"/>
+    <rect x="5" y="3" width="1" height="1"/>
+    <rect x="2" y="2" width="1" height="1"/>
+    <rect x="3" y="1" width="1" height="1"/>
+    <rect x="1" y="4" width="1" height="1"/>
+    <rect x="2" y="4" width="1" height="1"/>
+    <rect x="3" y="4" width="1" height="1"/>
+    <rect x="4" y="4" width="1" height="1"/>
+    <rect x="5" y="4" width="1" height="1"/>
+    <rect x="6" y="4" width="1" height="1"/>
+    <rect x="1" y="5" width="1" height="1"/>
+    <rect x="2" y="5" width="1" height="1"/>
+    <rect x="3" y="5" width="1" height="1"/>
+    <rect x="4" y="5" width="1" height="1"/>
+    <rect x="5" y="5" width="1" height="1"/>
+    <rect x="6" y="5" width="1" height="1"/>
+    <rect x="1" y="6" width="1" height="1"/>
+    <rect x="2" y="6" width="1" height="1"/>
+    <rect x="3" y="6" width="1" height="1"/>
+    <rect x="4" y="6" width="1" height="1"/>
+    <rect x="5" y="6" width="1" height="1"/>
+    <rect x="6" y="6" width="1" height="1"/>
+    <rect x="2" y="7" width="1" height="1"/>
+    <rect x="3" y="7" width="1" height="1"/>
+    <rect x="4" y="7" width="1" height="1"/>
+    <rect x="5" y="7" width="1" height="1"/>
+    <rect x="6" y="7" width="1" height="1"/>
+    <rect x="2" y="8" width="1" height="1"/>
+    <rect x="3" y="8" width="1" height="1"/>
+    <rect x="4" y="8" width="1" height="1"/>
+    <rect x="5" y="8" width="1" height="1"/>
+    <rect x="3" y="9" width="1" height="1"/>
+    <rect x="4" y="9" width="1" height="1"/>
+    <rect x="5" y="9" width="1" height="1"/>
+    <rect x="3" y="10" width="1" height="1"/>
+    <rect x="4" y="10" width="1" height="1"/>
+  </g>
+  <g fill="#a96e3f">
+    <rect x="2" y="2" width="1" height="1" opacity="0.35"/>
+    <rect x="6" y="6" width="1" height="1" opacity="0.35"/>
+  </g>
 </svg>`;
 
 // ── Typewriter voice helpers ──────────────────────────────────────────────────
@@ -3878,48 +3956,52 @@ function _injectCSS() {
 // the random NONE_LINES chatter. Half teach a budgeting/business/marketing
 // concept; half deliver an NYC fun-fact rooted in business or finance.
 // Reaching the last line of any of these triggers a 20g talk-mission reward.
+// Mission-NPC dialogue scripts. Stored as PLAIN TEXT — the dialogue panel
+// uses textContent for the typewriter, so HTML tags would render literally.
+// Key terms are written in UPPERCASE for emphasis instead. Each NPC's topic
+// is tied to the building they're in (cafe → cafe economics, etc.).
 const MISSION_NPC_SCRIPTS = {
-  // Times Square — opportunity cost via billboards
+  // Times Square — billboards → opportunity cost
   npc_martin_ts: [
     "Hey, new face! Welcome to Times Square. See all those huge glowing billboards?",
     "Each one costs more money for ONE HOUR than my apartment costs for a whole month. Companies fight to put their ad up there.",
-    "Here's a lesson about money: if a company spends on a Coca-Cola billboard, that money is gone — they can't also spend it on a Pepsi billboard. Choosing one means saying no to the other.",
-    "Saying no to other choices when you pick something is called <b>opportunity cost</b>. Same with your gold — every tool you buy is a tool you can't buy. So pick what helps you most.",
+    "Here's a money lesson: if a company spends on a Coca-Cola billboard, that money is gone — they can't also use it on a Pepsi billboard. Choosing one means saying no to the other.",
+    "Saying no to other choices when you pick something is called OPPORTUNITY COST. Same with your gold — every tool you buy is a tool you can't buy. So pick what helps you most.",
   ],
-  // Office worker — gross margin
+  // Office (accountant) — profit
   npc_grace_office: [
     "Sorry, eating quick — I do bookkeeping for a little shop down the block.",
     "Here's a thing every shop owner has to know: how much it costs you to MAKE something, versus how much you sell it for.",
-    "Say you sell a coffee for $5. The beans, cup, and lid cost you $1.50. So you keep $3.50 from that sale. That leftover money is called your <b>profit</b>.",
+    "Say you sell a coffee for $5. The beans, cup, and lid cost you $1.50. So you keep $3.50 from that sale. That leftover money is called PROFIT.",
     "If you only keep a tiny piece of every dollar that comes in, you're barely making money. Watching this number is how shops stay in business.",
   ],
-  // Cafe — NYC fun fact: the NYSE opening bell as marketing theatre
+  // Cafe (barista) — loss leader pricing
   npc_lucy_cafe: [
     "Espresso? You look like you need one.",
-    "Cool New York fact: the giant Stock Exchange building has rung a little bell every weekday since 1903 to mark the start of trading.",
-    "It's just a bell. But cameras film it every single morning. Celebrities, charities, even cartoon characters have rung it.",
-    "Why does it matter? Free attention. Millions of people watch a tiny ceremony and remember the company. That's <b>advertising</b> at its smartest — give people something fun to watch and they'll think of you.",
+    "See how we sell drip coffee for two bucks? We barely make any money on each cup. But check out the muffin display — that's where the real money is.",
+    "It's called a LOSS LEADER. Sell one thing cheap to pull people inside. Once you're here, you grab a $7 latte AND a $4 muffin. The cheap coffee paid for itself ten times over.",
+    "Smart shops everywhere use this trick — get you through the door with a deal, then make their money on what you buy next.",
   ],
-  // Diner — break-even point
+  // Diner (owner) — break-even
   npc_hassan_diner: [
     "Welcome, sit anywhere — coffee's on the house, friend.",
     "Thirty-one years I've run this diner. Every morning when I unlock the door, I'm already losing money: rent, electricity, eggs, my cousin's pay.",
-    "By eleven A.M., after I sell about fourteen breakfast plates, I've finally earned back what I spent that morning. That magic number — fourteen plates — is called <b>breaking even</b>.",
+    "By eleven A.M., after I sell about fourteen breakfast plates, I've finally earned back what I spent that morning. That magic number — fourteen plates — is called BREAKING EVEN.",
     "Once you know your number, you stop panicking on slow days. Just count plates. Past fourteen, every one is real money in my pocket.",
   ],
-  // Museum — NYC fun fact: Macy's parade as marketing
+  // Museum (docent) — gift shop economics
   npc_mei_museum: [
     "First time here at the museum?",
-    "Here's a fun New York story — you know the giant Macy's Thanksgiving Day Parade with the balloons? It started in 1924, but not just for the holiday.",
-    "Macy's department store wanted shoppers in their store the next morning. So they put on a free parade — families come watch, kids see all the toys floating by, parents bring the kids back to buy them.",
-    "Smart <b>advertising</b> isn't a flashy logo. It's giving people a reason to come visit, year after year, for a hundred years.",
+    "Cool fact about big museums: most don't really make their money from ticket sales. They make it in the GIFT SHOP.",
+    "A poster of a famous painting costs maybe four bucks to print. We sell it for thirty. That huge gap between cost and price is called a MARKUP — and it works because the art is what drew you in.",
+    "Same trick at sports stadiums, theme parks, concerts. The thing you came for isn't where the money is made. It's the souvenirs on the way out.",
   ],
-  // Gallery — branding
+  // Gallery (curator) — branding
   npc_carter_gallery: [
     "Welcome. Here for the art?",
     "Funny thing about paintings — half the price is who PAINTED it, not the painting itself.",
-    "Same canvas, same paint, but if a famous name signed it? Ten times the price. People aren't really buying the art. They're buying the right to say they own a famous person's work.",
-    "That's what we call a <b>brand</b> — a name people trust enough to pay extra for. Build one, and your work sells before you even finish it.",
+    "Same canvas, same paint. But if a famous name signed it? Ten times the price. People aren't really buying the art. They're buying the right to say they own a famous person's work.",
+    "That's what we call a BRAND — a name people trust enough to pay extra for. Build one, and your work sells before you even finish it.",
   ],
 };
 
@@ -10154,22 +10236,24 @@ function _onBuyBooster(id) {
         "Good luck out there, kid. Go discover all you can in the feet world."
       );
       _afterTipCallback = () => {
-        tutorial.finish();
-        ui.showTutorialComplete();
-        Audio.gameWin();
-        // After the 4.2s celebration overlay clears, fire the held-back
-        // Sprint Feet how-to tip, then introduce missions.
-        setTimeout(() => {
-          _showBoosterTip('sprint_feet');
+        // Order: Sprint Feet tip → missions intro → reveal missions →
+        // THEN the Tutorial Complete celebration (the actual finale).
+        _showBoosterTip('sprint_feet');
+        _afterTipCallback = () => {
+          ui.openFeetGodDialogue(
+            "Optional missions have appeared in the corner — three at a time. " +
+            "Some send you searching for a character in a landmark; others ask you to chat with locals who'll teach you about business and the city. " +
+            "They're side gold, not required to win — skip any you don't feel like. Finish one and a fresh mission slides in."
+          );
           _afterTipCallback = () => {
-            ui.openFeetGodDialogue(
-              "Optional <b>missions</b> have appeared in the corner — three at a time. " +
-              "Some send you searching for a <b>character</b> in a landmark; others ask you to <b>chat with locals</b> who'll teach you about business and the city. " +
-              "They're side gold, not required to win — skip any you don't feel like. Finish one and a fresh mission slides in."
-            );
-            _afterTipCallback = () => { _revealMissions(); };
+            _revealMissions();
+            // Now that the player has all the systems, end the tutorial
+            // and fire the celebration as the proper finale.
+            tutorial.finish();
+            ui.showTutorialComplete();
+            Audio.gameWin();
           };
-        }, 4500);
+        };
       };
     }, 350);
     return;
@@ -10578,29 +10662,12 @@ const _MAP_NPC_COLORS = { common:'#6699cc', rare:'#55aa55', epic:'#aa55cc', myth
 // Per-building distinct colors so the player can match a dot on the map
 // back to its name in the legend. Hues span the wheel; saturated values
 // stay readable on the dark map background.
-// Renamed from BUILDING_COLORS to avoid colliding with world.js's pre-existing
-// constant (the bundle concatenates everything into one scope, so duplicate
-// `const` names became a SyntaxError).
-const MAP_BUILDING_COLORS = {
-  'Cafe':         '#FF3B3B',  // bright red
-  'Diner':        '#FF8C00',  // dark orange
-  'Gym':          '#39FF14',  // neon green
-  'Office':       '#1E90FF',  // dodger blue
-  'Bar':          '#FF1493',  // deep pink
-  'Gallery':      '#FFD700',  // gold
-  'Laundry':      '#00FFFF',  // cyan
-  'Pharmacy':     '#9ACD32',  // yellow-green
-  'Hotel Lobby':  '#9370DB',  // medium purple
-  'KFC':          '#FFA07A',  // light salmon
-  'Museum':       '#48D1CC',  // medium turquoise
-  'Barbershop':   '#A52A2A',  // brown
-  // Shop + Bodega are rendered as named landmarks (Morton's, Fleet Feet)
-  // and don't appear in the generic-building loop.
-};
-const BUILDING_COLOR_FALLBACK = '#bbbbbb';
-function _buildingColor(name) {
-  return MAP_BUILDING_COLORS[name] ?? BUILDING_COLOR_FALLBACK;
-}
+// Every generic accessible building shares ONE color (yellow) so the player
+// reads the map as "yellow dot = a place I can walk into". Landmarks and
+// the two hero shops still get their own colors via _MAP_LMS — only the
+// 12 generic interiors here are uniform.
+const ACCESSIBLE_YELLOW = '#FFE060';
+function _buildingColor() { return ACCESSIBLE_YELLOW; }
 
 // Radar blink helper — flashes ON for ~250ms, OFF for ~150ms (≈2.5 Hz)
 // so the booster reads as a "live" radar ping rather than steady dots.
@@ -10691,24 +10758,16 @@ function _drawMapLabel(ctx, text, x, y, color, fontPx, placed) {
     ctx.fillText(text, cx, cy);
   };
 
-  // Spiral of candidate offsets from the anchor. Generated dynamically so
-  // we cover many rings — important on a dense map where the first 4 rings
-  // were running out of free spots and labels were ending up on top of
-  // each other.
+  // Axis-aligned candidate offsets only — labels sit directly above,
+  // below, left, or right of the marker, never diagonally. The leader
+  // line is therefore guaranteed to be horizontal or vertical.
   const STEP_Y = h + 3;
   const STEP_X = h + 3;
   const candidates = [[0, 0]];
-  for (let ring = 1; ring <= 8; ring++) {
-    // Vertical above + below
+  for (let ring = 1; ring <= 12; ring++) {
     candidates.push([0, -STEP_Y * ring], [0, STEP_Y * ring]);
-    // Side, with progressively more horizontal spread per ring
-    const sx = w / 2 + STEP_X * Math.min(ring, 3);
+    const sx = w / 2 + STEP_X * ring;
     candidates.push([-sx, 0], [sx, 0]);
-    // Diagonals at various offsets
-    for (let v = 1; v <= ring; v++) {
-      candidates.push([-sx, -STEP_Y * v], [sx, -STEP_Y * v]);
-      candidates.push([-sx,  STEP_Y * v], [sx,  STEP_Y * v]);
-    }
   }
   for (const [dx, dy] of candidates) {
     const cx = x + dx, cy = y + dy;
@@ -10799,13 +10858,17 @@ function _drawStaticMap() {
     if (_isWater(a) !== _isWater(b)) return _isWater(a) ?  1 : -1; // water last
     return (b.hw + b.hd) - (a.hw + a.hd);
   });
+  // Only HERO shops get labels printed on the map — everything else
+  // (Empire State, Chrysler, Grand Central, 1WTC, Times Square, Central
+  // Park, Brooklyn Bridge, Lower Manhattan, Columbus Circle) lives in the
+  // side legend keyed by color. Frees up huge label real estate for the
+  // dense building/subway labels in midtown.
   for (const lm of _byImportance) {
+    if (!_isHero(lm)) continue;
     const [cx, cz] = _wm(lm.wx, lm.wz);
-    if (_isHero(lm)) {
-      _drawMapLabel(staticCtx, lm.label, cx, cz, '#FFD700', 18, placedLabels);
-    } else {
-      _drawMapLabel(staticCtx, lm.label, cx, cz, '#ffffff', 14, placedLabels);
-    }
+    // Marker is 17px radius + 4px gold ring + label half-height (~13).
+    // Anchor the label 48px below so it clears the marker entirely.
+    _drawMapLabel(staticCtx, lm.label, cx, cz + 48, '#FFD700', 18, placedLabels);
   }
 
   // Enterable buildings — colored dot + name label drawn directly on the
@@ -10870,10 +10933,16 @@ function _drawStaticMap() {
     _mapStationHits.push({ st, cx: sx, cy: sz, r: 18 });
     placedLabels.push({ x: sx - 14, y: sz - 14, w: 28, h: 28 });
   }
-  // Pass 2: street-name labels in subway blue
+  // Pass 2: street-name labels in subway blue. 34TH ST sits in the busy
+  // midtown corridor between ESB and Central Park, so it gets a forced
+  // anchor BELOW the station dot to keep it away from those landmarks.
   for (const st of stations) {
     const [sx, sz] = _wm(st.x, st.z);
-    _drawMapLabel(staticCtx, st.name, sx, sz, '#88ccff', 13, placedLabels);
+    if (st.name === '34TH ST') {
+      _drawMapLabel(staticCtx, st.name, sx, sz + 22, '#88ccff', 13, placedLabels);
+    } else {
+      _drawMapLabel(staticCtx, st.name, sx, sz, '#88ccff', 13, placedLabels);
+    }
   }
 }
 
@@ -10975,23 +11044,32 @@ function _renderMapLegend() {
   const el = document.getElementById('map-legend');
   if (!el) return;
   const rows = [];
-  // With every name now drawn directly on the map, the legend only needs
-  // to call out the symbols a player can't read at a glance.
   rows.push('<h4>KEY</h4>');
+  // Universal markers first — these symbols repeat across the map and
+  // aren't named individually, so the player needs the legend to decode.
   rows.push(
     `<div class="lg-row">` +
-    `  <span class="lg-swatch circle" style="background:#FFD700; box-shadow:0 0 6px rgba(255,215,0,.8);"></span>` +
-    `  <span class="lg-text">★ Shops (Morton's, Fleet Feet)</span>` +
+    `  <span class="lg-swatch circle" style="background:${ACCESSIBLE_YELLOW};"></span>` +
+    `  <span class="lg-text">Accessible building</span>` +
     `</div>`,
     `<div class="lg-row">` +
     `  <span class="lg-swatch circle" style="background:#0033CC;"></span>` +
     `  <span class="lg-text">Subway station</span>` +
     `</div>`,
-    `<div class="lg-row">` +
-    `  <span class="lg-swatch circle" style="background:#888;"></span>` +
-    `  <span class="lg-text">Other accessible building</span>` +
-    `</div>`,
   );
+
+  // Color-coded LANDMARKS (the only color-coded markers on the map now —
+  // each landmark gets its own distinct hue so the legend is meaningful).
+  rows.push('<h4 style="margin-top:10px;">LANDMARKS</h4>');
+  for (const lm of _MAP_LMS) {
+    if (/River|Fence|Roosevelt/i.test(lm.label)) continue;  // skip water/boundary
+    rows.push(
+      `<div class="lg-row">` +
+      `  <span class="lg-swatch" style="background:${lm.color};"></span>` +
+      `  <span class="lg-text">${lm.label}</span>` +
+      `</div>`,
+    );
+  }
 
   if (feetdex.hasBooster('radar')) {
     rows.push('<h4 style="margin-top:10px;">RADAR</h4>');
@@ -11012,7 +11090,7 @@ function _renderMapLegend() {
   }
   if (feetdex.hasBooster('ancient_tracker')) {
     rows.push(
-      `<div class="lg-row">` +
+      `<div class="lg-row" style="margin-top:8px;">` +
       `  <span class="lg-swatch" style="background:#FFD700; clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);"></span>` +
       `  <span class="lg-text">Ancient One (Tracker)</span>` +
       `</div>`,
