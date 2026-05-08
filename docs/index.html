@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T053243';
+  var BAKED = '20260508T055029';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -524,7 +524,7 @@
       display:none; z-index:42; padding:10px 18px;
       background:rgba(0,0,0,.55); border:2px solid rgba(255,80,80,.55);
       border-radius:10px; box-shadow:0 4px 22px rgba(0,0,0,.55); }
-    #combat-hearts.active { display:flex; gap:6px; }
+    #combat-hearts.active { display:flex; gap:6px; flex-wrap:wrap; max-width:90vw; justify-content:center; }
     .cb2-heart { font-size:32px; line-height:1; text-shadow:0 0 6px rgba(0,0,0,.7); }
     .cb2-full  { color:#ff3344; }
     .cb2-half  { color:#ff3344; opacity:.55; }
@@ -1161,6 +1161,15 @@ const Audio = {
   // older name. Both produce the firework volley.
   rainShower(duration = 3.6) { this.fireworks(duration); },
 
+  // Lightsaber swing — quick swooping sweep with a thin metallic harmonic
+  // ride on top. Quick attack envelope, ~180ms, fits the sword's faster
+  // attack cadence without becoming droning.
+  lightsaberSwing() {
+    sweep(820, 220, 0.16, 'sawtooth', 0.20, 0);    // descending swoosh
+    sweep(440, 180, 0.16, 'triangle', 0.10, 0.01); // octave ride
+    tone(1800, 0.05, 'sine', 0.10, 0);             // crispy tip flick
+  },
+
   gameWin() {
     // 4-note cheerful jingle: C E G C(high)
     [261.63, 329.63, 392.00, 523.25].forEach((f, i) => tone(f, 0.15, 'sine', 0.2, i * 0.13));
@@ -1377,7 +1386,7 @@ const MISSIONS_ACTIVE_MAX = 3;
 const MISSION_POOL = [
   // ── FIND-CHARACTER (target = feetId; reveal omits the name) ────────────
   { id: 'find_grand_central', type: 'find', target: 'common_samurai',
-    label: 'A figure trains alone in the shadows of Grand Central.',
+    label: 'A wandering figure waits inside Grand Central Terminal.',
     reward: 'mystery' },
   { id: 'find_1wtc',          type: 'find', target: 'common_50shades',
     label: 'Someone in a sharp suit paces the One World Trade lobby.',
@@ -1798,6 +1807,50 @@ class Player {
       else             this._rightHip = hip;
     }
 
+    // ── Lightsaber (visible when the Sword booster is owned) ──
+    // Anchored to the camera lower-right like a hand-held weapon. Hidden
+    // by default; setLightsaberVisible(true) reveals it. swingLightsaber()
+    // plays a quick swing animation + audio cue.
+    this._saber = new THREE.Group();
+    this._saber.position.set(0.32, -0.30, -0.55);
+    this._saber.rotation.set(-0.30, 0.15, 0.05);
+    camera.add(this._saber);
+
+    const hilt = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.025, 0.030, 0.18, 12),
+      new THREE.MeshLambertMaterial({ color: 0x202020 }),
+    );
+    hilt.rotation.x = Math.PI / 2;     // lay along -Z (forward)
+    hilt.position.z = 0;
+    this._saber.add(hilt);
+
+    // Saber blade — long emissive cylinder. Built so its base is at the
+    // hilt's tip and it extends forward (–Z), giving a hand-held look.
+    const bladeMat = new THREE.MeshStandardMaterial({
+      color: 0xddffff, emissive: 0x55ddff, emissiveIntensity: 1.2,
+      transparent: true, opacity: 0.92,
+    });
+    const blade = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.018, 0.018, 1.2, 12),
+      bladeMat,
+    );
+    blade.rotation.x = Math.PI / 2;
+    blade.position.set(0, 0, -0.69);
+    this._saber.add(blade);
+
+    // Soft halo around the blade for the glow look
+    const halo = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.045, 1.2, 12),
+      new THREE.MeshBasicMaterial({ color: 0x88eeff, transparent: true, opacity: 0.25 }),
+    );
+    halo.rotation.x = Math.PI / 2;
+    halo.position.set(0, 0, -0.69);
+    this._saber.add(halo);
+
+    this._saber.visible = false;
+    this._saberSwingT  = 0;       // 0..1 progress of current swing
+    this._saberRestRotX = -0.30;  // resting tilt — the value set on this._saber.rotation.x above
+
     window.addEventListener('keydown', e => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this._sprint = true;
     });
@@ -1814,6 +1867,7 @@ class Player {
     this._move(dt, solids);
     this._updateCamera();
     this._animateLegs(dt);
+    this._animateLightsaber(dt);
   }
 
   // Swing the leg pivots based on horizontal velocity. Faster gait when
@@ -1833,6 +1887,37 @@ class Player {
     const swing = Math.sin(this._animTime) * (sprinting ? 0.7 : 0.5);
     this._leftHip.rotation.x  =  swing;
     this._rightHip.rotation.x = -swing;
+  }
+
+  // Show / hide the lightsaber. Called from main.js when sword is bought
+  // and on game-state transitions where weapons should not display.
+  setLightsaberVisible(on) {
+    if (this._saber) this._saber.visible = !!on;
+  }
+
+  // Trigger a quick swing animation on the lightsaber. Driven from
+  // CombatEncounter.playerAttack() each time the player connects.
+  swingLightsaber() {
+    if (!this._saber) return;
+    this._saberSwingT = 1.0;        // animation timer counts down to 0
+  }
+
+  _animateLightsaber(dt) {
+    if (!this._saber || !this._saber.visible) return;
+    if (this._saberSwingT > 0) {
+      this._saberSwingT = Math.max(0, this._saberSwingT - dt * 4.5);
+      const phase = 1 - this._saberSwingT;        // 0..1 forward
+      const swing = Math.sin(phase * Math.PI);    // 0 → 1 → 0
+      // Sweep right-to-left horizontally + tip forward thrust
+      this._saber.rotation.z = this._saberRestRotX + swing *  0.95;
+      this._saber.rotation.y = 0.15 + swing * -0.6;
+      this._saber.position.z = -0.55 - swing * 0.18;
+    } else {
+      // Idle — drift back to rest
+      this._saber.rotation.z *= 0.85;
+      this._saber.rotation.y += (0.15 - this._saber.rotation.y) * 0.15;
+      this._saber.position.z += (-0.55 - this._saber.position.z) * 0.15;
+    }
   }
 
   // Recolor the FP shoes for a cosmetic. Pass null to revert to default.
@@ -2135,7 +2220,9 @@ const SPECIAL_DEFS = [
   // Messi near Central Park (north zone)
   { name: 'Leo Messi',    pos: [ 20, 0,  45], rarity: 'mythic', feetId: 'mythic_messi',      minigame: 'rps', bodyScale: 0.97 },
   // The Ancient One — dead end of a hidden 2-unit alley in the far NW outskirts
-  { name: 'The Ancient One', pos: [-117, 0, -228], rarity: 'secret', feetId: 'secret_rexey',     minigame: null,  bodyScale: 1.00 },
+  // Placed deep behind both maze partitions — invisible from the alley
+  // entrance. Player must zig-zag past both interior walls to find them.
+  { name: 'The Ancient One', pos: [-115.5, 0, -234], rarity: 'secret', feetId: 'secret_rexey', minigame: null, bodyScale: 1.00 },
   // One named character per accessible building. Each interior is at world
   // x=INTERIOR_BASE_X + (3 + interiorIdx) * 200 with z near 0:
   //   Cafe=2600, Diner=2800, Gym=3000, Office=3200, Shop=3400, Bar=3600,
@@ -3708,8 +3795,13 @@ class CombatEncounter {
     this._flashScreen('rgba(255,255,80,0.18)');
     this._renderNpcBar();
 
-    // ── Hit feedback: punch SFX, NPC hurt SFX, scale-pulse, recoil push ──
-    try { Audio.playerHit(); } catch (_) {}
+    // ── Hit feedback: SFX, NPC hurt SFX, scale-pulse, recoil push ──
+    if (this._hasSword) {
+      try { Audio.lightsaberSwing(); } catch (_) {}
+      this._player?.swingLightsaber?.();
+    } else {
+      try { Audio.playerHit(); } catch (_) {}
+    }
     try { Audio.npcHurt();   } catch (_) {}
     this._hurtFlashUntil = now + 220;
     // Push NPC away from player along the hit direction (decays over a few frames)
@@ -3767,10 +3859,12 @@ class CombatEncounter {
 
   _renderHearts() {
     if (!this._heartsEl) return;
-    // 10 hearts, each = 10 HP. Display: full / half / empty.
-    const hp = this._playerHP;
+    // Hearts scale with max HP so armor's doubled HP shows as 20 hearts
+    // (10 hearts/100 HP). Each heart = 10 HP, displayed full/half/empty.
+    const hp     = this._playerHP;
     const hearts = [];
-    for (let i = 0; i < 10; i++) {
+    const total  = Math.max(10, Math.ceil((this._playerMax || 100) / 10));
+    for (let i = 0; i < total; i++) {
       const v = hp - i * 10;
       const cls = v >= 10 ? 'full' : v >= 5 ? 'half' : 'empty';
       hearts.push(`<span class="cb2-heart cb2-${cls}">&#10084;</span>`);
@@ -8540,14 +8634,26 @@ function buildInteriors(scene, _SO) {
 
 function buildSecretAlley(scene, solidObjects) {
   // Walls run north-south. Entrance faces +z (south); dead-end at the north (-z).
-  // Gap centered on x=-117, between two flanking dark-brick slabs.
+  // The corridor is split by TWO interior partition walls so the player
+  // must turn one corner, then turn the opposite way, to reach The
+  // Ancient One — making this a small zig-zag maze rather than a straight
+  // shot. Line-of-sight from the entrance is broken twice.
   const darkMat = new THREE.MeshLambertMaterial({ color: 0x2a1b10 });
   const colliders = [];
 
   const slabs = [
-    { cx: -123,   cz: -228, w: 8, h: 68, d: 16 }, // left wall   x=[-127,-119]  z=[-236,-220]
-    { cx: -111.5, cz: -228, w: 7, h: 68, d: 16 }, // right wall  x=[-115,-108]  z=[-236,-220]
-    { cx: -134,   cz: -228, w: 8, h: 54, d: 16 }, // left flank  x=[-138,-130]
+    // Outer walls (long north-south slabs flanking the corridor).
+    { cx: -123,   cz: -228, w: 8, h: 68, d: 16 }, // left outer   x=[-127,-119]
+    { cx: -111.5, cz: -228, w: 7, h: 68, d: 16 }, // right outer  x=[-115,-108]
+    { cx: -134,   cz: -228, w: 8, h: 54, d: 16 }, // left flank   x=[-138,-130]
+
+    // Interior partition #1 — blocks the EAST half of the corridor at
+    // z=-225, forcing the player to slip past on the west side.
+    { cx: -116.5, cz: -225, w: 3, h: 56, d: 1.4 },
+
+    // Interior partition #2 — blocks the WEST half at z=-231, forcing
+    // the player to swing back east to keep going north.
+    { cx: -117.5, cz: -231, w: 3, h: 56, d: 1.4 },
   ];
   for (const s of slabs) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(s.w, s.h, s.d), darkMat);
@@ -9004,9 +9110,14 @@ function buildGrandCentralExterior(scene, solidObjects) {
     bx(0xc8bc98, wx, 21, 5.05, 5, 1.2, 0.25);          // arch keystone top
   }
 
-  // Entrance steps on the north face (where the door is)
+  // Entrance steps on the north face (where the door is). Steps now LEAD
+  // UP to the doorway from the street side: the outermost step (farthest
+  // from the door, biggest z) is the lowest, and the topmost step (right
+  // at the door threshold, z=5) is the highest.
   for (let s = 0; s < 4; s++) {
-    bx(0xc0b498, 0, s * 0.35 + 0.18, 5 + s * 0.5, 14, 0.35, 1);
+    bx(0xc0b498, 0, s * 0.35 + 0.18, 6.5 - s * 0.5, 14, 0.35, 1);
+    // s=0: z=6.5, y=0.18 (far  + low)
+    // s=3: z=5.0, y=1.23 (door + highest)
   }
 
   // Famous Tiffany clock — circular, mounted above the entrance
@@ -10698,7 +10809,7 @@ const _MAP_LMS = [
   // name in the side legend at a glance.
   { wx:  0, wz:  5, hw:14, hd:12, color:'#FF4444', label:'Empire State' },     // red
   { wx: 40, wz: 27, hw:12, hd:12, color:'#00BFFF', label:'Chrysler' },         // cyan
-  { wx:  0, wz:-160, hw:14, hd:12, color:'#9D4EDD', label:'1WTC' },            // purple
+  { wx:  0, wz:-160, hw:14, hd:12, color:'#9D4EDD', label:'World Trade Center' }, // purple
   { wx: 10, wz:-25, hw:18, hd:12, color:'#FFD700', label:'Times Square' },     // gold
   { wx:-15, wz: 60, hw:22, hd:18, color:'#2E8B57', label:'Central Park' },     // sea green
   { wx:-60, wz:-80, hw:10, hd:32, color:'#FF6347', label:'Brooklyn Bridge' },  // tomato
@@ -11461,8 +11572,9 @@ function _updateCompassPointer() {
 }
 
 // ── Ancient Tracker compass ──────────────────────────────────────────────────
-// World position of The Ancient One's alley dead-end (matches buildSecretAlley)
-const _ANCIENT_POS = { x: -117, z: -228 };
+// World position of The Ancient One's hiding spot (matches the SPECIAL_DEFS
+// entry in npc.js and the maze layout in buildSecretAlley).
+const _ANCIENT_POS = { x: -115.5, z: -234 };
 function _updateTrackerCompass() {
   if (!feetdex.hasBooster('ancient_tracker') || feetdex.has('secret_rexey')) {
     ui.updateTrackerCompass(false);
@@ -11546,6 +11658,13 @@ function gameLoop() {
   if (input.justPressed('KeyM'))   _handleM();
   if (input.justPressed('KeyC'))   _handleC();
   if (input.justPressed('Escape')) _handleESC();
+
+  // Show the lightsaber any time the sword booster is owned and the
+  // player is in actively-played states (not paused, etc.)
+  player.setLightsaberVisible?.(
+    feetdex.hasBooster('sword') &&
+    (state === 'playing' || state === 'interior' || state === 'combat'),
+  );
 
   _updateHint();
   _updateTrackerCompass();
