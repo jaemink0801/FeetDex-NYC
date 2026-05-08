@@ -10548,7 +10548,10 @@ const _MAP_NPC_COLORS = { common:'#6699cc', rare:'#55aa55', epic:'#aa55cc', myth
 // Per-building distinct colors so the player can match a dot on the map
 // back to its name in the legend. Hues span the wheel; saturated values
 // stay readable on the dark map background.
-const BUILDING_COLORS = {
+// Renamed from BUILDING_COLORS to avoid colliding with world.js's pre-existing
+// constant (the bundle concatenates everything into one scope, so duplicate
+// `const` names became a SyntaxError).
+const MAP_BUILDING_COLORS = {
   'Cafe':         '#FF3B3B',  // bright red
   'Diner':        '#FF8C00',  // dark orange
   'Gym':          '#39FF14',  // neon green
@@ -10566,7 +10569,7 @@ const BUILDING_COLORS = {
 };
 const BUILDING_COLOR_FALLBACK = '#bbbbbb';
 function _buildingColor(name) {
-  return BUILDING_COLORS[name] ?? BUILDING_COLOR_FALLBACK;
+  return MAP_BUILDING_COLORS[name] ?? BUILDING_COLOR_FALLBACK;
 }
 
 // Radar blink helper — flashes ON for ~250ms, OFF for ~150ms (≈2.5 Hz)
