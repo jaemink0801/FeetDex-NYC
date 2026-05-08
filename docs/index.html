@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T055247';
+  var BAKED = '20260508T174842';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -11232,17 +11232,27 @@ function _drawStaticMap() {
     if (_isWater(a) !== _isWater(b)) return _isWater(a) ?  1 : -1; // water last
     return (b.hw + b.hd) - (a.hw + a.hd);
   });
+  // Pre-register the hero-shop markers as label-exclusion zones so
+  // building labels (Hotel, Bar, etc.) can't land on top of them.
+  for (const heroLbl of ["Morton's Shop", 'Fleet Feet']) {
+    const lm = _MAP_LMS.find(l => l.label === heroLbl);
+    if (!lm) continue;
+    const [cx, cz] = _wm(lm.wx, lm.wz);
+    const r = 28;   // covers the white circle (17) + ring + outer halo (20)
+    placedLabels.push({ x: cx - r, y: cz - r, w: r * 2, h: r * 2 });
+  }
+
   // Only HERO shops get labels printed on the map — everything else
   // (Empire State, Chrysler, Grand Central, 1WTC, Times Square, Central
   // Park, Brooklyn Bridge, Lower Manhattan, Columbus Circle) lives in the
-  // side legend keyed by color. Frees up huge label real estate for the
-  // dense building/subway labels in midtown.
+  // side legend keyed by color.
   for (const lm of _byImportance) {
     if (!_isHero(lm)) continue;
     const [cx, cz] = _wm(lm.wx, lm.wz);
-    // Marker is 17px radius + 4px gold ring + label half-height (~13).
-    // Anchor the label 48px below so it clears the marker entirely.
-    _drawMapLabel(staticCtx, lm.label, cx, cz + 48, '#FFD700', 18, placedLabels);
+    // Morton's Shop label is force-anchored down-LEFT so it has breathing
+    // room from nearby buildings. Fleet Feet stays straight below.
+    const offX = (lm.label === "Morton's Shop") ? -34 : 0;
+    _drawMapLabel(staticCtx, lm.label, cx + offX, cz + 48, '#FFD700', 18, placedLabels);
   }
 
   // Enterable buildings — colored dot + name label drawn directly on the
@@ -11330,7 +11340,9 @@ function _drawStaticMap() {
   for (const st of stations) {
     const [sx, sz] = _wm(st.x, st.z);
     if (st.name === '34TH ST') {
-      _drawMapLabel(staticCtx, st.name, sx, sz + 22, '#88ccff', 13, placedLabels);
+      // "Right below the station marker" — tight 14px offset so the label
+      // hugs the dot instead of floating between ESB and Central Park.
+      _drawMapLabel(staticCtx, st.name, sx, sz + 14, '#88ccff', 13, placedLabels);
     } else {
       _drawMapLabel(staticCtx, st.name, sx, sz, '#88ccff', 13, placedLabels);
     }
