@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T021214';
+  var BAKED = '20260508T053243';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -646,7 +646,7 @@
       overflow:hidden; }
     .foot-drop { position:absolute; top:-80px; opacity:0;
       filter:drop-shadow(2px 2px 3px rgba(0,0,0,.5));
-      animation:foot-fall 3.6s ease-in forwards; }
+      animation:foot-fall 5.4s ease-in forwards; }
     .foot-drop svg { width:100%; height:100%; }
     @keyframes foot-fall {
       0%   { transform:translateY(0) rotate(0deg);     opacity:0; }
@@ -1144,20 +1144,22 @@ const Audio = {
     tone(f * 2,    0.11, 'triangle', 0.12);
   },
 
-  // Fireworks sound for celebrations. Stages 6-12 individual "pops" over
+  // Fireworks sound for celebrations. Stages many individual "pops" over
   // the duration: each pop is a quick whistle (pitch sweep) followed by a
-  // short noisy crackle, like a firework shell launching and bursting.
-  // The whole thing is mixed under masterGain so it respects the user's
-  // volume setting.
-  rainShower(duration = 3.5) {
+  // short noisy crackle and (sometimes) a low boom — like overlapping
+  // firework shells. The whole thing respects masterGain (volume slider).
+  fireworks(duration = 5.4) {
     const c = getCtx();
     const t0 = c.currentTime;
-    const popCount = Math.max(5, Math.round(duration * 2.4));
+    const popCount = Math.max(8, Math.round(duration * 2.6));
     for (let i = 0; i < popCount; i++) {
-      const at = t0 + (i * (duration / popCount)) + Math.random() * 0.18;
+      const at = t0 + (i * (duration / popCount)) + Math.random() * 0.22;
       _firework(c, at);
     }
   },
+  // Back-compat alias — older callers (mission completion) still use the
+  // older name. Both produce the firework volley.
+  rainShower(duration = 3.6) { this.fireworks(duration); },
 
   gameWin() {
     // 4-note cheerful jingle: C E G C(high)
@@ -1708,52 +1710,89 @@ class Player {
     this._getFloor  = () => 0;
     this._animTime  = 0;     // accumulator for leg-swing animation
 
-    // ── First-person legs + feet ──
-    // Two hip-pivot groups. The legs group is parented to the SCENE (not
-    // the camera) so it tracks the player's world position + yaw but
-    // ignores pitch — pitching the camera down therefore brings the legs
-    // into view exactly the way looking at your feet does in real life.
-    // Default colors: dark pants, BARE FEET (skin-toned). Equipping a
-    // collected foot via Fleet Feet recolors the shoes through setShoeColor.
+    // ── First-person body, legs + toed feet ──
+    // Whole lower body is parented to the SCENE so the camera's pitch
+    // doesn't move it — pitching the camera down therefore actually shows
+    // the player their own legs and feet. The group's origin is at the
+    // player's GROUND position; everything builds upward from y=0 so the
+    // soles sit flat on the floor (no phasing through). Default skin is
+    // bare; setShoeColor recolors the foot blocks when a skin is equipped.
     this._legs = new THREE.Group();
     if (this.scene) this.scene.add(this._legs);
     else            camera.add(this._legs);  // fallback (still better than nothing)
     this._legShoes = [];     // cached for cosmetic recolor
 
     const pantMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a28 });
+    const shirtMat = new THREE.MeshLambertMaterial({ color: 0x444466 });
     const skinMat  = new THREE.MeshLambertMaterial({ color: 0xcca888 });
-    // Player starts barefoot — same skin tone as the ankle band. Buying
-    // and equipping a collected foot through Fleet Feet recolors this.
+    // Player starts barefoot — same skin tone. Buying and equipping a
+    // collected foot through Fleet Feet recolors this.
     this._defaultShoeMat = new THREE.MeshLambertMaterial({ color: 0xcca888 });
+
+    // Torso (waist → upper chest). Visible when the player tilts the
+    // camera down so they see "their body," not legs floating in space.
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.50, 0.22), shirtMat);
+    torso.position.set(0, 1.20, 0);
+    this._legs.add(torso);
+
+    // Pelvis — small block bridging torso and hips so legs visibly
+    // connect to the body rather than dangling free.
+    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.10, 0.20), pantMat);
+    pelvis.position.set(0, 0.93, 0);
+    this._legs.add(pelvis);
 
     for (const side of [-1, 1]) {
       const hip = new THREE.Group();
-      hip.position.set(side * 0.13, 0, 0);
+      hip.position.set(side * 0.10, 0.88, 0);   // hip joint at waist
       this._legs.add(hip);
 
-      // Pant section
+      // Upper leg / pant — top at hip joint (y=0), bottom at y=-0.78
       const pant = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.075, 0.085, 0.55, 8), pantMat,
+        new THREE.CylinderGeometry(0.080, 0.090, 0.78, 8), pantMat,
       );
-      pant.position.set(0, -0.32, 0);
+      pant.position.set(0, -0.39, 0);
       hip.add(pant);
 
       // Ankle / skin band
       const ankle = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.075, 0.075, 0.06, 8), skinMat,
+        new THREE.CylinderGeometry(0.080, 0.080, 0.05, 8), skinMat,
       );
-      ankle.position.set(0, -0.62, 0);
+      ankle.position.set(0, -0.81, 0);
       hip.add(ankle);
 
-      // Shoe — its material is cloned per leg so cosmetic recolor doesn't
-      // affect the shared default material on other legs.
+      // Foot = HEEL block + SOLE block + 5 toe blocks (big toe larger).
+      // Built as a sub-group anchored at the ankle so cosmetic skins can
+      // be swapped/colored as a unit.
+      const foot = new THREE.Group();
+      foot.position.set(0, -0.84, 0);   // top of foot just under ankle
+      hip.add(foot);
+
       const shoeMat = this._defaultShoeMat.clone();
-      const shoe = new THREE.Mesh(
-        new THREE.BoxGeometry(0.14, 0.07, 0.20), shoeMat,
-      );
-      shoe.position.set(0, -0.69, 0.04);
-      hip.add(shoe);
-      this._legShoes.push(shoe);
+
+      // Heel (back of the foot)
+      const heel = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.06, 0.10), shoeMat);
+      heel.position.set(0, -0.03, -0.045);
+      foot.add(heel);
+
+      // Sole (mid-foot to ball)
+      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.05, 0.12), shoeMat);
+      sole.position.set(0, -0.025, 0.06);
+      foot.add(sole);
+
+      // Toes — big toe slightly larger (inner side), 4 smaller along the rest
+      const big = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.045), shoeMat);
+      big.position.set(side * 0.045, -0.025, 0.13);
+      foot.add(big);
+      for (let t = 0; t < 4; t++) {
+        const toe = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.040, 0.040), shoeMat);
+        // Outer toes get smaller and step back slightly
+        const off = side * (-0.005 - t * 0.030);
+        toe.position.set(off, -0.025, 0.13 - t * 0.005);
+        foot.add(toe);
+      }
+
+      // Cache every shoe-material mesh so setShoeColor recolors the whole foot.
+      foot.traverse(o => { if (o.isMesh && o.material === shoeMat) this._legShoes.push(o); });
 
       if (side === -1) this._leftHip  = hip;
       else             this._rightHip = hip;
@@ -1937,18 +1976,12 @@ class Player {
     this.camera.rotation.y = this.yaw;
     this.camera.rotation.x = this.pitch;
 
-    // Anchor the legs group to the player's WORLD position (and yaw only)
-    // so the player can pitch the camera down and actually see their feet.
+    // Anchor the legs/body group to the player's WORLD position (and yaw
+    // only) so the camera's pitch doesn't rotate it. Legs origin sits at
+    // ground level, with everything (feet, shins, pants, pelvis, torso)
+    // built upward, so the soles rest flat on the floor — no phasing.
     if (this._legs && this._legs.parent !== this.camera) {
-      // Place the leg root just below the camera and slightly forward,
-      // matching the old camera-relative offset (–EYE_LEVEL+0.2, –0.05).
-      const fwdX = -Math.sin(this.yaw);
-      const fwdZ = -Math.cos(this.yaw);
-      this._legs.position.set(
-        this.position.x + fwdX * 0.05,
-        this.position.y + 0.2,
-        this.position.z + fwdZ * 0.05,
-      );
+      this._legs.position.set(this.position.x, this.position.y, this.position.z);
       this._legs.rotation.y = this.yaw;
     }
   }
@@ -3469,7 +3502,8 @@ function showHUDMessage(text, durationMs = 2500) {
 
 // ── Combat encounter ──────────────────────────────────────────────────────────
 
-const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 150 };
+// Legendary HP = 2× mythic.
+const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 200 };
 const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 37  };
 const PLAYER_DMG  = 10;
 const PLAYER_MAX  = 100;
@@ -3499,10 +3533,9 @@ class CombatEncounter {
     this._npcHP      = _NPC_HP[npc.rarity] ?? PLAYER_MAX;
     this._npcMaxHP   = this._npcHP;
 
-    // Per-rarity attack-speed multiplier. Mythics swing 1.65× faster than
-    // baseline (1.5 × 1.1). Legendaries 1.5× — they're tougher in HP/damage
-    // already, so attack-speed parity with mythics keeps the fight fair.
-    const speedMult = npc.rarity === 'legendary' ? 1.5
+    // Per-rarity attack-speed multiplier. Legendaries swing 1.25× faster
+    // than mythics (mythic baseline 1.65× → legendary 2.0625×).
+    const speedMult = npc.rarity === 'legendary' ? 1.65 * 1.25
                      : npc.rarity === 'mythic'    ? 1.65
                      : 1;
     this._atkCd  = NPC_ATK_CD / speedMult;
@@ -3514,9 +3547,9 @@ class CombatEncounter {
     this._nextSwing     = Date.now() + 1200;
     this._koTime        = 0;        // when NPC HP hit 0
     this._active        = true;
-    // Mythics chase at 8.1 m/s; legendaries 1.25× faster (≈10.1) — they're
-    // the late-game challenge so they hunt you down more aggressively.
-    this._chaseSpeed    = (npc.rarity === 'legendary') ? 10.1 : 8.1;
+    // Mythics chase at 8.1 m/s; legendaries 1.5× faster (≈12.15) — they
+    // hunt you down much more aggressively as the endgame challenge.
+    this._chaseSpeed    = (npc.rarity === 'legendary') ? 8.1 * 1.5 : 8.1;
     this._origGroupY    = npc.group.position.y;
     this._origGroupRotX = npc.group.rotation.x;
     this._bodyScale     = npc.group.scale.x;
@@ -3801,55 +3834,27 @@ class InteractionSystem {
 // ── ui.js ─────────────────────────────────────────────
 
 
-// Pixelated 2D foot — a top-down sole made of square pixels. Renders the
-// same on every system (no emoji font dependency) and reads as a foot at
-// any size. shape-rendering:crispEdges keeps the pixels sharp.
-const FOOT_SVG = `<svg viewBox="0 0 8 12" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" style="width:100%;height:100%;display:block;">
-  <g fill="#ffc99a">
-    <rect x="2" y="3" width="1" height="1"/>
-    <rect x="3" y="3" width="1" height="1"/>
-    <rect x="4" y="3" width="1" height="1"/>
-    <rect x="5" y="3" width="1" height="1"/>
-    <rect x="2" y="2" width="1" height="1"/>
-    <rect x="3" y="1" width="1" height="1"/>
-    <rect x="1" y="4" width="1" height="1"/>
-    <rect x="2" y="4" width="1" height="1"/>
-    <rect x="3" y="4" width="1" height="1"/>
-    <rect x="4" y="4" width="1" height="1"/>
-    <rect x="5" y="4" width="1" height="1"/>
-    <rect x="6" y="4" width="1" height="1"/>
-    <rect x="1" y="5" width="1" height="1"/>
-    <rect x="2" y="5" width="1" height="1"/>
-    <rect x="3" y="5" width="1" height="1"/>
-    <rect x="4" y="5" width="1" height="1"/>
-    <rect x="5" y="5" width="1" height="1"/>
-    <rect x="6" y="5" width="1" height="1"/>
-    <rect x="1" y="6" width="1" height="1"/>
-    <rect x="2" y="6" width="1" height="1"/>
-    <rect x="3" y="6" width="1" height="1"/>
-    <rect x="4" y="6" width="1" height="1"/>
-    <rect x="5" y="6" width="1" height="1"/>
-    <rect x="6" y="6" width="1" height="1"/>
-    <rect x="2" y="7" width="1" height="1"/>
-    <rect x="3" y="7" width="1" height="1"/>
-    <rect x="4" y="7" width="1" height="1"/>
-    <rect x="5" y="7" width="1" height="1"/>
-    <rect x="6" y="7" width="1" height="1"/>
-    <rect x="2" y="8" width="1" height="1"/>
-    <rect x="3" y="8" width="1" height="1"/>
-    <rect x="4" y="8" width="1" height="1"/>
-    <rect x="5" y="8" width="1" height="1"/>
-    <rect x="3" y="9" width="1" height="1"/>
-    <rect x="4" y="9" width="1" height="1"/>
-    <rect x="5" y="9" width="1" height="1"/>
-    <rect x="3" y="10" width="1" height="1"/>
-    <rect x="4" y="10" width="1" height="1"/>
-  </g>
-  <g fill="#a96e3f">
-    <rect x="2" y="2" width="1" height="1" opacity="0.35"/>
-    <rect x="6" y="6" width="1" height="1" opacity="0.35"/>
-  </g>
-</svg>`;
+// Simple 2D top-down foot silhouette: oval sole + 5 round toes (big toe
+// noticeably larger). Color is parameterized so each falling foot can pick
+// from a varied palette of skin tones plus brighter celebratory colors.
+function _footSVG(color) {
+  return `<svg viewBox="0 0 30 50" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" style="width:100%;height:100%;display:block;">
+    <ellipse cx="15" cy="32" rx="11" ry="16" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+    <circle cx="9"  cy="11" r="4.5" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+    <circle cx="14" cy="7"  r="3.0" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+    <circle cx="18" cy="6"  r="2.6" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+    <circle cx="22" cy="7"  r="2.2" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+    <circle cx="25" cy="9"  r="1.9" fill="${color}" stroke="rgba(0,0,0,0.35)" stroke-width="1"/>
+  </svg>`;
+}
+// Mix of skin tones + bright celebratory colors. Skin tones are oversampled
+// so the rain feels grounded; the bright hues add festive variety.
+const FOOT_RAIN_PALETTE = [
+  '#ffd6b3', '#ffd6b3', '#d4a574', '#d4a574', '#a87a4a', '#8b5a3c',
+  '#6e3f1a', '#f3c5a3',
+  '#ff69b4', '#ffd700', '#00ced1', '#ff6347',
+  '#9370db', '#39ff14', '#ff1493', '#1e90ff',
+];
 
 // ── Typewriter voice helpers ──────────────────────────────────────────────────
 
@@ -4357,29 +4362,28 @@ class UI {
     if (svg) svg.style.transform = `rotate(${dirDeg}deg)`;
   }
 
-  // Spawn `count` falling 2D feet (inline SVG) for celebrations. The emoji
-  // 🦶 / 👟 rendered inconsistently across systems, so this draws an actual
-  // foot silhouette every browser will render the same way. A rain/shower
-  // sound plays alongside the fall.
-  spawnFeetRain(count = 30) {
+  // Spawn falling 2D feet for celebrations. Duration is 1.5× longer than
+  // before; each foot picks from the palette so the rain shows skin tones
+  // mixed with bright celebratory colors.
+  spawnFeetRain(count = 45) {
     const wrap = document.getElementById('feet-rain');
     if (!wrap) return;
-    Audio.rainShower?.(3.6);
+    Audio.fireworks?.(5.4);  // longer satisfying sound layered over the rain
     for (let i = 0; i < count; i++) {
-      const sz = 28 + Math.random() * 32;
+      const sz = 30 + Math.random() * 36;
       const drop = document.createElement('div');
       drop.className = 'foot-drop';
-      drop.style.left  = `${Math.random() * 100}vw`;
-      drop.style.width = `${sz * 0.7}px`;
+      drop.style.left   = `${Math.random() * 100}vw`;
+      drop.style.width  = `${sz * 0.7}px`;
       drop.style.height = `${sz}px`;
-      drop.style.animationDelay = `${Math.random() * 0.8}s`;
-      drop.style.animationDuration = `${2.8 + Math.random() * 1.6}s`;
-      // Mirror half of them to vary the silhouette (left vs right foot)
-      drop.innerHTML = (i % 2)
-        ? FOOT_SVG.replace('<svg ', '<svg style="transform:scaleX(-1)" ')
-        : FOOT_SVG;
+      drop.style.animationDelay    = `${Math.random() * 1.0}s`;
+      drop.style.animationDuration = `${4.2 + Math.random() * 2.0}s`;
+      const color = FOOT_RAIN_PALETTE[Math.floor(Math.random() * FOOT_RAIN_PALETTE.length)];
+      let svg = _footSVG(color);
+      if (i % 2) svg = svg.replace('<svg ', '<svg style="transform:scaleX(-1)" ');
+      drop.innerHTML = svg;
       wrap.appendChild(drop);
-      setTimeout(() => drop.remove(), 5000);
+      setTimeout(() => drop.remove(), 7000);
     }
   }
 
@@ -7503,7 +7507,10 @@ function buildGenericInteriors(scene, enterables, _SO) {
   const SPAWN_POS = {
     Cafe:         [[-3, 1.5], [3, 2],    [ 0, -5]],
     Diner:        [[-2,-4.5], [2,-4.5],  [-4, -1]],
-    Gym:          [[ 0,  0],  [4, -3],   [-4,  3]],
+    // Gym: [0,0] spawn removed — DEX stands at the gym's exact center
+    // (world 3000,0). A random crowd NPC at [0,0] kept materializing
+    // inside his model, fusing them visually.
+    Gym:          [[5, 4],  [-5, -4]],
     Office:       [[-4, -1],  [4,  1],   [ 0, -6]],
     // Shop interior intentionally empty — Morton stands at the back of the
     // room (z=-4.5) and the player walks straight north from the entry door
@@ -7995,6 +8002,15 @@ function buildLandmarkDoors(scene) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 0.2), mat);
     mesh.position.copy(def.pos);
     scene.add(mesh);
+    // Make the door physically solid — the player must press E to enter
+    // through it, no walking through. The bounding-box is registered to
+    // the global SOLID_COLLIDERS registry that player movement consults.
+    if (window.SOLID_COLLIDERS) {
+      const halfW = 1.0, halfH = 1.5, halfD = 0.12;
+      const min = new THREE.Vector3(def.pos.x - halfW, 0,             def.pos.z - halfD);
+      const max = new THREE.Vector3(def.pos.x + halfW, def.pos.y + halfH + 1, def.pos.z + halfD);
+      window.SOLID_COLLIDERS.push({ box: new THREE.Box3(min, max), mesh, isStatic: true });
+    }
   }
 
   return doorDefs;
@@ -9433,11 +9449,11 @@ class World {
   checkDoorProximity(playerPos) {
     for (const door of this.landmarkDoors) {
       if (playerPos.distanceTo(door.pos) < 3)
-        return { action: 'near-entry', id: door.id, name: door.name };
+        return { action: 'near-entry', id: door.id, name: door.name, pos: door.pos };
     }
     for (const [id, interior] of Object.entries(this.interiors)) {
       if (playerPos.distanceTo(interior.exitDoorWorldPos) < 3)
-        return { action: 'near-exit', id };
+        return { action: 'near-exit', id, pos: interior.exitDoorWorldPos };
     }
     return null;
   }
@@ -9521,6 +9537,7 @@ let currentInteriorId = null;
 let _nearestNPC       = null;  // updated each frame — proximity only
 let _activeNPC        = null;  // set when interaction begins, used through dialogue/discovery/minigame
 let _mapOpen          = false;
+let _subwayMarkersBlink = false;  // flashes subway dots when player E-rode in
 
 // Expose state, camera, and feetdex (booster set) for cross-module access
 window.gameCamera = camera;
@@ -9622,9 +9639,9 @@ function _updateTutorial() {
 //   { type: 'hud',   selector }     — anchors above a fixed HUD element
 // After tutorial.active goes false, the hand is permanently hidden.
 const HAND_TARGETS = {
-  // ESB door — point at the top of the building so it reads "look here"
-  // rather than "look at the ground". The roof of ESB is far above ground.
-  'enter-esb':   { type: 'world', wx: 0,    wy: 60,  wz: 8.2 },
+  // ESB door — pointer hovers at eye level, just above the door, so the
+  // player doesn't have to crane their neck up to see the hand.
+  'enter-esb':   { type: 'world', wx: 0,    wy: 3,   wz: 8.2 },
   // Sonion at the back of the ESB lobby (interior coords ~ world x=2000)
   'find-sonion': { type: 'world', wx: 2000, wy: 2.4, wz: 3 },
   // Find-shop step: point at the minimap so the player notices the map UI
@@ -9799,6 +9816,28 @@ function _handleE() {
 
     case 'playing':
     case 'interior': {
+      // Cursor-based prioritization: when the player is in range of BOTH
+      // an NPC and a door, look at where the camera is aimed and let
+      // whichever is closer to the cursor win. Avoids accidentally
+      // opening dialogue when the player meant to enter a building.
+      const _doorHere = world.checkDoorProximity(player.position);
+      if (_nearestNPC && _doorHere && _doorHere.action === 'near-entry') {
+        const fwd = new THREE.Vector3();
+        camera.getWorldDirection(fwd);
+        const npcDx = _nearestNPC.group.position.x - player.position.x;
+        const npcDz = _nearestNPC.group.position.z - player.position.z;
+        const doorDx = (_doorHere.pos?.x ?? 0) - player.position.x;
+        const doorDz = (_doorHere.pos?.z ?? 0) - player.position.z;
+        const npcLen  = Math.hypot(npcDx, npcDz)   || 1;
+        const doorLen = Math.hypot(doorDx, doorDz) || 1;
+        const npcDot  = (npcDx / npcLen) * fwd.x  + (npcDz / npcLen) * fwd.z;
+        const doorDot = (doorDx / doorLen) * fwd.x + (doorDz / doorLen) * fwd.z;
+        if (doorDot > npcDot) {
+          _enterLandmark(_doorHere.id, _doorHere.name);
+          return;
+        }
+        // else fall through to NPC interaction
+      }
       // Priority 1: NPC interaction
       if (_nearestNPC) {
         // Morton routes to the shop UI instead of the discovery dialogue flow.
@@ -9847,6 +9886,7 @@ function _handleE() {
       const station = _nearestSubway();
       if (station && feetdex.hasBooster('metrocard')) {
         Audio.interact();
+        _subwayMarkersBlink = true;     // make blue dots pulse on the map
         _openMap();
         return;
       }
@@ -10214,7 +10254,7 @@ const BOOSTER_TIPS = {
   radar:          { title: 'RADAR',
     body: 'All <b>common</b>, <b>rare</b>, and <b>epic</b> characters now show as colored dots on both the minimap and the <b>[M]</b> map — anywhere in the city.' },
   compass:        { title: 'COMPASS',
-    body: 'Press <b>[C]</b> and the needle twitches toward powerful presences — <b>mythics</b> and <b>legendaries</b>. It can\'t tell you who or how far, just which way.' },
+    body: 'A needle now twitches in the top-left toward powerful presences — <b>mythics</b> and <b>legendaries</b>. It can\'t tell you who or how far, just which way.' },
   armor:          { title: 'ARMOR',
     body: 'Your HP is doubled and you take 30% less damage from mythics and legendaries.' },
   sword:          { title: 'SWORD',
@@ -10331,7 +10371,17 @@ function _relocateLegendary(npc) {
       b => x > b.min.x + 1 && x < b.max.x - 1 && z > b.min.z + 1 && z < b.max.z - 1,
     );
     if (!inBuilding) {
-      npc.group.position.set(x, npc.group.position.y, z);
+      npc.group.position.set(x, 0, z);
+      // Reset their KO/flop pose so they're STANDING in the new spot —
+      // otherwise they stay laying down on the ground and become invisible
+      // / unfindable.
+      npc._kod = false;
+      npc.group.rotation.x = 0;
+      npc.group.rotation.z = 0;
+      const s = npc._bodyScale ?? 1;
+      npc.group.scale.set(s, s, s);
+      if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
+      if (npc._leftArmPivot)  npc._leftArmPivot.rotation.x  = 0;
       return;
     }
   }
@@ -10643,15 +10693,18 @@ const _MAP_LMS = [
   // Roosevelt Island
   { wx: 180, wz:-10, hw: 4, hd: 30, color:'#3A6B35', label:'Roosevelt Is.' },
   // Major landmarks
-  { wx:  0, wz:  5, hw:14, hd:12, color:'#85B7EB', label:'Empire State' },
-  { wx: 40, wz: 27, hw:12, hd:12, color:'#B5D4F4', label:'Chrysler' },
-  { wx:  0, wz:-160, hw:14, hd:12, color:'#A8C9E0', label:'1WTC' },
-  { wx: 10, wz:-25, hw:18, hd:12, color:'#FAC775', label:'Times Square' },
-  { wx:-15, wz: 60, hw:22, hd:18, color:'#97C459', label:'Central Park' },
-  { wx:-60, wz:-80, hw:10, hd:32, color:'#B4B2A9', label:'Brooklyn Bridge' },
-  { wx: 75, wz:-30, hw:11, hd: 6, color:'#C4A87A', label:'Grand Central' },
-  { wx:-25, wz:-110, hw:10, hd:10, color:'#C8C0A8', label:'Columbus Circle' },
-  { wx:  0, wz:-165, hw:22, hd:20, color:'#9BBBD4', label:'Lower Manhattan' },
+  // Landmarks: each gets a vivid, distinct hue so the legend swatches are
+  // unambiguous and players can match a colored block on the map back to a
+  // name in the side legend at a glance.
+  { wx:  0, wz:  5, hw:14, hd:12, color:'#FF4444', label:'Empire State' },     // red
+  { wx: 40, wz: 27, hw:12, hd:12, color:'#00BFFF', label:'Chrysler' },         // cyan
+  { wx:  0, wz:-160, hw:14, hd:12, color:'#9D4EDD', label:'1WTC' },            // purple
+  { wx: 10, wz:-25, hw:18, hd:12, color:'#FFD700', label:'Times Square' },     // gold
+  { wx:-15, wz: 60, hw:22, hd:18, color:'#2E8B57', label:'Central Park' },     // sea green
+  { wx:-60, wz:-80, hw:10, hd:32, color:'#FF6347', label:'Brooklyn Bridge' },  // tomato
+  { wx: 75, wz:-30, hw:11, hd: 6, color:'#FF1493', label:'Grand Central' },    // deep pink
+  { wx:-25, wz:-110, hw:10, hd:10, color:'#00FA9A', label:'Columbus Circle' }, // mint
+  { wx:  0, wz:-165, hw:22, hd:20, color:'#A0522D', label:'Lower Manhattan' }, // sienna brown
 ];
 
 // Linear features (rendered as thin lines — fences along rivers)
@@ -10918,29 +10971,46 @@ function _drawStaticMap() {
   }
   // Pass 2: building names. Drawn AFTER landmarks so landmark text wins
   // the prime central spots; the algorithm pushes building labels to
-  // whatever free space remains.
+  // whatever free space remains. Gallery is force-anchored ABOVE its dot
+  // because the 4TH ST subway sits right next to it and was eating the
+  // label.
   for (const lbl of world.buildingLabels) {
     if (_LANDMARK_BUILDING_NAMES.has(lbl.name)) continue;
     const [bx, bz] = _wm(lbl.wx, lbl.wz);
-    _drawMapLabel(staticCtx, lbl.name, bx, bz, '#e6e6e6', 12, placedLabels);
+    if (lbl.name === 'Gallery') {
+      _drawMapLabel(staticCtx, lbl.name, bx, bz - 22, '#e6e6e6', 12, placedLabels);
+    } else {
+      _drawMapLabel(staticCtx, lbl.name, bx, bz, '#e6e6e6', 12, placedLabels);
+    }
   }
   // Hero treatment for Morton's Shop + Fleet Feet — bigger marker with a
   // glowing gold ring so they read as "important" at a glance even on a
   // dense map. The labels are already drawn by the landmark loop above.
+  // Hero shops — pure white center with a colored ring (each shop's brand
+  // color) and a gold halo. The white center pops off the busy map at any
+  // zoom, the ring tells the two apart, and the halo shouts "important".
   for (const heroLbl of ["Morton's Shop", 'Fleet Feet']) {
     const lm = _MAP_LMS.find(l => l.label === heroLbl);
     if (!lm) continue;
     const [cx, cz] = _wm(lm.wx, lm.wz);
     staticCtx.save();
+    // Outer gold halo
     staticCtx.shadowColor = '#FFD700';
-    staticCtx.shadowBlur  = 18;
-    staticCtx.fillStyle   = lm.color;
+    staticCtx.shadowBlur  = 22;
+    staticCtx.fillStyle   = '#FFFFFF';
     staticCtx.beginPath();
     staticCtx.arc(cx, cz, 17, 0, Math.PI * 2);
     staticCtx.fill();
     staticCtx.shadowBlur  = 0;
-    staticCtx.lineWidth   = 4;
+    // Brand-colored ring around the white center
+    staticCtx.lineWidth   = 5;
+    staticCtx.strokeStyle = lm.color;
+    staticCtx.stroke();
+    // Thin gold outline outside the ring for crisp definition
+    staticCtx.lineWidth   = 1.5;
     staticCtx.strokeStyle = '#FFD700';
+    staticCtx.beginPath();
+    staticCtx.arc(cx, cz, 20, 0, Math.PI * 2);
     staticCtx.stroke();
     staticCtx.restore();
   }
@@ -10980,16 +11050,32 @@ function _drawStaticMap() {
 function _drawDynamicMap() {
   dynCtx.clearRect(0, 0, MAP_SIZE, MAP_SIZE);
 
-  // Radar booster: steady rarity-colored dots for every uncollected
-  // common/rare/epic character anywhere in the city. Indoor characters are
-  // projected back to their landmark's city-side door.
-  if (feetdex.hasBooster('radar')) {
+  // Subway-station blinking ring overlay — fires when the player E-pressed
+  // at a station to open the map (so they immediately see the network).
+  if (_subwayMarkersBlink && _radarBlinkOn()) {
+    for (const st of (window.SUBWAY_STATIONS || [])) {
+      const [sx, sz] = _wm(st.x, st.z);
+      dynCtx.save();
+      dynCtx.strokeStyle = '#FFD700';
+      dynCtx.lineWidth   = 3;
+      dynCtx.shadowColor = '#FFD700';
+      dynCtx.shadowBlur  = 8;
+      dynCtx.beginPath();
+      dynCtx.arc(sx, sz, 17, 0, Math.PI * 2);
+      dynCtx.stroke();
+      dynCtx.restore();
+    }
+  }
+
+  // Radar booster: every uncollected common/rare/epic character blinks RED
+  // on the map. No per-rarity color split — keep it instantly readable.
+  if (feetdex.hasBooster('radar') && _radarBlinkOn()) {
     for (const npc of (window.ALL_NPCS || [])) {
       if (!_isRadarVisibleNpc(npc)) continue;
       const projected = _radarProjectedPos(npc);
       if (!projected) continue;
       const [nx, nz] = _wm(projected.x, projected.z);
-      dynCtx.fillStyle = RADAR_DOT_COLORS[npc.rarity];
+      dynCtx.fillStyle = '#ff3344';
       dynCtx.beginPath();
       dynCtx.arc(nx, nz, 7, 0, Math.PI * 2);
       dynCtx.fill();
@@ -11006,9 +11092,12 @@ function _drawDynamicMap() {
   dynCtx.rotate(-player.yaw);
   dynCtx.fillStyle = '#44ff88';
   dynCtx.beginPath();
-  dynCtx.moveTo(0, -18);
-  dynCtx.lineTo(13, 16);
-  dynCtx.lineTo(-13, 16);
+  // Tip at (0,0) — the player's actual position. Triangle extends BACKWARD
+  // from the tip so the player marker doesn't visually cover whatever
+  // they're standing in front of.
+  dynCtx.moveTo(0, 0);
+  dynCtx.lineTo(13, 30);
+  dynCtx.lineTo(-13, 30);
   dynCtx.closePath();
   dynCtx.fill();
   dynCtx.strokeStyle = 'rgba(0,0,0,0.8)';
@@ -11103,19 +11192,10 @@ function _renderMapLegend() {
   }
 
   if (feetdex.hasBooster('radar')) {
-    rows.push('<h4 style="margin-top:10px;">RADAR</h4>');
     rows.push(
-      `<div class="lg-row">` +
-      `  <span class="lg-swatch circle" style="background:${RADAR_DOT_COLORS.common};"></span>` +
-      `  <span class="lg-text">Common</span>` +
-      `</div>`,
-      `<div class="lg-row">` +
-      `  <span class="lg-swatch circle" style="background:${RADAR_DOT_COLORS.rare};"></span>` +
-      `  <span class="lg-text">Rare</span>` +
-      `</div>`,
-      `<div class="lg-row">` +
-      `  <span class="lg-swatch circle" style="background:${RADAR_DOT_COLORS.epic};"></span>` +
-      `  <span class="lg-text">Epic</span>` +
+      `<div class="lg-row" style="margin-top:8px;">` +
+      `  <span class="lg-swatch circle" style="background:#ff3344;"></span>` +
+      `  <span class="lg-text">Character (Radar — blinks)</span>` +
       `</div>`,
     );
   }
@@ -11142,6 +11222,7 @@ function _openMap() {
 
 function _closeMap(attemptLock = false) {
   _mapOpen = false;
+  _subwayMarkersBlink = false;     // turn off the subway-ring pulse
   mapOverlay.classList.remove('active');
   clearInterval(_mapBlinkInterval);
   _mapBlinkInterval = null;
@@ -11275,17 +11356,17 @@ function _drawMinimap(elapsed) {
     _mmCtx.stroke();
   }
 
-  // Radar booster: steady rarity-colored dots for every uncollected
-  // common/rare/epic character anywhere in the city.
-  if (feetdex.hasBooster('radar')) {
+  // Radar booster: blinking red dots for every uncollected common/rare/
+  // epic character anywhere in the city.
+  if (feetdex.hasBooster('radar') && _radarBlinkOn()) {
     for (const npc of (window.ALL_NPCS || [])) {
       if (!_isRadarVisibleNpc(npc)) continue;
       const projected = _radarProjectedPos(npc);
       if (!projected) continue;
       const [nx, nz] = _mm(projected.x, projected.z);
-      _mmCtx.fillStyle = RADAR_DOT_COLORS[npc.rarity];
+      _mmCtx.fillStyle = '#ff3344';
       _mmCtx.beginPath();
-      _mmCtx.arc(nx, nz, 2.4, 0, Math.PI * 2);
+      _mmCtx.arc(nx, nz, 2.6, 0, Math.PI * 2);
       _mmCtx.fill();
     }
   }
@@ -11320,7 +11401,8 @@ function _drawMinimap(elapsed) {
   _mmCtx.translate(px, pz);
   _mmCtx.rotate(-player.yaw);
   _mmCtx.fillStyle = '#44ff88';
-  _mmCtx.beginPath(); _mmCtx.moveTo(0, -7); _mmCtx.lineTo(5, 6); _mmCtx.lineTo(-5, 6); _mmCtx.closePath(); _mmCtx.fill();
+  // Tip at (0,0) is the player's exact position — base extends behind.
+  _mmCtx.beginPath(); _mmCtx.moveTo(0, 0); _mmCtx.lineTo(5, 13); _mmCtx.lineTo(-5, 13); _mmCtx.closePath(); _mmCtx.fill();
   _mmCtx.strokeStyle = 'rgba(0,0,0,0.7)';
   _mmCtx.lineWidth = 1.2;
   _mmCtx.stroke();
@@ -11339,16 +11421,10 @@ function _drawMinimap(elapsed) {
 }
 
 // ── Compass booster ──────────────────────────────────────────────────────────
-// Compass no longer picks a building. While active, it auto-points at the
-// nearest live mythic or legendary NPC (uncollected/undefeated), without
-// disclosing who it is or how far. "Vague" by design — direction only.
-let _compassActive = false;
-
-function _handleC() {
-  if (!feetdex.hasBooster('compass')) return;
-  if (state !== 'playing' && state !== 'interior') return;
-  _compassActive = !_compassActive;
-}
+// Compass auto-points at the nearest live mythic or legendary NPC the
+// moment it's owned — no toggle, no special key. "Vague" because it shows
+// direction only (no distance, no name).
+function _handleC() { /* compass needs no manual key */ }
 
 function _findNearestBoss(from) {
   const npcs = window.ALL_NPCS || [];
@@ -11367,7 +11443,7 @@ function _findNearestBoss(from) {
 }
 
 function _updateCompassPointer() {
-  if (!feetdex.hasBooster('compass') || !_compassActive) {
+  if (!feetdex.hasBooster('compass')) {
     ui.updateCompassPointer(false);
     return;
   }
