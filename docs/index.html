@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T014647';
+  var BAKED = '20260508T015103';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -270,17 +270,25 @@
     #lock-overlay p  { font-size:15px; opacity:.65; }
     #lock-overlay .controls { margin-top:28px; font-size:12px; opacity:.4; line-height:2; text-align:center; }
 
-    /* Full-screen map overlay (M key) */
+    /* Full-screen map overlay (M key). The map fills as much of the
+       viewport as possible while staying square; the legend rides
+       alongside. Canvas internal resolution is fixed (see MAP_SIZE in
+       main.js); CSS scales the canvas to whatever size the wrap is. */
     #map-overlay { position:fixed; inset:0; background:rgba(0,0,0,.92);
       display:none; flex-direction:column; align-items:center; justify-content:center; z-index:165; }
     #map-overlay.active { display:flex; }
-    #map-row { display:flex; gap:18px; align-items:flex-start; }
-    #map-wrap { position:relative; width:500px; height:500px; }
-    #map-can-static, #map-can-dyn { position:absolute; top:0; left:0; }
+    #map-row { display:flex; gap:18px; align-items:flex-start;
+      width:100vw; height:100vh; padding:24px; box-sizing:border-box;
+      justify-content:center; }
+    #map-wrap { position:relative; width:min(88vh, calc(100vw - 280px));
+      height:min(88vh, calc(100vw - 280px)); }
+    #map-can-static, #map-can-dyn { position:absolute; top:0; left:0;
+      width:100%; height:100%; }
     #map-close-hint { font-size:11px; opacity:.35; margin-top:10px; }
 
     /* Side-panel legend listing landmark colors and station markers */
-    #map-legend { width:230px; height:500px; overflow-y:auto;
+    #map-legend { width:220px; height:min(88vh, calc(100vw - 280px));
+      overflow-y:auto;
       background:rgba(20,20,28,.85); border:1px solid rgba(255,255,255,.18);
       border-radius:4px; padding:12px 14px; font-size:11px;
       color:#dcdcdc; letter-spacing:1px; }
@@ -824,8 +832,8 @@
   <div id="map-overlay">
     <div id="map-row">
       <div id="map-wrap">
-        <canvas id="map-can-static" width="500" height="500"></canvas>
-        <canvas id="map-can-dyn"    width="500" height="500"></canvas>
+        <canvas id="map-can-static" width="1000" height="1000"></canvas>
+        <canvas id="map-can-dyn"    width="1000" height="1000"></canvas>
       </div>
       <div id="map-legend"></div>
     </div>
@@ -10500,7 +10508,7 @@ function _triggerDeath() {
 }
 
 // ── Full-screen map (M key) ───────────────────────────────────────────────────
-const MAP_SIZE  = 500;
+const MAP_SIZE  = 1000;
 const MAP_WORLD = 265;
 const MAP_SCALE = MAP_SIZE / (MAP_WORLD * 2);
 
@@ -10678,29 +10686,25 @@ function _drawMapLabel(ctx, text, x, y, color, fontPx, placed) {
     ctx.fillText(text, cx, cy);
   };
 
-  // Spiral of candidate offsets from the anchor. Steps outward in rings so
-  // the closest non-overlapping spot wins.
+  // Spiral of candidate offsets from the anchor. Generated dynamically so
+  // we cover many rings — important on a dense map where the first 4 rings
+  // were running out of free spots and labels were ending up on top of
+  // each other.
   const STEP_Y = h + 3;
   const STEP_X = h + 3;
-  const candidates = [
-    [0, 0],
-    // ring 1
-    [0, -STEP_Y], [0, STEP_Y],
-    [-(w / 2 + STEP_X), 0], [w / 2 + STEP_X, 0],
-    // ring 2
-    [0, -STEP_Y * 2], [0, STEP_Y * 2],
-    [-(w / 2 + STEP_X), -STEP_Y], [w / 2 + STEP_X, -STEP_Y],
-    [-(w / 2 + STEP_X),  STEP_Y], [w / 2 + STEP_X,  STEP_Y],
-    // ring 3
-    [0, -STEP_Y * 3], [0, STEP_Y * 3],
-    [-(w / 2 + STEP_X * 2), 0], [w / 2 + STEP_X * 2, 0],
-    [-(w / 2 + STEP_X), -STEP_Y * 2], [w / 2 + STEP_X, -STEP_Y * 2],
-    [-(w / 2 + STEP_X),  STEP_Y * 2], [w / 2 + STEP_X,  STEP_Y * 2],
-    // ring 4
-    [0, -STEP_Y * 4], [0, STEP_Y * 4],
-    [-(w / 2 + STEP_X * 2), -STEP_Y], [w / 2 + STEP_X * 2, -STEP_Y],
-    [-(w / 2 + STEP_X * 2),  STEP_Y], [w / 2 + STEP_X * 2,  STEP_Y],
-  ];
+  const candidates = [[0, 0]];
+  for (let ring = 1; ring <= 8; ring++) {
+    // Vertical above + below
+    candidates.push([0, -STEP_Y * ring], [0, STEP_Y * ring]);
+    // Side, with progressively more horizontal spread per ring
+    const sx = w / 2 + STEP_X * Math.min(ring, 3);
+    candidates.push([-sx, 0], [sx, 0]);
+    // Diagonals at various offsets
+    for (let v = 1; v <= ring; v++) {
+      candidates.push([-sx, -STEP_Y * v], [sx, -STEP_Y * v]);
+      candidates.push([-sx,  STEP_Y * v], [sx,  STEP_Y * v]);
+    }
+  }
   for (const [dx, dy] of candidates) {
     const cx = x + dx, cy = y + dy;
     if (!_hits(cx, cy)) { _draw(cx, cy); return true; }
@@ -10760,12 +10764,12 @@ function _drawStaticMap() {
   staticCtx.textBaseline = 'middle';
   const placedLabels = [];
 
-  // Pre-register the yellow enterable-building dots as exclusion zones so
+  // Pre-register the colored enterable-building dots as exclusion zones so
   // landmark labels are guaranteed to skip past them and stay readable.
   for (const lbl of world.buildingLabels) {
     if (lbl.name === 'Shop' || lbl.name === 'Bodega') continue; // landmarks
     const [bx, bz] = _wm(lbl.wx, lbl.wz);
-    const r = 6;                           // dot radius + small clearance
+    const r = 12;                          // dot radius + clearance
     placedLabels.push({ x: bx - r, y: bz - r, w: r * 2, h: r * 2 });
   }
 
@@ -10785,9 +10789,9 @@ function _drawStaticMap() {
   for (const lm of _byImportance) {
     const [cx, cz] = _wm(lm.wx, lm.wz);
     if (_isHero(lm)) {
-      _drawMapLabel(staticCtx, lm.label, cx, cz, '#FFD700', 13, placedLabels);
+      _drawMapLabel(staticCtx, lm.label, cx, cz, '#FFD700', 22, placedLabels);
     } else {
-      _drawMapLabel(staticCtx, lm.label, cx, cz, '#ffffff', 11, placedLabels);
+      _drawMapLabel(staticCtx, lm.label, cx, cz, '#ffffff', 18, placedLabels);
     }
   }
 
@@ -10799,10 +10803,10 @@ function _drawStaticMap() {
     const [bx, bz] = _wm(lbl.wx, lbl.wz);
     staticCtx.fillStyle = _buildingColor(lbl.name);
     staticCtx.beginPath();
-    staticCtx.arc(bx, bz, 4.0, 0, Math.PI * 2);
+    staticCtx.arc(bx, bz, 7.5, 0, Math.PI * 2);
     staticCtx.fill();
     staticCtx.strokeStyle = 'rgba(0,0,0,.6)';
-    staticCtx.lineWidth = 1.2;
+    staticCtx.lineWidth = 2;
     staticCtx.stroke();
   }
   // Pass 2: building names. Drawn AFTER landmarks so landmark text wins the
@@ -10811,7 +10815,7 @@ function _drawStaticMap() {
   for (const lbl of world.buildingLabels) {
     if (lbl.name === 'Shop' || lbl.name === 'Bodega') continue;
     const [bx, bz] = _wm(lbl.wx, lbl.wz);
-    _drawMapLabel(staticCtx, lbl.name, bx, bz, '#e6e6e6', 9, placedLabels);
+    _drawMapLabel(staticCtx, lbl.name, bx, bz, '#e6e6e6', 14, placedLabels);
   }
   // Hero treatment for Morton's Shop + Fleet Feet — bigger marker with a
   // glowing gold ring so they read as "important" at a glance even on a
@@ -10822,13 +10826,13 @@ function _drawStaticMap() {
     const [cx, cz] = _wm(lm.wx, lm.wz);
     staticCtx.save();
     staticCtx.shadowColor = '#FFD700';
-    staticCtx.shadowBlur  = 10;
+    staticCtx.shadowBlur  = 18;
     staticCtx.fillStyle   = lm.color;
     staticCtx.beginPath();
-    staticCtx.arc(cx, cz, 9, 0, Math.PI * 2);
+    staticCtx.arc(cx, cz, 17, 0, Math.PI * 2);
     staticCtx.fill();
     staticCtx.shadowBlur  = 0;
-    staticCtx.lineWidth   = 2.4;
+    staticCtx.lineWidth   = 4;
     staticCtx.strokeStyle = '#FFD700';
     staticCtx.stroke();
     staticCtx.restore();
@@ -10844,19 +10848,19 @@ function _drawStaticMap() {
     const [sx, sz] = _wm(st.x, st.z);
     staticCtx.fillStyle = '#0033CC';
     staticCtx.beginPath();
-    staticCtx.arc(sx, sz, 6, 0, Math.PI * 2);
+    staticCtx.arc(sx, sz, 11, 0, Math.PI * 2);
     staticCtx.fill();
     staticCtx.fillStyle = '#fff';
     staticCtx.beginPath();
-    staticCtx.arc(sx, sz, 2, 0, Math.PI * 2);
+    staticCtx.arc(sx, sz, 4, 0, Math.PI * 2);
     staticCtx.fill();
-    _mapStationHits.push({ st, cx: sx, cy: sz, r: 10 });
-    placedLabels.push({ x: sx - 8, y: sz - 8, w: 16, h: 16 });
+    _mapStationHits.push({ st, cx: sx, cy: sz, r: 18 });
+    placedLabels.push({ x: sx - 14, y: sz - 14, w: 28, h: 28 });
   }
   // Pass 2: street-name labels in subway blue
   for (const st of stations) {
     const [sx, sz] = _wm(st.x, st.z);
-    _drawMapLabel(staticCtx, st.name, sx, sz, '#88ccff', 11, placedLabels);
+    _drawMapLabel(staticCtx, st.name, sx, sz, '#88ccff', 16, placedLabels);
   }
 }
 
@@ -10874,10 +10878,10 @@ function _drawDynamicMap() {
       const [nx, nz] = _wm(projected.x, projected.z);
       dynCtx.fillStyle = RADAR_DOT_COLORS[npc.rarity];
       dynCtx.beginPath();
-      dynCtx.arc(nx, nz, 4, 0, Math.PI * 2);
+      dynCtx.arc(nx, nz, 7, 0, Math.PI * 2);
       dynCtx.fill();
       dynCtx.strokeStyle = 'rgba(0,0,0,0.7)';
-      dynCtx.lineWidth = 1.2;
+      dynCtx.lineWidth = 2;
       dynCtx.stroke();
     }
   }
@@ -10889,13 +10893,13 @@ function _drawDynamicMap() {
   dynCtx.rotate(-player.yaw);
   dynCtx.fillStyle = '#44ff88';
   dynCtx.beginPath();
-  dynCtx.moveTo(0, -10);
-  dynCtx.lineTo(7, 9);
-  dynCtx.lineTo(-7, 9);
+  dynCtx.moveTo(0, -18);
+  dynCtx.lineTo(13, 16);
+  dynCtx.lineTo(-13, 16);
   dynCtx.closePath();
   dynCtx.fill();
-  dynCtx.strokeStyle = 'rgba(0,0,0,0.7)';
-  dynCtx.lineWidth = 1.5;
+  dynCtx.strokeStyle = 'rgba(0,0,0,0.8)';
+  dynCtx.lineWidth = 2.5;
   dynCtx.stroke();
   dynCtx.restore();
   // Indoor indicator: dashed circle around the arrow
