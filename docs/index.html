@@ -7,6 +7,23 @@
   <meta http-equiv="Cache-Control" content="no-store, max-age=0"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
+  <script>(function(){
+  var BAKED = '20260508T014647';
+  try {
+    var u = new URL(location.href);
+    if (u.searchParams.get("v") === BAKED) return;
+    fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
+      .then(function(r){ return r.ok ? r.text() : ""; })
+      .then(function(latest){
+        latest = (latest || "").trim();
+        if (latest && latest !== BAKED) {
+          u.searchParams.set("v", latest);
+          location.replace(u.toString());
+        }
+      })
+      .catch(function(){});
+  } catch (e) {}
+})();</script>
 
   
   <style>
