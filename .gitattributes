@@ -1,0 +1,4 @@
+# Built bundle files: keep LF, don't normalize. Avoids the auto-publish in
+# build_single.py thinking the file is "unchanged" when only CRLF differs.
+docs/index.html  text eol=lf
+feetdex-nyc.html text eol=lf
