@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FeetDex: NYC</title>
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js" } }
+  </script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#000; overflow:hidden; font-family:'Courier New',monospace; color:#fff; }
+    #canvas { display:block; width:100vw; height:100vh; }
+
+    /* HUD */
+    #hud { position:fixed; inset:0; pointer-events:none; user-select:none; }
+    #hud-title { position:absolute; top:14px; left:16px; font-size:18px; font-weight:bold;
+      text-shadow:1px 1px 3px #000; letter-spacing:2px; }
+    #hud-collection { position:absolute; top:14px; right:180px; font-size:13px; text-shadow:1px 1px 3px #000; }
+
+    /* Gold readout — anchored top-right alongside the collection counter. */
+    #hud-gold { position:absolute; top:32px; right:180px; font-size:14px;
+      color:#FFD700; text-shadow:1px 1px 3px #000; font-weight:bold;
+      letter-spacing:1px; }
+
+    /* Tutorial pointing hand. A single oversized emoji that moves around
+       the screen during the tutorial — it points at the next thing the
+       player needs to look at. After the tutorial it's permanently hidden.
+       Default orientation sits ABOVE the target (hand-above); when the
+       target is too close to the top of the screen we use hand-below
+       which sits BELOW the target and points up. */
+    #tutorial-hand { position:fixed; left:0; top:0; font-size:84px;
+      line-height:1; user-select:none; pointer-events:none;
+      filter:drop-shadow(3px 3px 6px #000) drop-shadow(0 0 12px rgba(255,215,0,.7));
+      opacity:0; transition:opacity .25s, left .15s linear, top .15s linear;
+      z-index:240; transform:translate(-50%, -100%); }
+    #tutorial-hand.hand-below { transform:translate(-50%, 0%); }
+    #tutorial-hand.active             { opacity:1; animation:tut-hand-bob-down 0.9s ease-in-out infinite; }
+    #tutorial-hand.active.hand-below  { animation:tut-hand-bob-up   0.9s ease-in-out infinite; }
+    @keyframes tut-hand-bob-down {
+      0%, 100% { transform:translate(-50%, -100%)            scale(1);    }
+      50%      { transform:translate(-50%, calc(-100% - 14px)) scale(1.12); }
+    }
+    @keyframes tut-hand-bob-up {
+      0%, 100% { transform:translate(-50%, 0%)               scale(1);    }
+      50%      { transform:translate(-50%, calc(0% + 14px))  scale(1.12); }
+    }
+
+    /* Floating "+N gold" toast that drifts up and fades on collection */
+    #gold-toast { position:fixed; top:50%; left:50%;
+      transform:translate(-50%, -50%); font-size:42px; font-weight:bold;
+      color:#FFD700; text-shadow:2px 2px 6px #000, 0 0 18px rgba(255,215,0,.6);
+      pointer-events:none; opacity:0; z-index:80;
+      transition:opacity .3s, transform 1.2s cubic-bezier(.2,.7,.4,1); }
+    #gold-toast.fly { opacity:1; transform:translate(-50%, -160%); }
+
+    /* Morton's Shop overlay */
+    #morton-shop { position:fixed; inset:0; background:rgba(20,12,4,.96);
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      z-index:175; padding:32px 24px; }
+    #morton-shop.active { display:flex; }
+    #morton-shop h2 { font-size:30px; letter-spacing:5px;
+      color:#FFD27A; text-shadow:0 0 14px rgba(255,180,80,.4);
+      margin-bottom:6px; }
+    #morton-shop .ms-sub { font-size:11px; opacity:.6; letter-spacing:3px;
+      margin-bottom:6px; color:#cdb285; }
+    #morton-shop .ms-gold { font-size:18px; color:#FFD700; font-weight:bold;
+      letter-spacing:2px; margin-bottom:24px; }
+    #ms-cards { display:flex; gap:14px; flex-wrap:wrap; justify-content:center;
+      max-width:1100px; }
+    .ms-card { width:180px; background:rgba(40,28,16,.9);
+      border:2px solid rgba(160,120,60,.5); border-radius:6px;
+      padding:14px 12px; display:flex; flex-direction:column; align-items:center;
+      text-align:center; transition:border-color .15s, transform .15s; }
+    /* Tutorial highlight ring on the recommended card */
+    .ms-card.ms-highlight { border-color:#FFD700;
+      animation:ms-card-pulse 1.4s ease-in-out infinite; }
+    @keyframes ms-card-pulse {
+      0%, 100% { box-shadow:0 0 0 rgba(255,215,0,0); transform:scale(1); }
+      50%      { box-shadow:0 0 22px rgba(255,215,0,.7); transform:scale(1.04); }
+    }
+    .ms-card:hover { border-color:rgba(255,210,120,.85); transform:translateY(-3px); }
+    .ms-card.owned { border-color:rgba(80,200,120,.7);
+      background:rgba(20,40,28,.85); }
+    .ms-icon { font-size:36px; margin-bottom:8px; }
+    .ms-name { font-size:13px; font-weight:bold; color:#FFD27A;
+      letter-spacing:2px; margin-bottom:6px; }
+    .ms-desc { font-size:10px; color:#bba98a; line-height:1.5;
+      min-height:42px; margin-bottom:10px; }
+    .ms-price { font-size:14px; color:#FFD700; font-weight:bold;
+      margin-bottom:8px; }
+    .ms-buy { background:rgba(120,80,40,.7); border:1px solid rgba(255,210,120,.6);
+      color:#fff; font-family:'Courier New',monospace; font-size:11px;
+      letter-spacing:2px; padding:7px 14px; cursor:pointer; border-radius:3px;
+      width:100%; }
+    .ms-buy:hover { background:rgba(180,120,60,.85); }
+    .ms-buy.owned { background:rgba(60,120,80,.6); border-color:rgba(120,200,140,.7);
+      cursor:default; }
+    .ms-buy.cant { background:rgba(80,40,40,.6); border-color:rgba(160,80,80,.55);
+      color:#cca; cursor:default; }
+    #ms-morton-line { font-size:13px; color:#cdb285; font-style:italic;
+      margin-top:24px; max-width:600px; text-align:center; min-height:36px; }
+    #ms-close-hint { position:absolute; bottom:24px; font-size:11px;
+      opacity:.45; letter-spacing:2px; }
+
+    /* Fleet Feet (cosmetic shop) overlay */
+    #fleet-feet { position:fixed; inset:0; background:rgba(12,12,12,.96);
+      display:none; flex-direction:column; align-items:center; justify-content:flex-start;
+      z-index:175; padding:32px 24px; overflow-y:auto; }
+    #fleet-feet.active { display:flex; }
+    #fleet-feet h2 { font-size:34px; letter-spacing:6px;
+      color:#ffffff; text-shadow:0 0 14px rgba(255,102,51,.5);
+      margin-bottom:6px; font-family:'Impact','Arial Black',sans-serif; }
+    #fleet-feet .ff-sub { font-size:11px; opacity:.6; letter-spacing:3px;
+      margin-bottom:6px; color:#ff8855; }
+    #fleet-feet .ff-gold { font-size:18px; color:#FFD700; font-weight:bold;
+      letter-spacing:2px; margin-bottom:20px; }
+    #ff-cards { display:grid; grid-template-columns:repeat(auto-fill,150px);
+      gap:12px; max-width:1100px; justify-content:center; padding-bottom:20px; }
+    .ff-card { width:150px; background:rgba(28,28,32,.92);
+      border:2px solid rgba(255,102,51,.45); border-radius:6px;
+      padding:10px 8px; display:flex; flex-direction:column; align-items:center;
+      text-align:center; transition:border-color .15s, transform .15s; }
+    .ff-card:hover { border-color:rgba(255,140,80,.95); transform:translateY(-2px); }
+    .ff-card.locked { border-color:rgba(80,80,80,.5);
+      background:rgba(20,20,24,.7); opacity:.55; }
+    .ff-card.owned { border-color:rgba(255,170,90,.85); }
+    .ff-card.equipped { border-color:rgba(80,220,140,.85);
+      box-shadow:0 0 14px rgba(80,220,140,.4); }
+    .ff-rarity { font-size:9px; letter-spacing:2px; font-weight:bold;
+      margin-bottom:4px; }
+    .ff-icon { font-size:32px; margin-bottom:4px; }
+    .ff-name { font-size:10px; color:#eee; line-height:1.3;
+      min-height:32px; margin-bottom:4px; }
+    .ff-price { font-size:13px; color:#FFD700; font-weight:bold;
+      margin-bottom:8px; }
+    .ff-btn-row { width:100%; }
+    .ff-btn { width:100%; background:rgba(180,80,40,.7);
+      border:1px solid rgba(255,140,80,.7); color:#fff;
+      font-family:'Courier New',monospace; font-size:9px;
+      letter-spacing:1.5px; padding:6px 4px; cursor:pointer; border-radius:3px; }
+    .ff-btn:hover { background:rgba(220,110,60,.85); }
+    .ff-btn.owned { background:rgba(40,80,140,.7);
+      border-color:rgba(120,180,255,.6); }
+    .ff-btn.owned:hover { background:rgba(60,110,180,.85); }
+    .ff-btn.equipped { background:rgba(40,120,80,.75);
+      border-color:rgba(120,220,160,.7); }
+    .ff-btn.equipped:hover { background:rgba(60,160,110,.9); }
+    .ff-btn.cant { background:rgba(60,60,70,.6);
+      border-color:rgba(120,120,140,.5); color:#aaa; cursor:default; }
+    #ff-vance-line { font-size:13px; color:#ff9966; font-style:italic;
+      margin-top:14px; max-width:600px; text-align:center; min-height:36px; }
+    #ff-close-hint { position:absolute; bottom:24px; font-size:11px;
+      opacity:.45; letter-spacing:2px; color:#ff9966; }
+
+    /* Win-screen budgeting portfolio */
+    #win-portfolio { width:520px; max-width:90%; background:rgba(20,20,28,.85);
+      border:1px solid rgba(255,255,255,.18); border-radius:8px;
+      padding:20px 24px; margin-bottom:24px; }
+    #win-portfolio h3 { font-size:13px; letter-spacing:4px; opacity:.7;
+      margin-bottom:14px; text-align:center; }
+    .wp-row { display:flex; justify-content:space-between;
+      font-size:12px; padding:5px 0; opacity:.85; }
+    .wp-saved { border-top:1px solid rgba(255,255,255,.15);
+      padding-top:9px; margin-top:5px; opacity:1; font-weight:bold; }
+    .wp-num { color:#FFD700; font-family:'Courier New',monospace; }
+    .wp-bar { display:flex; height:10px; margin-top:14px;
+      background:rgba(0,0,0,.4); border-radius:3px; overflow:hidden; }
+    .wp-seg { transition:flex .4s; }
+    .wp-seg-tools { background:#C9A24A; }
+    .wp-seg-skins { background:#FF6633; }
+    .wp-seg-saved { background:#446b8a; }
+    .wp-legend { display:flex; justify-content:center; gap:18px;
+      font-size:10px; margin-top:8px; opacity:.65; }
+    .wp-dot { display:inline-block; width:8px; height:8px;
+      border-radius:50%; margin-right:5px; vertical-align:middle; }
+    .wp-dot-tools { background:#C9A24A; }
+    .wp-dot-skins { background:#FF6633; }
+    .wp-dot-saved { background:#446b8a; }
+    .wp-verdicts { margin-top:16px; display:flex; flex-direction:column; gap:7px; }
+    .wp-verdict { font-size:11px; line-height:1.5; padding:8px 12px;
+      border-left:3px solid; border-radius:3px; text-align:left; }
+    .wp-verdict.v-good { color:#a8e6c0; border-left-color:#5fbf85;
+      background:rgba(40,90,60,.25); }
+    .wp-verdict.v-warn { color:#f0d090; border-left-color:#caa050;
+      background:rgba(80,60,30,.3); }
+    .wp-verdict.v-bad  { color:#f4b0a0; border-left-color:#cc6044;
+      background:rgba(80,30,30,.3); }
+
+    /* Ancient Tracker compass arrow at top of screen */
+    #tracker-compass { position:fixed; top:80px; left:50%;
+      transform:translateX(-50%); display:none; align-items:center; gap:8px;
+      background:rgba(0,0,0,.55); border:1px solid rgba(255,215,0,.4);
+      border-radius:4px; padding:6px 14px; z-index:35;
+      color:#FFE08A; font-size:12px; letter-spacing:2px;
+      text-shadow:1px 1px 2px #000; }
+    #tracker-compass.active { display:flex; }
+    #tracker-compass svg { width:14px; height:14px; }
+
+    /* Compass booster pointer — top-LEFT so it doesn't fight the tracker */
+    #compass-pointer { position:fixed; top:80px; left:24px;
+      display:none; align-items:center; gap:8px;
+      background:rgba(0,0,0,.55); border:1px solid rgba(110,170,255,.45);
+      border-radius:4px; padding:6px 14px; z-index:35;
+      color:#bbd6ff; font-size:12px; letter-spacing:2px;
+      text-shadow:1px 1px 2px #000; }
+    #compass-pointer.active { display:flex; }
+    #compass-pointer svg { width:14px; height:14px; }
+
+    /* Compass destination selector (opened with [C]) */
+    #compass-picker { position:fixed; inset:0; background:rgba(8,16,32,.94);
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      z-index:175; padding:32px 24px; }
+    #compass-picker.active { display:flex; }
+    #compass-picker h2 { font-size:24px; letter-spacing:5px;
+      color:#bbd6ff; text-shadow:0 0 14px rgba(110,170,255,.5); margin-bottom:6px; }
+    #compass-picker .cp-sub { font-size:11px; opacity:.55;
+      letter-spacing:3px; margin-bottom:24px; color:#7990b8; }
+    #cp-grid { display:grid; grid-template-columns:repeat(3,1fr);
+      gap:10px; max-width:600px; }
+    .cp-btn { background:rgba(20,40,80,.7);
+      border:1px solid rgba(110,170,255,.4); color:#cee0ff;
+      font-family:'Courier New',monospace; font-size:12px;
+      letter-spacing:2px; padding:14px 18px; cursor:pointer;
+      border-radius:4px; transition:background .15s, border-color .15s; }
+    .cp-btn:hover { background:rgba(40,70,140,.85);
+      border-color:rgba(180,220,255,.85); }
+    #cp-close { position:absolute; bottom:24px; font-size:11px;
+      opacity:.5; letter-spacing:2px; }
+
+    /* MetroCard subway-teleport overlay shown on the map */
+    .map-station-icon { fill:#FFD700; stroke:#000; stroke-width:1.4;
+      cursor:pointer; }
+    .map-station-icon:hover { fill:#fff5aa; }
+    #hud-interact { position:absolute; bottom:28px; left:50%; transform:translateX(-50%);
+      font-size:13px; text-shadow:1px 1px 3px #000; background:rgba(0,0,0,0.45);
+      padding:4px 14px; border-radius:4px; transition:opacity .3s; }
+
+    /* Crosshair */
+    #crosshair { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      width:20px; height:20px; pointer-events:none; }
+    #crosshair::before, #crosshair::after { content:''; position:absolute; background:rgba(255,255,255,.75); }
+    #crosshair::before { width:2px; height:100%; left:50%; transform:translateX(-50%); }
+    #crosshair::after  { width:100%; height:2px; top:50%; transform:translateY(-50%); }
+
+    /* Click-to-play */
+    #lock-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75);
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      cursor:pointer; z-index:100; }
+    #lock-overlay h1 { font-size:52px; letter-spacing:6px; margin-bottom:10px; }
+    #lock-overlay p  { font-size:15px; opacity:.65; }
+    #lock-overlay .controls { margin-top:28px; font-size:12px; opacity:.4; line-height:2; text-align:center; }
+
+    /* Full-screen map overlay (M key) */
+    #map-overlay { position:fixed; inset:0; background:rgba(0,0,0,.92);
+      display:none; flex-direction:column; align-items:center; justify-content:center; z-index:165; }
+    #map-overlay.active { display:flex; }
+    #map-row { display:flex; gap:18px; align-items:flex-start; }
+    #map-wrap { position:relative; width:500px; height:500px; }
+    #map-can-static, #map-can-dyn { position:absolute; top:0; left:0; }
+    #map-close-hint { font-size:11px; opacity:.35; margin-top:10px; }
+
+    /* Side-panel legend listing landmark colors and station markers */
+    #map-legend { width:230px; height:500px; overflow-y:auto;
+      background:rgba(20,20,28,.85); border:1px solid rgba(255,255,255,.18);
+      border-radius:4px; padding:12px 14px; font-size:11px;
+      color:#dcdcdc; letter-spacing:1px; }
+    #map-legend h4 { font-size:12px; letter-spacing:3px; opacity:.7;
+      margin-bottom:10px; padding-bottom:6px;
+      border-bottom:1px solid rgba(255,255,255,.15); }
+    #map-legend h4:not(:first-child) { margin-top:14px; }
+    .lg-row { display:flex; align-items:center; gap:8px; padding:3px 0; }
+    .lg-swatch { display:inline-block; width:14px; height:14px;
+      border:1px solid rgba(0,0,0,.55); border-radius:2px; flex-shrink:0; }
+    .lg-swatch.circle { border-radius:50%; }
+    .lg-text { font-size:11px; }
+
+    /* Dialogue panel */
+    #dialogue-panel { position:fixed; bottom:0; left:0; right:0; height:30%;
+      background:rgba(6,6,14,.9); border-top:1px solid rgba(255,255,255,.12);
+      display:none; padding:18px 28px 14px; z-index:50; flex-direction:column; }
+    #dialogue-panel.active { display:flex; }
+    #dialogue-header { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+    #dialogue-npc-name { font-size:15px; font-weight:bold; }
+    #dialogue-rarity-badge { font-size:10px; padding:2px 8px; border-radius:10px;
+      text-transform:uppercase; letter-spacing:1px; font-weight:bold; }
+    #dialogue-encounter { font-size:11px; opacity:.4; margin-left:auto; }
+    #dialogue-text { flex:1; font-size:14px; line-height:1.7; }
+    #dialogue-hint { text-align:right; font-size:11px; opacity:.45; margin-top:6px; }
+
+    /* Discovery overlay */
+    #discovery-overlay { position:fixed; inset:0; background:#000;
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      z-index:200; text-align:center; }
+    #discovery-overlay.active { display:flex; }
+    #discovery-border { border:2px solid #fff; padding:36px 56px;
+      animation:pulse-border 1.5s infinite; }
+    #discovery-overlay.legendary #discovery-border { border-color:#ffd700; animation:pulse-gold 1s infinite; }
+    @keyframes pulse-border { 0%,100%{border-color:rgba(255,255,255,.5);box-shadow:0 0 8px rgba(255,255,255,.15)}
+      50%{border-color:#fff;box-shadow:0 0 28px rgba(255,255,255,.5)} }
+    @keyframes pulse-gold { 0%,100%{border-color:#ffd700;box-shadow:0 0 18px rgba(255,215,0,.3)}
+      50%{border-color:#ffec6e;box-shadow:0 0 55px rgba(255,215,0,.75)} }
+    #discovery-foot { width:72px; height:72px; margin-bottom:14px; }
+    #discovery-rarity { font-size:11px; letter-spacing:4px; text-transform:uppercase; margin-bottom:4px; }
+    #discovery-title { font-size:26px; font-weight:bold; margin-bottom:6px; }
+    #discovery-name { font-size:17px; opacity:.85; margin-bottom:4px; }
+    #discovery-sub { font-size:11px; opacity:.4; margin-bottom:22px; }
+    #discovery-cta { font-size:12px; opacity:.5; animation:blink 1.2s infinite; }
+    @keyframes blink { 0%,100%{opacity:.4} 50%{opacity:1} }
+
+    /* FeetDex screen */
+    #feetdex-screen { position:fixed; inset:0; background:rgba(4,4,14,.97);
+      display:none; flex-direction:column; padding:22px 24px; z-index:150; overflow-y:auto; }
+    #feetdex-screen.active { display:flex; }
+    #feetdex-screen h2 { font-size:22px; letter-spacing:4px; margin-bottom:2px; }
+    #feetdex-screen .subtitle { font-size:11px; opacity:.4; margin-bottom:18px; }
+    #feetdex-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; }
+    .fdex-slot { border:1px solid rgba(255,255,255,.12); padding:12px 8px;
+      display:flex; flex-direction:column; align-items:center; text-align:center;
+      min-height:110px; border-radius:3px; }
+    .fdex-slot.unlocked { border-color:rgba(255,255,255,.35); }
+    .fdex-slot.legendary-slot { border-color:rgba(255,215,0,.3); }
+    .fdex-slot.legendary-slot.unlocked { border-color:#ffd700; box-shadow:0 0 8px rgba(255,215,0,.3); }
+    .fdex-slot svg { width:32px; height:32px; margin-bottom:6px; }
+    .fdex-slot .slot-rarity { font-size:9px; letter-spacing:2px; text-transform:uppercase; margin-bottom:4px; }
+    .fdex-slot .slot-name { font-size:10px; line-height:1.4; opacity:.85; }
+    .fdex-slot .slot-lock { font-size:20px; opacity:.18; }
+    .fdex-close { position:absolute; top:14px; right:20px; font-size:13px; cursor:pointer;
+      opacity:.5; pointer-events:all; }
+    .fdex-close:hover { opacity:1; }
+
+    /* Pause menu */
+    #pause-menu { position:fixed; inset:0; background:rgba(0,0,0,.82);
+      display:none; flex-direction:column; align-items:center; justify-content:center; z-index:160; }
+    #pause-menu.active { display:flex; }
+    #pause-menu h2 { font-size:30px; letter-spacing:4px; margin-bottom:6px; }
+    #pause-count { font-size:12px; opacity:.35; margin-bottom:24px; }
+    .pause-btn { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18);
+      color:#fff; font-family:'Courier New',monospace; font-size:13px; letter-spacing:2px;
+      padding:11px 36px; margin:5px; cursor:pointer; width:250px; transition:background .15s; }
+    .pause-btn:hover { background:rgba(255,255,255,.16); }
+    .pause-btn.danger { border-color:rgba(255,80,80,.35); color:#ff8888; }
+    #vol-row { display:flex; align-items:center; gap:12px; margin:10px 0; }
+    #vol-row label { font-size:11px; opacity:.5; width:56px; }
+    #vol-slider { width:150px; accent-color:#fff; }
+
+    /* Mini-game overlay */
+    #minigame-overlay { position:fixed; inset:0; background:rgba(3,3,10,.96);
+      display:none; flex-direction:column; align-items:center; justify-content:center; z-index:180; }
+    #minigame-overlay.active { display:flex; }
+    #minigame-header { text-align:center; margin-bottom:22px; }
+    #mg-npc-name { font-size:19px; font-weight:bold; }
+    .mg-challenge-label { font-size:10px; letter-spacing:4px; color:#ff6600; text-transform:uppercase; margin-top:4px; }
+    #mg-close-hint { position:absolute; top:14px; right:18px; font-size:11px; opacity:.35; cursor:pointer; }
+    #minigame-content { max-width:560px; width:100%; }
+
+    /* Mini-game shared styles */
+    .mg-title { font-size:16px; letter-spacing:2px; text-align:center; margin-bottom:20px; opacity:.7; }
+    .mg-timer { text-align:center; font-size:22px; font-weight:bold; margin-bottom:16px; }
+    .mg-score { text-align:center; font-size:12px; opacity:.5; margin-bottom:20px; }
+
+    /* RPS */
+    .rps-choices { display:flex; justify-content:center; gap:20px; margin-bottom:20px; }
+    .rps-btn { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.2);
+      font-size:44px; padding:16px 22px; cursor:pointer; border-radius:6px; transition:background .15s; }
+    .rps-btn:hover { background:rgba(255,255,255,.18); }
+    .rps-btn.selected { border-color:#fff; background:rgba(255,255,255,.22); }
+    .rps-result { text-align:center; font-size:16px; margin-top:10px; min-height:24px; }
+
+    /* Word scramble */
+    .ws-tiles { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:16px; }
+    .ws-tile { background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.25);
+      padding:8px 12px; font-size:16px; font-weight:bold; cursor:pointer; border-radius:3px;
+      min-width:36px; text-align:center; transition:background .1s; }
+    .ws-tile:hover { background:rgba(255,255,255,.2); }
+    .ws-tile.used { opacity:.2; cursor:default; }
+    .ws-answer { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:16px;
+      min-height:44px; border-bottom:1px solid rgba(255,255,255,.15); padding-bottom:12px; }
+    .ws-answer-tile { background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.2);
+      padding:8px 12px; font-size:16px; font-weight:bold; cursor:pointer; border-radius:3px; min-width:36px; text-align:center; }
+    .ws-controls { display:flex; justify-content:center; gap:12px; }
+    .ws-btn { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.2);
+      color:#fff; font-family:'Courier New',monospace; font-size:12px; padding:8px 20px; cursor:pointer; }
+    .ws-btn:hover { background:rgba(255,255,255,.15); }
+    .ws-progress { text-align:center; font-size:12px; opacity:.5; margin-bottom:12px; }
+
+    /* Reaction test */
+    .rt-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; max-width:280px; margin:0 auto 16px; }
+    .rt-tile { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.15);
+      height:72px; cursor:pointer; border-radius:4px; transition:background .1s; }
+    .rt-tile.lit { background:rgba(255,255,100,.6); border-color:#ffe; }
+    .rt-tile.clicked { background:rgba(100,200,255,.5); }
+    .rt-tile.wrong { background:rgba(255,60,60,.5); }
+    .rt-progress { text-align:center; font-size:12px; opacity:.5; margin-bottom:12px; }
+
+    /* Win screen */
+    #win-screen { position:fixed; inset:0; background:#000; display:none;
+      flex-direction:column; align-items:center; overflow-y:auto; z-index:300; padding:40px 24px; }
+    #win-screen.active { display:flex; }
+    #win-title { font-size:44px; letter-spacing:4px; margin-bottom:8px; }
+    #win-sub { font-size:13px; opacity:.45; margin-bottom:28px; }
+    #win-list { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:28px; max-width:800px; }
+    .win-entry { border:1px solid rgba(255,255,255,.18); padding:10px 14px; min-width:130px; text-align:center; border-radius:3px; }
+    .win-entry .w-rarity { font-size:9px; letter-spacing:2px; text-transform:uppercase; }
+    .win-entry .w-name { font-size:11px; margin-top:4px; opacity:.8; }
+    #win-play-again { background:none; border:1px solid rgba(255,255,255,.35);
+      color:#fff; font-family:'Courier New',monospace; font-size:13px;
+      letter-spacing:2px; padding:12px 40px; cursor:pointer; }
+    #win-play-again:hover { background:rgba(255,255,255,.1); }
+    #confetti-canvas { position:fixed; inset:0; pointer-events:none; z-index:301; }
+
+    /* Legendary 3-meeting hint */
+    #legendary-hint { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      display:none; background:rgba(8,8,16,.92);
+      border:2px solid rgba(255,215,0,.7); border-radius:10px;
+      padding:24px 36px; max-width:520px; text-align:center;
+      box-shadow:0 0 40px rgba(255,215,0,.35); z-index:170; }
+    #legendary-hint.active { display:block; }
+    #legendary-hint h3 { font-size:18px; letter-spacing:4px; color:#ffd700;
+      margin-bottom:14px; text-shadow:0 0 10px rgba(255,215,0,.6); }
+    #legendary-hint p { font-size:13px; line-height:1.7; color:#e8e8e8;
+      margin-bottom:14px; }
+    #legendary-hint .lh-cta { font-size:11px; opacity:.55; letter-spacing:2px; }
+
+    /* Generic tip popup. Three themes: default (b/w menu style),
+       theme-mythic (orange), theme-legendary (gold). */
+    #generic-tip { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+      display:none; background:rgba(8,8,16,.92);
+      border:2px solid rgba(255,255,255,.55); border-radius:10px;
+      padding:24px 36px; max-width:480px; text-align:center;
+      box-shadow:0 0 30px rgba(255,255,255,.18); z-index:170; }
+    #generic-tip.active { display:block; }
+    #generic-tip h3 { font-size:18px; letter-spacing:4px; color:#ffffff;
+      margin-bottom:14px; text-shadow:0 0 8px rgba(255,255,255,.3); }
+    #generic-tip p { font-size:13px; line-height:1.7; color:#e8e8e8;
+      margin-bottom:14px; }
+    #generic-tip .lh-cta { font-size:11px; opacity:.55; letter-spacing:2px; }
+    /* Mythic-fight theme — orange */
+    #generic-tip.theme-mythic { border-color:rgba(255,140,40,.75);
+      box-shadow:0 0 40px rgba(255,140,40,.35); }
+    #generic-tip.theme-mythic h3 { color:#ffaa55;
+      text-shadow:0 0 10px rgba(255,140,40,.6); }
+    /* Legendary-fight theme — gold */
+    #generic-tip.theme-legendary { border-color:rgba(255,215,0,.75);
+      box-shadow:0 0 40px rgba(255,215,0,.35); }
+    #generic-tip.theme-legendary h3 { color:#ffd700;
+      text-shadow:0 0 10px rgba(255,215,0,.6); }
+
+    /* Battle countdown overlay — large center number that ticks 3 → 2 → 1 → FIGHT! */
+    #countdown-overlay { position:fixed; inset:0; pointer-events:none;
+      display:none; align-items:center; justify-content:center;
+      z-index:155; background:rgba(0,0,0,0); transition:background .15s; }
+    #countdown-overlay.active { display:flex; }
+    #countdown-num { font-size:180px; font-weight:bold; color:#ff5555;
+      text-shadow:0 0 30px rgba(255,80,80,.8), 4px 4px 6px #000;
+      letter-spacing:4px; animation:cd-pop .8s ease-out; }
+    #countdown-num.go { color:#44ff88; font-size:140px;
+      text-shadow:0 0 40px rgba(80,255,140,.9), 4px 4px 6px #000; }
+    @keyframes cd-pop { 0% { transform:scale(2); opacity:0; }
+                        20% { transform:scale(1); opacity:1; }
+                        100% { transform:scale(1.05); opacity:0.95; } }
+
+    /* Death overlay */
+    #death-overlay { position:fixed; inset:0; background:rgba(20,0,0,.0);
+      display:none; flex-direction:column; align-items:center; justify-content:center;
+      z-index:400; transition:background .6s ease; }
+    #death-overlay.active { display:flex; background:rgba(20,0,0,.92); }
+    #death-overlay h1 { font-size:64px; letter-spacing:10px; color:#ff4444;
+      text-shadow:0 0 24px #ff0000, 2px 2px 4px #000;
+      animation:death-pulse 1.4s ease-in-out infinite; margin-bottom:14px; }
+    #death-overlay p { font-size:14px; opacity:.7; letter-spacing:2px; }
+    @keyframes death-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+
+    /* HUD message toast */
+    #hud-msg { position:fixed; bottom:72px; left:50%; transform:translateX(-50%);
+      font-size:14px; background:rgba(0,0,0,.72); padding:5px 16px;
+      border:1px solid rgba(255,255,255,.18); border-radius:4px;
+      opacity:0; transition:opacity .25s; pointer-events:none; z-index:30;
+      white-space:nowrap; }
+    #hud-msg.visible { opacity:1; }
+
+    /* Old combat HUD (kept for legacy code paths but hidden by default) */
+    #combat-hud { display:none; }
+
+    /* Battle vignette — subtle red border so it's clear you're in a fight */
+    #battle-vignette { position:fixed; inset:0; pointer-events:none;
+      box-shadow:inset 0 0 80px rgba(220,30,30,.55), inset 0 0 240px rgba(160,0,0,.35);
+      opacity:0; transition:opacity .4s; z-index:35; }
+    #battle-vignette.active { opacity:1; }
+
+    /* Hearts row — bottom-center, large and unmissable */
+    #combat-hearts { position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+      display:none; z-index:42; padding:10px 18px;
+      background:rgba(0,0,0,.55); border:2px solid rgba(255,80,80,.55);
+      border-radius:10px; box-shadow:0 4px 22px rgba(0,0,0,.55); }
+    #combat-hearts.active { display:flex; gap:6px; }
+    .cb2-heart { font-size:32px; line-height:1; text-shadow:0 0 6px rgba(0,0,0,.7); }
+    .cb2-full  { color:#ff3344; }
+    .cb2-half  { color:#ff3344; opacity:.55; }
+    .cb2-empty { color:#3a1010; opacity:.7; }
+
+    /* Enemy floating HP bar above their head (positioned by JS) */
+    #combat-npc-label { position:fixed; transform:translate(-50%,-130%);
+      display:none; z-index:42; pointer-events:none; text-align:center;
+      filter:drop-shadow(0 2px 4px rgba(0,0,0,.85)); }
+    #combat-npc-label.active { display:block; }
+    .cb2-name { font-size:13px; font-weight:bold; color:#fff;
+      letter-spacing:1px; margin-bottom:3px; text-shadow:1px 1px 3px #000; }
+    .cb2-bar-wrap { width:140px; height:8px; background:rgba(0,0,0,.7);
+      border:1px solid rgba(255,255,255,.5); border-radius:3px; overflow:hidden; }
+    .cb2-bar { height:100%; background:linear-gradient(90deg,#ff3344,#ff8866);
+      width:100%; transition:width .12s; }
+
+    /* Combat flash overlay */
+    #combat-flash { position:fixed; inset:0; pointer-events:none;
+      opacity:0; transition:opacity .12s; z-index:38; }
+
+    /* Rarity color classes */
+    .r-none     { color:#999; }
+    .r-common   { color:#6699cc; }
+    .r-rare     { color:#55aa55; }
+    .r-epic     { color:#aa55cc; }
+    .r-mythic   { color:#ff7733; }
+    .r-legendary{ color:#ffd700; }
+    .badge-common   { background:rgba(100,150,210,.25); color:#88bbee; }
+    .badge-rare     { background:rgba(80,170,80,.25);   color:#88cc88; }
+    .badge-epic     { background:rgba(170,80,210,.25);  color:#cc88ee; }
+    .badge-mythic   { background:rgba(255,120,50,.22);  color:#ffaa66; }
+    .badge-legendary{ background:rgba(255,215,0,.2);    color:#ffd700; }
+
+    /* ── Tutorial UI ───────────────────────────────────────────────────── */
+    #tutorial-arrow { position:fixed; top:60px; left:50%; transform:translateX(-50%);
+      width:80px; height:80px; z-index:60; pointer-events:none; opacity:0;
+      transition:opacity .3s; filter:drop-shadow(0 0 8px rgba(255,215,0,.7)); }
+    #tutorial-arrow.active { opacity:1; animation:tut-arrow-bob 1.2s ease-in-out infinite; }
+    #tutorial-arrow svg { width:100%; height:100%; }
+    @keyframes tut-arrow-bob {
+      0%, 100% { transform:translateX(-50%) translateY(0); }
+      50%      { transform:translateX(-50%) translateY(8px); }
+    }
+
+    #tutorial-checklist { position:fixed; top:50%; left:14px;
+      transform:translateY(-50%); width:230px; z-index:55; pointer-events:none;
+      background:rgba(20,16,8,.78); border:1px solid rgba(255,215,0,.45);
+      border-radius:6px; padding:12px 14px; font-size:12px; letter-spacing:1px;
+      display:none; }
+    #tutorial-checklist.active { display:block; }
+    #tutorial-checklist h4 { margin:0 0 8px 0; font-size:11px;
+      color:#FFD700; letter-spacing:3px; }
+    .tut-row { display:flex; align-items:flex-start; gap:6px;
+      padding:5px 0; opacity:.5; transition:opacity .2s, color .2s; }
+    .tut-row.current { opacity:1; color:#FFE680; }
+    .tut-row.done    { opacity:.7; color:#9bdc9b; text-decoration:line-through; }
+    .tut-row .tut-box { font-size:14px; line-height:1; flex-shrink:0; }
+    .tut-row.current { animation:tut-glow 1.6s ease-in-out infinite; }
+    @keyframes tut-glow {
+      0%, 100% { text-shadow:none; }
+      50%      { text-shadow:0 0 8px rgba(255,215,0,.7); }
+    }
+
+    /* Feet God tip theme — distinct from default/mythic/legendary */
+    #generic-tip.theme-feetgod { border-color:#FFD700;
+      background:linear-gradient(180deg, rgba(48,32,4,.97) 0%, rgba(20,12,2,.97) 100%);
+      box-shadow:0 0 22px rgba(255,215,0,.45), inset 0 0 12px rgba(255,215,0,.18); }
+    #generic-tip.theme-feetgod #tip-title { color:#FFD700;
+      letter-spacing:5px; text-shadow:0 0 10px rgba(255,215,0,.7); }
+
+    /* ── Feet God dialogue (full presentation, not just a tip) ─────────── */
+    /* Full-screen radial gold vignette behind the panel — subtle but
+       unmistakable signal that this is a divine voice, not a UI tip. */
+    #feetgod-overlay { position:fixed; inset:0; z-index:170;
+      pointer-events:none; opacity:0; transition:opacity .35s ease;
+      display:flex; align-items:flex-end; justify-content:center; }
+    #feetgod-overlay.active { opacity:1; }
+    #feetgod-vignette { position:absolute; inset:0; pointer-events:none;
+      background:
+        radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(40,28,4,.55) 70%, rgba(60,42,6,.85) 100%),
+        radial-gradient(ellipse at center, rgba(255,215,0,.10) 0%, rgba(255,215,0,0) 55%);
+      animation:fg-vignette-pulse 3.4s ease-in-out infinite; }
+    @keyframes fg-vignette-pulse {
+      0%, 100% { filter:brightness(1); }
+      50%      { filter:brightness(1.18); }
+    }
+    #feetgod-panel { position:relative; width:min(880px, 92vw);
+      margin:0 0 38px 0; padding:24px 30px 22px;
+      background:linear-gradient(180deg, rgba(36,22,4,.97) 0%, rgba(14,8,2,.98) 100%);
+      border:3px solid #FFD700; border-radius:10px; pointer-events:auto;
+      box-shadow:0 0 38px rgba(255,215,0,.65),
+                 0 0 80px rgba(255,180,40,.35),
+                 inset 0 0 28px rgba(255,215,0,.18);
+      animation:fg-border-glow 2.2s ease-in-out infinite; }
+    @keyframes fg-border-glow {
+      0%, 100% { box-shadow:0 0 32px rgba(255,215,0,.55),
+                            0 0 70px rgba(255,180,40,.30),
+                            inset 0 0 24px rgba(255,215,0,.16); }
+      50%      { box-shadow:0 0 50px rgba(255,215,0,.85),
+                            0 0 100px rgba(255,180,40,.50),
+                            inset 0 0 36px rgba(255,215,0,.26); }
+    }
+    #feetgod-name { font-size:30px; font-weight:bold; letter-spacing:9px;
+      color:#FFD700;
+      text-shadow:0 0 14px rgba(255,215,0,.9), 0 0 28px rgba(255,140,20,.55),
+                  2px 2px 0 #1a0d00, 4px 4px 0 #0a0500;
+      margin-bottom:14px; line-height:1; }
+    #feetgod-text { font-size:18px; line-height:1.6; color:#FFE9A8;
+      text-shadow:0 0 6px rgba(255,215,0,.4), 1px 1px 2px #000;
+      min-height:1.6em; }
+    #feetgod-text b { color:#FFFFFF; text-shadow:0 0 8px rgba(255,255,255,.5); }
+    #feetgod-hint { margin-top:16px; font-size:11px; letter-spacing:4px;
+      color:rgba(255,215,0,.7); text-align:right; }
+
+    /* Feet rain — celebratory effect for tutorial complete & missions.
+       Each drop is a div containing an inline SVG foot silhouette. */
+    #feet-rain { position:fixed; inset:0; pointer-events:none; z-index:200;
+      overflow:hidden; }
+    .foot-drop { position:absolute; top:-80px; opacity:0;
+      filter:drop-shadow(2px 2px 3px rgba(0,0,0,.5));
+      animation:foot-fall 3.6s ease-in forwards; }
+    .foot-drop svg { width:100%; height:100%; }
+    @keyframes foot-fall {
+      0%   { transform:translateY(0) rotate(0deg);     opacity:0; }
+      10%  { opacity:1; }
+      85%  { opacity:1; }
+      100% { transform:translateY(110vh) rotate(540deg); opacity:0; }
+    }
+
+    /* Tutorial Complete fullscreen banner */
+    #tutorial-complete { position:fixed; inset:0; z-index:210;
+      display:none; align-items:center; justify-content:center;
+      background:radial-gradient(ellipse at center, rgba(60,40,4,.55) 0%, rgba(0,0,0,.78) 70%);
+      pointer-events:none; }
+    #tutorial-complete.active { display:flex; animation:tc-fade .5s ease-out; }
+    #tutorial-complete .tc-card { text-align:center; padding:30px 50px;
+      background:rgba(28,18,4,.92); border:2px solid #FFD700; border-radius:10px;
+      box-shadow:0 0 40px rgba(255,215,0,.6); }
+    #tutorial-complete .tc-title { font-size:42px; letter-spacing:8px;
+      color:#FFD700; text-shadow:0 0 18px rgba(255,215,0,.8); margin:0 0 8px 0; }
+    #tutorial-complete .tc-sub { font-size:14px; letter-spacing:3px;
+      color:#FFE9A8; opacity:.85; }
+    @keyframes tc-fade { from { opacity:0; } to { opacity:1; } }
+
+    /* ── Missions corner ─────────────────────────────────────────────── */
+    /* Sits below the FeetDex:NYC title so it doesn't compete for the
+       top-left attention slot during the tutorial. */
+    #missions-corner { position:fixed; top:44px; left:14px; width:300px;
+      z-index:55; pointer-events:none; font-size:12px; letter-spacing:.5px;
+      display:none; }
+    #missions-corner.active { display:block; }
+    #missions-corner h4 { margin:0 0 6px 0; font-size:11px; color:#FFD700;
+      letter-spacing:3px; text-shadow:1px 1px 2px #000; }
+    .mission-row { background:rgba(20,16,8,.78);
+      border:1px solid rgba(255,215,0,.32); border-radius:5px;
+      padding:7px 9px; margin-bottom:6px; display:flex; align-items:flex-start;
+      gap:8px; transition:opacity .35s, transform .35s, border-color .25s,
+      background-color .25s; }
+    .mission-row.complete { border-color:#9bdc9b; background:rgba(40,80,40,.85);
+      animation:mission-pop .55s ease-out; }
+    .mission-row.entering { transform:translateX(-30px); opacity:0; }
+    .mission-row.entering.in { transform:translateX(0); opacity:1; }
+    .mission-row .m-box { flex-shrink:0; font-size:14px; line-height:1; }
+    .mission-row .m-text { flex:1; line-height:1.3; }
+    .mission-row .m-reward { flex-shrink:0; color:#FFD700; font-weight:bold; }
+    @keyframes mission-pop {
+      0%   { transform:scale(1); }
+      30%  { transform:scale(1.06); }
+      100% { transform:scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div id="hud-title">FeetDex: NYC</div>
+    <div id="hud-collection">Feet collected: 0 / 18</div>
+    <div id="hud-gold">Gold: 0 ⛂</div>
+    <div id="hud-interact">[E] Interact</div>
+  </div>
+  <!-- Roving tutorial pointer hand — follows whatever the current tutorial
+       step needs to highlight (Sonion, Morton, ESB, the minimap, etc.).
+       Permanently hidden once the tutorial is done. -->
+  <div id="tutorial-hand" aria-hidden="true">👇</div>
+  <div id="crosshair"></div>
+  <div id="hud-msg"></div>
+  <div id="combat-hud"></div>
+  <div id="combat-flash"></div>
+  <div id="battle-vignette"></div>
+  <div id="gold-toast"></div>
+  <div id="tracker-compass">
+    <svg viewBox="0 0 16 16" fill="currentColor">
+      <polygon points="8,1 14,15 8,11 2,15"/>
+    </svg>
+    <span id="tracker-compass-text">FOLLOW THE STAR</span>
+  </div>
+  <div id="compass-pointer">
+    <svg viewBox="0 0 16 16" fill="currentColor">
+      <polygon points="8,1 14,15 8,11 2,15"/>
+    </svg>
+    <span id="compass-pointer-text">— —</span>
+  </div>
+
+  <!-- Feet God divine dialogue (booming voice, golden vignette) -->
+  <div id="feetgod-overlay">
+    <div id="feetgod-vignette"></div>
+    <div id="feetgod-panel">
+      <div id="feetgod-name">THE FEET GOD</div>
+      <div id="feetgod-text"></div>
+      <div id="feetgod-hint">[E] CONTINUE</div>
+    </div>
+  </div>
+
+  <!-- Tutorial guiding arrow (top-center, points toward current target) -->
+  <div id="tutorial-arrow">
+    <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="16,2 28,28 16,22 4,28" fill="#FFD700" stroke="#7a5800" stroke-width="1.5"/>
+    </svg>
+  </div>
+
+  <!-- Tutorial side checklist -->
+  <div id="tutorial-checklist">
+    <h4>TUTORIAL</h4>
+    <div id="tut-rows"></div>
+  </div>
+
+  <!-- Mission corner panel -->
+  <div id="missions-corner">
+    <h4>MISSIONS</h4>
+    <div id="mission-rows"></div>
+  </div>
+
+  <!-- Tutorial complete celebration -->
+  <div id="tutorial-complete">
+    <div class="tc-card">
+      <div class="tc-title">TUTORIAL COMPLETE!</div>
+      <div class="tc-sub">Go discover all you can in the feet world.</div>
+    </div>
+  </div>
+
+  <!-- Feet rain container -->
+  <div id="feet-rain"></div>
+
+  <!-- Compass destination picker [C] -->
+  <div id="compass-picker">
+    <h2>COMPASS</h2>
+    <div class="cp-sub">CHOOSE A DESTINATION</div>
+    <div id="cp-grid"></div>
+    <span id="cp-close">[C] or [ESC] — close</span>
+  </div>
+
+  <!-- Morton's Shop -->
+  <div id="morton-shop">
+    <h2>MORTON'S SHOP</h2>
+    <div class="ms-sub">SMART SPENDERS WIN</div>
+    <div class="ms-gold" id="ms-gold-display">Your gold: 0 ⛂</div>
+    <div id="ms-cards"></div>
+    <div id="ms-morton-line"></div>
+    <span id="ms-close-hint">[E] or [ESC] — leave shop</span>
+  </div>
+
+  <!-- Fleet Feet (cosmetic shop) -->
+  <div id="fleet-feet">
+    <h2>FLEET FEET</h2>
+    <div class="ff-sub">DRESS YOUR SOLES</div>
+    <div class="ff-gold" id="ff-gold-display">Your gold: 0 ⛂</div>
+    <div id="ff-cards"></div>
+    <div id="ff-vance-line"></div>
+    <span id="ff-close-hint">[E] or [ESC] — leave shop</span>
+  </div>
+  <div id="combat-hearts"></div>
+  <div id="combat-npc-label">
+    <div class="cb2-name"></div>
+    <div class="cb2-bar-wrap"><div class="cb2-bar"></div></div>
+  </div>
+
+  <!-- Legendary 3-meeting hint (shown after first legendary encounter) -->
+  <div id="legendary-hint">
+    <h3>LEGENDARY ENCOUNTER</h3>
+    <p>Legendaries don't trust easily. You'll have to find AND defeat this one
+       <b>three times</b> across the city before they show you their feet.<br/><br/>
+       They move between fights — keep your eyes open.<br/>
+       Their HP and damage are <b>1.5×</b> a mythic. Bring Sword and Armor.</p>
+    <div class="lh-cta">[E] Got it</div>
+  </div>
+
+  <!-- Generic tip popup (used for booster purchase tips + fight tutorials) -->
+  <div id="generic-tip">
+    <h3 id="tip-title">TIP</h3>
+    <p id="tip-body"></p>
+    <div class="lh-cta">[E] Got it</div>
+  </div>
+
+  <!-- Battle countdown overlay (3-2-1-FIGHT) -->
+  <div id="countdown-overlay">
+    <div id="countdown-num">3</div>
+  </div>
+
+  <!-- Death overlay -->
+  <div id="death-overlay">
+    <h1>YOU DIED</h1>
+    <p>Returning to spawn...</p>
+  </div>
+
+  <!-- Full-screen map (M key) -->
+  <div id="map-overlay">
+    <div id="map-row">
+      <div id="map-wrap">
+        <canvas id="map-can-static" width="500" height="500"></canvas>
+        <canvas id="map-can-dyn"    width="500" height="500"></canvas>
+      </div>
+      <div id="map-legend"></div>
+    </div>
+    <span id="map-close-hint">[M] or [ESC] — close map</span>
+  </div>
+
+  <!-- Click-to-play -->
+  <div id="lock-overlay">
+    <h1>FeetDex: NYC</h1>
+    <p>Click to explore</p>
+    <div style="margin-top:18px;font-size:13px;max-width:460px;text-align:center;
+      line-height:1.6;color:#ffe080;text-shadow:1px 1px 3px #000;letter-spacing:1px;">
+      <b>OBJECTIVE</b><br/>
+      Roam the streets of New York City and collect all 18 unique pairs of feet.
+      Talk to strangers. Beat mythic challengers. Earn legendary trust.
+    </div>
+    <div class="controls">
+      WASD — Move &nbsp;|&nbsp; Shift — Sprint &nbsp;|&nbsp; Space — Jump<br/>
+      Mouse — Look &nbsp;|&nbsp; E — Interact &nbsp;|&nbsp; F — FeetDex &nbsp;|&nbsp; M — Map &nbsp;|&nbsp; ESC — Pause<br/>
+      [LMB] Attack in combat
+    </div>
+  </div>
+
+  <!-- Dialogue panel -->
+  <div id="dialogue-panel">
+    <div id="dialogue-header">
+      <span id="dialogue-npc-name"></span>
+      <span id="dialogue-rarity-badge"></span>
+      <span id="dialogue-encounter"></span>
+    </div>
+    <div id="dialogue-text"></div>
+    <div id="dialogue-hint">[E] Continue</div>
+  </div>
+
+  <!-- Discovery overlay -->
+  <div id="discovery-overlay">
+    <div id="discovery-border">
+      <svg id="discovery-foot" viewBox="0 0 100 120" fill="currentColor">
+        <rect x="16" y="30" width="68" height="65" rx="18"/>
+        <ellipse cx="50" cy="92" rx="34" ry="20"/>
+        <circle cx="22" cy="28" r="11"/>
+        <circle cx="37" cy="20" r="13"/>
+        <circle cx="53" cy="17" r="12"/>
+        <circle cx="68" cy="21" r="10"/>
+        <circle cx="79" cy="30" r="9"/>
+      </svg>
+      <div id="discovery-rarity"></div>
+      <div id="discovery-title">DISCOVERED!</div>
+      <div id="discovery-name"></div>
+      <div id="discovery-sub"></div>
+      <div id="discovery-cta">[E] Add to FeetDex</div>
+    </div>
+  </div>
+
+  <!-- FeetDex screen -->
+  <div id="feetdex-screen">
+    <h2>FeetDex</h2>
+    <div class="subtitle">NYC Street Foot Collection — <span id="fdex-count">0 / 18</span></div>
+    <div id="feetdex-grid"></div>
+    <span class="fdex-close" id="fdex-close-btn">[F] Close</span>
+  </div>
+
+  <!-- Pause menu -->
+  <div id="pause-menu">
+    <h2>PAUSED</h2>
+    <div id="pause-count"></div>
+    <div id="pause-objective" style="font-size:12px;color:#ffe080;letter-spacing:1px;
+      text-align:center;max-width:380px;line-height:1.6;margin-bottom:18px;">
+      <b>OBJECTIVE</b> — Collect all 18 unique pairs of feet across NYC.
+    </div>
+    <div id="pause-controls" style="font-size:12px;color:#cfcfcf;letter-spacing:1px;
+      max-width:380px;line-height:1.9;margin-bottom:18px;
+      border:1px solid rgba(255,255,255,.18);padding:12px 18px;border-radius:6px;">
+      <div style="text-align:center;font-size:11px;opacity:.55;margin-bottom:8px;">CONTROLS</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;">
+        <span style="opacity:.6;">WASD</span><span>Move</span>
+        <span style="opacity:.6;">Shift</span><span>Sprint</span>
+        <span style="opacity:.6;">Space</span><span>Jump</span>
+        <span style="opacity:.6;">Mouse</span><span>Look around</span>
+        <span style="opacity:.6;">E</span><span>Talk / Enter / Continue</span>
+        <span style="opacity:.6;">F</span><span>Open FeetDex</span>
+        <span style="opacity:.6;">M</span><span>Open Map</span>
+        <span style="opacity:.6;">LMB</span><span>Punch (in combat)</span>
+        <span style="opacity:.6;">ESC</span><span>Pause / Cancel</span>
+      </div>
+    </div>
+    <button class="pause-btn" id="pause-resume">Resume</button>
+    <button class="pause-btn" id="pause-feetdex">Open FeetDex</button>
+    <div id="vol-row">
+      <label>Volume</label>
+      <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.5"/>
+    </div>
+    <button class="pause-btn danger" id="pause-reset">Reset Progress</button>
+  </div>
+
+  <!-- Mini-game overlay -->
+  <div id="minigame-overlay">
+    <span id="mg-close-hint">ESC — cancel</span>
+    <div id="minigame-header">
+      <div id="mg-npc-name"></div>
+      <div class="mg-challenge-label">Mythic Challenge</div>
+    </div>
+    <div id="minigame-content"></div>
+  </div>
+
+  <!-- Win screen -->
+  <div id="win-screen">
+    <div id="win-title">FeetDex Complete!</div>
+    <div id="win-sub">All 18 feet collected.</div>
+    <div id="win-list"></div>
+    <button id="win-play-again">Play Again</button>
+    <button id="win-close-btn" style="margin-top:8px;background:none;border:1px solid rgba(255,255,255,.2);
+      color:rgba(255,255,255,.5);font-family:'Courier New',monospace;font-size:12px;
+      letter-spacing:2px;padding:10px 36px;cursor:pointer;">Close</button>
+  </div>
+
+  <script>localStorage.clear();</script>
+  <!-- Cache-bust: bump v= whenever JS changes so browsers re-fetch -->
+  <script type="module" src="src/main.js?v=20260507g"></script>
+</body>
+</html>

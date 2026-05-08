@@ -1,0 +1,17 @@
+# Editor / IDE / OS junk
+.claude/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Local-only
+*.log
+.env
+.env.*
