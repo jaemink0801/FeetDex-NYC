@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T055029';
+  var BAKED = '20260508T055247';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1692,6 +1692,140 @@ const PLAYER_R      = 0.4;
 const LOOK_SENS     = 0.002;
 const STEP_INTERVAL = 0.4;
 
+// ── Per-character foot-skin catalog ──────────────────────────────────────────
+// Each entry: { color, extras }. `extras` is an array of geometry specs
+// applied to BOTH feet (mirrored for the left side). Specs:
+//   { type:'box',      s:[w,h,d], color, pos:[x,y,z], rot?:[x,y,z] }
+//   { type:'sphere',   r,         color, pos:[x,y,z] }
+//   { type:'cylinder', r,h,       color, pos:[x,y,z], rot?:[x,y,z] }
+const SHOE_STYLES = {
+  // Common
+  common_samurai:  { color: 0x8B6914, extras: [
+    // Geta — wooden platform with two cross teeth
+    { type:'box', s:[0.18, 0.04, 0.18], color:0x6b4423, pos:[0, -0.06, 0.05] },
+    { type:'box', s:[0.04, 0.04, 0.18], color:0x5a3618, pos:[0.05, -0.10, 0.05] },
+    { type:'box', s:[0.04, 0.04, 0.18], color:0x5a3618, pos:[-0.05,-0.10, 0.05] },
+  ] },
+  common_bill:     { color: 0xb5785a, extras: [
+    // Hiking boot: thicker rubber sole + side leather strap
+    { type:'box', s:[0.20, 0.04, 0.22], color:0x3a2210, pos:[0, -0.05, 0.04] },
+    { type:'box', s:[0.18, 0.05, 0.06], color:0xa86b3f, pos:[0,  0.01, 0.10] },
+  ] },
+  common_gymrat:   { color: 0x39ff14, extras: [
+    // Neon green sneakers with three white side stripes
+    { type:'box', s:[0.005, 0.025, 0.16], color:0xffffff, pos:[0.085, 0.00, 0.05] },
+    { type:'box', s:[0.005, 0.025, 0.04], color:0xffffff, pos:[0.085, -0.015, 0.10] },
+    { type:'box', s:[0.005, 0.025, 0.04], color:0xffffff, pos:[0.085,  0.015, 0.10] },
+  ] },
+  common_50shades: { color: 0x080808, extras: [
+    // Glossy formal shoe — silver toe-cap + heel block
+    { type:'box', s:[0.10, 0.025, 0.05], color:0xc8c8d0, pos:[0, 0.005, 0.16] },
+    { type:'box', s:[0.10, 0.04, 0.04], color:0x080808, pos:[0,-0.04, -0.06] },
+  ] },
+  common_happyfeet:{ color: 0xf5a623, extras: [
+    // Penguin webbed feet — three orange claws sticking out + dark webbing
+    { type:'box', s:[0.025, 0.02, 0.06], color:0xe8971a, pos:[ 0.04, 0, 0.18] },
+    { type:'box', s:[0.025, 0.02, 0.06], color:0xe8971a, pos:[ 0.00, 0, 0.20] },
+    { type:'box', s:[0.025, 0.02, 0.06], color:0xe8971a, pos:[-0.04, 0, 0.18] },
+  ] },
+  // Rare
+  rare_trex:       { color: 0x4a6741, extras: [
+    // Bigger green dino feet + 3 sharp dark claws on each foot
+    { type:'box', s:[0.20, 0.06, 0.22], color:0x4a6741, pos:[0, -0.02, 0.04] },
+    { type:'cylinder', r:0.018, h:0.10, color:0x222222, pos:[ 0.06, -0.01, 0.18], rot:[Math.PI/2, 0, 0] },
+    { type:'cylinder', r:0.018, h:0.10, color:0x222222, pos:[ 0.00, -0.01, 0.20], rot:[Math.PI/2, 0, 0] },
+    { type:'cylinder', r:0.018, h:0.10, color:0x222222, pos:[-0.06, -0.01, 0.18], rot:[Math.PI/2, 0, 0] },
+  ] },
+  rare_gramma:     { color: 0xffb3c1, extras: [
+    // Pink fuzzy slippers — fluffy ball on top of the foot
+    { type:'sphere', r:0.06, color:0xffd1de, pos:[0, 0.04, 0.06] },
+    { type:'sphere', r:0.04, color:0xffe4ec, pos:[0.04, 0.05, 0.04] },
+    { type:'sphere', r:0.04, color:0xffe4ec, pos:[-0.04, 0.05, 0.04] },
+  ] },
+  rare_colonel:    { color: 0xffffff, extras: [
+    // Crisp white dress shoes with a black heel cap and small red bowtie strap
+    { type:'box', s:[0.10, 0.03, 0.04], color:0x000000, pos:[0, -0.04, -0.06] },
+    { type:'box', s:[0.06, 0.02, 0.02], color:0xc81818, pos:[0,  0.02,  0.07] },
+  ] },
+  rare_cheerleader:{ color: 0xf5f5f5, extras: [
+    // POM POMS — fluffy blue+white spheres on top of each foot
+    { type:'sphere', r:0.07, color:0x1a3c8a, pos:[0,  0.06, 0.06] },
+    { type:'sphere', r:0.04, color:0xffffff, pos:[ 0.04, 0.08, 0.04] },
+    { type:'sphere', r:0.04, color:0xffffff, pos:[-0.04, 0.08, 0.04] },
+    { type:'sphere', r:0.04, color:0xffffff, pos:[ 0.00, 0.08, 0.10] },
+  ] },
+  // Epic
+  epic_lebron:     { color: 0x552583, extras: [
+    // Purple high-tops — tall ankle wrap + gold "23"
+    { type:'box', s:[0.16, 0.10, 0.10], color:0x552583, pos:[0, 0.05, -0.02] },
+    { type:'box', s:[0.04, 0.025, 0.005], color:0xffd700, pos:[0.06, 0.05, 0.04] },
+  ] },
+  epic_sonion:     { color: 0x000000, extras: [
+    // Deep purple glow strip along the toe
+    { type:'box', s:[0.14, 0.01, 0.04], color:0x9D4EDD, pos:[0, 0.005, 0.13] },
+    { type:'sphere', r:0.025, color:0x4b0082, pos:[0, 0.01, -0.04] },
+  ] },
+  epic_sydney:     { color: 0xd62828, extras: [
+    // Red high heels — tall back stiletto + bright red strap
+    { type:'cylinder', r:0.018, h:0.18, color:0x8a1a1a, pos:[0, -0.10, -0.06] },
+    { type:'box', s:[0.12, 0.02, 0.04], color:0xd62828, pos:[0, 0.04, 0.04] },
+  ] },
+  // Mythic
+  mythic_clav:     { color: 0x0d0d0d, extras: [
+    // Sleek black + chestnut hair tufts to match Clav's iconic locks
+    { type:'sphere', r:0.045, color:0x6B4423, pos:[ 0.04, 0.05, 0.02] },
+    { type:'sphere', r:0.040, color:0x6B4423, pos:[-0.04, 0.05, 0.02] },
+    { type:'sphere', r:0.035, color:0x6B4423, pos:[ 0.00, 0.06, 0.06] },
+  ] },
+  mythic_patapim:  { color: 0xffeb3b, extras: [
+    // Pink + yellow alternating boots — bright kid energy
+    { type:'box', s:[0.16, 0.06, 0.06], color:0xff6b9d, pos:[0, 0.04, -0.02] },
+    { type:'box', s:[0.04, 0.04, 0.04], color:0xff69b4, pos:[0, 0.005, 0.15] },
+  ] },
+  mythic_messi:    { color: 0x75aadb, extras: [
+    // White-blue cleats — gold studs on the underside
+    { type:'box', s:[0.16, 0.02, 0.18], color:0xffffff, pos:[0, -0.04, 0.04] },
+    { type:'sphere', r:0.012, color:0xffd700, pos:[ 0.05, -0.06, 0.10] },
+    { type:'sphere', r:0.012, color:0xffd700, pos:[-0.05, -0.06, 0.10] },
+    { type:'sphere', r:0.012, color:0xffd700, pos:[ 0.00, -0.06, 0.16] },
+  ] },
+  // Legendary
+  legendary_margot:{ color: 0xff69b4, extras: [
+    // Tall pink platinum heels — like Barbie premiere
+    { type:'cylinder', r:0.020, h:0.20, color:0xc4458b, pos:[0, -0.11, -0.06] },
+    { type:'box', s:[0.13, 0.02, 0.20], color:0xff69b4, pos:[0, 0.005, 0.04] },
+    { type:'sphere', r:0.025, color:0xfaf0e6, pos:[0, 0.04, 0.10] },
+  ] },
+  legendary_bigfoot:{ color: 0x5c3d11, extras: [
+    // Hairy big-foot — dense fur tufts on top + extra wide
+    { type:'box', s:[0.22, 0.06, 0.24], color:0x3d2008, pos:[0, -0.02, 0.04] },
+    { type:'sphere', r:0.05, color:0x3d2008, pos:[ 0.05, 0.05, 0.02] },
+    { type:'sphere', r:0.05, color:0x3d2008, pos:[-0.05, 0.05, 0.02] },
+    { type:'sphere', r:0.05, color:0x3d2008, pos:[ 0.00, 0.06, 0.08] },
+  ] },
+  // Secret
+  secret_rexey:    { color: 0x8B6914, extras: [
+    // Cracked leather sandals — single thong strap
+    { type:'box', s:[0.18, 0.02, 0.20], color:0x6b4423, pos:[0, -0.04, 0.04] },
+    { type:'cylinder', r:0.008, h:0.12, color:0x4a2e1e, pos:[0, 0.02, 0.08], rot:[0, 0, Math.PI/2] },
+  ] },
+};
+
+function _makeExtraMesh(spec, sx = 1) {
+  let geo;
+  if      (spec.type === 'sphere')   geo = new THREE.SphereGeometry(spec.r, 10, 8);
+  else if (spec.type === 'cylinder') geo = new THREE.CylinderGeometry(spec.r, spec.r, spec.h, 10);
+  else                               geo = new THREE.BoxGeometry(...spec.s);
+  const mat  = new THREE.MeshLambertMaterial({ color: spec.color });
+  const mesh = new THREE.Mesh(geo, mat);
+  // Mirror the X position for the left foot so accessories sit on the
+  // outer side of each leg symmetrically.
+  const [px, py, pz] = spec.pos;
+  mesh.position.set(px * sx, py, pz);
+  if (spec.rot) mesh.rotation.set(spec.rot[0], spec.rot[1], spec.rot[2]);
+  return mesh;
+}
+
 // Circle vs AABB overlap — closest point on box to circle center
 function _overlapsAABB(px, pz, radius, box) {
   const nearX = Math.max(box.minX, Math.min(px, box.maxX));
@@ -1729,6 +1863,8 @@ class Player {
     this._legs = new THREE.Group();
     if (this.scene) this.scene.add(this._legs);
     else            camera.add(this._legs);  // fallback (still better than nothing)
+    this._feet = [];                  // per-side foot groups for skins
+    this._shoeAccessories = [];       // active skin add-ons (cleared on swap)
     this._legShoes = [];     // cached for cosmetic recolor
 
     const pantMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a28 });
@@ -1802,6 +1938,12 @@ class Player {
 
       // Cache every shoe-material mesh so setShoeColor recolors the whole foot.
       foot.traverse(o => { if (o.isMesh && o.material === shoeMat) this._legShoes.push(o); });
+
+      // Track each foot group so skins can attach character-specific
+      // accessories (claws, pom-poms, heels, etc.) without disturbing the
+      // base anatomy.
+      foot.userData.side = side;
+      this._feet.push(foot);
 
       if (side === -1) this._leftHip  = hip;
       else             this._rightHip = hip;
@@ -1930,6 +2072,37 @@ class Player {
         shoe.material.color.set(hex);
       }
       shoe.material.needsUpdate = true;
+    }
+  }
+
+  // Apply a full character-themed skin to BOTH feet — base color plus a
+  // bundle of "extras" (claws, pom-poms, fluff, heels, etc.) defined in
+  // SHOE_STYLES. Pass null to clear back to barefoot.
+  setShoeStyle(feetId) {
+    // Always clear any previously-applied accessories first.
+    if (this._shoeAccessories) {
+      for (const m of this._shoeAccessories) m.parent?.remove(m);
+      this._shoeAccessories.length = 0;
+    }
+    if (!feetId) {
+      this.setShoeColor(null);  // bare again
+      return;
+    }
+    const style = SHOE_STYLES[feetId];
+    if (!style) {
+      this.setShoeColor(null);
+      return;
+    }
+    if (style.color != null) this.setShoeColor(style.color);
+    if (!style.extras || !this._feet) return;
+    // Mirror x for the left foot so accessories sit symmetrically.
+    for (const foot of this._feet) {
+      const sx = foot.userData.side ?? 1;
+      for (const ex of style.extras) {
+        const mesh = _makeExtraMesh(ex, sx);
+        foot.add(mesh);
+        this._shoeAccessories.push(mesh);
+      }
     }
   }
 
@@ -10327,7 +10500,13 @@ function _closeFleet() {
 
 function _applyEquippedCosmetic() {
   const id = feetdex.equippedCosmetic;
-  player.setShoeColor(id ? (COSMETIC_SHOE_COLORS[id] ?? null) : null);
+  // Use the rich per-character skin (color + claws/pom-poms/heels/etc.)
+  // when one is equipped. Falls back to bare feet when nothing is equipped.
+  if (player.setShoeStyle) {
+    player.setShoeStyle(id ?? null);
+  } else {
+    player.setShoeColor(id ? (COSMETIC_SHOE_COLORS[id] ?? null) : null);
+  }
 }
 
 function _onBuyCosmetic(footId) {
