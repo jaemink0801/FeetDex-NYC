@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T020729';
+  var BAKED = '20260508T021214';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1691,8 +1691,9 @@ function _overlapsAABB(px, pz, radius, box) {
 }
 
 class Player {
-  constructor(camera, input, audioFn) {
+  constructor(camera, input, audioFn, scene = null) {
     this.camera   = camera;
+    this.scene    = scene ?? camera.parent ?? null; // accept scene or fall back
     this.input    = input;
     this.playStep = audioFn;
 
@@ -1708,18 +1709,22 @@ class Player {
     this._animTime  = 0;     // accumulator for leg-swing animation
 
     // ── First-person legs + feet ──
-    // Two hip-pivot groups attached to the camera. Pivot rotates around the
-    // hip joint (top of leg) so the leg + foot swing together when walking.
-    // Default colors: dark pants, dark shoes. Equipped cosmetic foot recolors
-    // the shoes via setShoeColor() called from main.js.
+    // Two hip-pivot groups. The legs group is parented to the SCENE (not
+    // the camera) so it tracks the player's world position + yaw but
+    // ignores pitch — pitching the camera down therefore brings the legs
+    // into view exactly the way looking at your feet does in real life.
+    // Default colors: dark pants, BARE FEET (skin-toned). Equipping a
+    // collected foot via Fleet Feet recolors the shoes through setShoeColor.
     this._legs = new THREE.Group();
-    camera.add(this._legs);
-    this._legs.position.set(0, -EYE_LEVEL + 0.2, -0.05);
+    if (this.scene) this.scene.add(this._legs);
+    else            camera.add(this._legs);  // fallback (still better than nothing)
     this._legShoes = [];     // cached for cosmetic recolor
 
     const pantMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a28 });
     const skinMat  = new THREE.MeshLambertMaterial({ color: 0xcca888 });
-    this._defaultShoeMat = new THREE.MeshLambertMaterial({ color: 0x2a1b10 });
+    // Player starts barefoot — same skin tone as the ankle band. Buying
+    // and equipping a collected foot through Fleet Feet recolors this.
+    this._defaultShoeMat = new THREE.MeshLambertMaterial({ color: 0xcca888 });
 
     for (const side of [-1, 1]) {
       const hip = new THREE.Group();
@@ -1931,6 +1936,21 @@ class Player {
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.y = this.yaw;
     this.camera.rotation.x = this.pitch;
+
+    // Anchor the legs group to the player's WORLD position (and yaw only)
+    // so the player can pitch the camera down and actually see their feet.
+    if (this._legs && this._legs.parent !== this.camera) {
+      // Place the leg root just below the camera and slightly forward,
+      // matching the old camera-relative offset (–EYE_LEVEL+0.2, –0.05).
+      const fwdX = -Math.sin(this.yaw);
+      const fwdZ = -Math.cos(this.yaw);
+      this._legs.position.set(
+        this.position.x + fwdX * 0.05,
+        this.position.y + 0.2,
+        this.position.z + fwdZ * 0.05,
+      );
+      this._legs.rotation.y = this.yaw;
+    }
   }
 }
 
@@ -9489,7 +9509,7 @@ const feetdex = new FeetDex();
 const ui      = new UI();
 const npcMgr  = new NPCManager(scene, world.colliders);
 npcMgr.addInteriorNpcs(scene, world.interiorNpcSpawns);
-const player  = new Player(camera, input, () => Audio.footstep());
+const player  = new Player(camera, input, () => Audio.footstep(), scene);
 player.setFloorFn((x, z, cy) => world.getFloorY(x, z, cy));
 
 const interaction = new InteractionSystem(camera, scene, player);
@@ -10236,8 +10256,12 @@ function _onBuyBooster(id) {
         "Good luck out there, kid. Go discover all you can in the feet world."
       );
       _afterTipCallback = () => {
-        // Order: Sprint Feet tip → missions intro → reveal missions →
-        // THEN the Tutorial Complete celebration (the actual finale).
+        // Tutorial order (everything below is still PART OF the tutorial —
+        // celebration only after the player has been told about all systems):
+        //   1. Sprint Feet how-to tip
+        //   2. Missions intro Feet God dialogue → reveal missions panel
+        //   3. Fleet Feet intro Feet God dialogue (skins + always-available)
+        //   4. Tutorial finishes → celebration
         _showBoosterTip('sprint_feet');
         _afterTipCallback = () => {
           ui.openFeetGodDialogue(
@@ -10247,11 +10271,18 @@ function _onBuyBooster(id) {
           );
           _afterTipCallback = () => {
             _revealMissions();
-            // Now that the player has all the systems, end the tutorial
-            // and fire the celebration as the proper finale.
-            tutorial.finish();
-            ui.showTutorialComplete();
-            Audio.gameWin();
+            // Fleet Feet intro — last lesson before the celebration.
+            ui.openFeetGodDialogue(
+              "One last thing. You're walking around BAREFOOT. " +
+              "Every foot you collect can also be worn as a SKIN — visit <b>Fleet Feet</b> on the map and trade gold for the kicks of any character you've discovered. " +
+              "You can stop by Fleet Feet any time you have gold. Mix and match, look fly out there."
+            );
+            _afterTipCallback = () => {
+              // NOW the tutorial is done. Celebrate.
+              tutorial.finish();
+              ui.showTutorialComplete();
+              Audio.gameWin();
+            };
           };
         };
       };
