@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T175843';
+  var BAKED = '20260508T193714';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1918,13 +1918,25 @@ class Player {
     // collected foot through Fleet Feet recolors this.
     this._defaultShoeMat = new THREE.MeshLambertMaterial({ color: 0xcca888 });
 
-    // Lower belly / waistline only — small block that bridges the legs
-    // into a single "body." A full torso filled the entire downward view
-    // when the camera pitched down (camera sits inside the chest), so we
-    // skip the chest and keep just the pelvis seam where the legs connect.
-    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.18), pantMat);
+    // Pelvis + slim torso column — bridges the legs all the way up to just
+    // below eye level so the lower body visually connects to the user's
+    // viewpoint instead of floating detached. The pelvis is kept SHALLOW
+    // (10 cm front-to-back, was 18 cm) so it doesn't form a wide lid over
+    // the feet — toes now poke past its forward edge and are visible when
+    // the camera pitches down. The torso column above is narrow at the top
+    // (~5 cm radius) so looking straight down it appears as a small disc
+    // rather than filling the view.
+    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.10), pantMat);
     pelvis.position.set(0, 0.92, 0);
     this._legs.add(pelvis);
+
+    const torsoMat = new THREE.MeshLambertMaterial({ color: 0x3a3a4a });
+    const torso = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.11, 0.50, 8),
+      torsoMat,
+    );
+    torso.position.set(0, 1.24, 0);   // bottom y≈0.99 (above pelvis), top y≈1.49 (below eyes 1.6)
+    this._legs.add(torso);
 
     for (const side of [-1, 1]) {
       const hip = new THREE.Group();
@@ -1947,8 +1959,16 @@ class Player {
 
       // Foot = HEEL block + SOLE block + 5 toe blocks (big toe larger).
       // Built as a sub-group anchored at the ankle so cosmetic skins can
-      // be swapped/colored as a unit.
+      // be swapped/colored as a unit. The model author placed toes at
+      // local +Z and heel at -Z, but the body group rotates with the
+      // player's yaw such that body-local +Z is the player's BACK at
+      // yaw=0 — so without this 180° flip the toes point behind the
+      // player and pitching the camera down never reveals them. Rotating
+      // the foot group π re-aligns toes with the player's forward
+      // direction (and naturally re-mirrors the big toe to the inner
+      // side of each foot, which previously sat on the outside).
       const foot = new THREE.Group();
+      foot.rotation.y = Math.PI;
       foot.position.set(0, -0.84, 0);   // top of foot just under ankle
       hip.add(foot);
 
@@ -11172,12 +11192,14 @@ function _drawMapLabel(ctx, text, x, y, color, fontPx, placed) {
       ctx.lineTo(cx, cy);
       ctx.stroke();
     }
-    placed.push({ x: cx - w / 2, y: cy - h / 2, w, h });
+    const box = { x: cx - w / 2, y: cy - h / 2, w, h };
+    placed.push(box);
     // Text shadow + fill
     ctx.fillStyle = 'rgba(0,0,0,0.92)';
     ctx.fillText(text, cx + 1, cy + 1);
     ctx.fillStyle = color;
     ctx.fillText(text, cx, cy);
+    return box;
   };
 
   // Axis-aligned candidate offsets only — labels sit directly above,
@@ -11193,11 +11215,10 @@ function _drawMapLabel(ctx, text, x, y, color, fontPx, placed) {
   }
   for (const [dx, dy] of candidates) {
     const cx = x + dx, cy = y + dy;
-    if (!_hits(cx, cy)) { _draw(cx, cy); return true; }
+    if (!_hits(cx, cy)) return _draw(cx, cy);
   }
   // Last resort — place at center even if overlapping
-  _draw(x, y);
-  return true;
+  return _draw(x, y);
 }
 
 const mapOverlay = document.getElementById('map-overlay');
@@ -11385,15 +11406,20 @@ function _drawStaticMap() {
   // Pass 2: street-name labels in subway blue. 34TH ST sits in the busy
   // midtown corridor between ESB and Central Park, so it gets a forced
   // anchor BELOW the station dot to keep it away from those landmarks.
-  for (const st of stations) {
+  // The placed label box is attached to the station's hit entry so clicks
+  // on the label (not just the dot) register as a teleport target.
+  for (let i = 0; i < stations.length; i++) {
+    const st = stations[i];
     const [sx, sz] = _wm(st.x, st.z);
+    let labelBox;
     if (st.name === '34TH ST') {
       // "Right below the station marker" — tight 14px offset so the label
       // hugs the dot instead of floating between ESB and Central Park.
-      _drawMapLabel(staticCtx, st.name, sx, sz + 14, '#88ccff', 13, placedLabels);
+      labelBox = _drawMapLabel(staticCtx, st.name, sx, sz + 14, '#88ccff', 13, placedLabels);
     } else {
-      _drawMapLabel(staticCtx, st.name, sx, sz, '#88ccff', 13, placedLabels);
+      labelBox = _drawMapLabel(staticCtx, st.name, sx, sz, '#88ccff', 13, placedLabels);
     }
+    if (_mapStationHits[i]) _mapStationHits[i].labelBox = labelBox;
   }
 }
 
@@ -11475,20 +11501,25 @@ if (_mapDynCanvas) {
     const rect = _mapDynCanvas.getBoundingClientRect();
     const cx = ((e.clientX - rect.left) / rect.width)  * MAP_SIZE;
     const cy = ((e.clientY - rect.top)  / rect.height) * MAP_SIZE;
-    // Pick the station whose dot center is CLOSEST to the click cursor
-    // (after testing the click is inside its radius). Old code returned
-    // on the first match, which let the player's CURRENT station win
-    // when its hit-zone overlapped the click target — blocking teleport
-    // to a nearby destination. Closest-wins resolves that.
+    // Pick the station whose dot center is CLOSEST to the click cursor,
+    // accepting clicks on EITHER the dot (within hit.r) or the station's
+    // text label box. The label can be pushed 30+ px from the dot by the
+    // anti-overlap placer, so dot-only hit zones miss most label clicks
+    // and the teleport silently does nothing — the user's reported
+    // "can't go to that station" symptom.
+    const _hitMatches = (hit, x, y) => {
+      const dx = x - hit.cx, dy = y - hit.cy;
+      if (dx * dx + dy * dy <= hit.r * hit.r) return true;
+      const lb = hit.labelBox;
+      return !!(lb && x >= lb.x && x <= lb.x + lb.w && y >= lb.y && y <= lb.y + lb.h);
+    };
     const me = _displayPos();
     let best = null, bestDist2 = Infinity;
     for (const hit of _mapStationHits) {
+      if (!_hitMatches(hit, cx, cy)) continue;
       const dx = cx - hit.cx, dy = cy - hit.cy;
       const d2 = dx * dx + dy * dy;
-      if (d2 <= hit.r * hit.r && d2 < bestDist2) {
-        bestDist2 = d2;
-        best = hit;
-      }
+      if (d2 < bestDist2) { bestDist2 = d2; best = hit; }
     }
     if (!best) return;
     // If the closest match IS the station the player's standing at, find
@@ -11498,12 +11529,10 @@ if (_mapDynCanvas) {
       let alt = null, altDist2 = Infinity;
       for (const hit of _mapStationHits) {
         if (hit === best) continue;
+        if (!_hitMatches(hit, cx, cy)) continue;
         const dx = cx - hit.cx, dy = cy - hit.cy;
         const d2 = dx * dx + dy * dy;
-        if (d2 <= hit.r * hit.r && d2 < altDist2) {
-          altDist2 = d2;
-          alt = hit;
-        }
+        if (d2 < altDist2) { altDist2 = d2; alt = hit; }
       }
       if (!alt) return;            // really did click the station they're at
       best = alt;
