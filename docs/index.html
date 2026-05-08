@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T175412';
+  var BAKED = '20260508T175843';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -646,7 +646,7 @@
       overflow:hidden; }
     .foot-drop { position:absolute; top:-80px; opacity:0;
       filter:drop-shadow(2px 2px 3px rgba(0,0,0,.5));
-      animation:foot-fall 5.4s ease-in forwards; }
+      animation:foot-fall 4.3s ease-in forwards; }
     .foot-drop svg { width:100%; height:100%; }
     @keyframes foot-fall {
       0%   { transform:translateY(0) rotate(0deg);     opacity:0; }
@@ -2446,7 +2446,10 @@ const SPECIAL_DEFS = [
   // LeBron James — Hotel Lobby (relocated from Gym to fix Dex overlap)
   { name: 'LeBron James',      pos: [4400, 0,   0], rarity: 'epic',   feetId: 'epic_lebron',       minigame: null,  bodyScale: 1.05 },
   // Gramma Tilda — Pharmacy
-  { name: 'Gramma Tilda',      pos: [4200, 0,   2], rarity: 'rare',   feetId: 'rare_gramma',       minigame: null,  bodyScale: 1.00 },
+  // Gramma stands BEHIND the pharmacy counter (counter at z=-8, depth 0.6
+  // → north edge at z=-7.7). She lives at z=-7 to stay clear of both the
+  // counter collider and all five shelving aisles (which span z=[-4,4]).
+  { name: 'Gramma Tilda',      pos: [4200, 0,  -7], rarity: 'rare',   feetId: 'rare_gramma',       minigame: null,  bodyScale: 1.00 },
   // The Colonel — KFC
   { name: 'The Colonel',       pos: [4600, 0,   3], rarity: 'rare',   feetId: 'rare_colonel',      minigame: null,  bodyScale: 1.00 },
   // Captain Brianna — Bar (relocated from Brooklyn Bridge to fix Rex overlap)
@@ -4672,13 +4675,12 @@ class UI {
     if (svg) svg.style.transform = `rotate(${dirDeg}deg)`;
   }
 
-  // Spawn falling 2D feet for celebrations. Duration is 1.5× longer than
-  // before; each foot picks from the palette so the rain shows skin tones
-  // mixed with bright celebratory colors.
-  spawnFeetRain(count = 45) {
+  // Spawn falling 2D feet for celebrations. Each foot picks from the
+  // palette so the rain mixes skin tones with bright festive colors.
+  spawnFeetRain(count = 40) {
     const wrap = document.getElementById('feet-rain');
     if (!wrap) return;
-    Audio.fireworks?.(5.4);  // longer satisfying sound layered over the rain
+    Audio.fireworks?.(4.3);  // 0.8× the previous 5.4s duration
     for (let i = 0; i < count; i++) {
       const sz = 30 + Math.random() * 36;
       const drop = document.createElement('div');
@@ -4686,14 +4688,14 @@ class UI {
       drop.style.left   = `${Math.random() * 100}vw`;
       drop.style.width  = `${sz * 0.7}px`;
       drop.style.height = `${sz}px`;
-      drop.style.animationDelay    = `${Math.random() * 1.0}s`;
-      drop.style.animationDuration = `${4.2 + Math.random() * 2.0}s`;
+      drop.style.animationDelay    = `${Math.random() * 0.8}s`;
+      drop.style.animationDuration = `${3.4 + Math.random() * 1.6}s`;
       const color = FOOT_RAIN_PALETTE[Math.floor(Math.random() * FOOT_RAIN_PALETTE.length)];
       let svg = _footSVG(color);
       if (i % 2) svg = svg.replace('<svg ', '<svg style="transform:scaleX(-1)" ');
       drop.innerHTML = svg;
       wrap.appendChild(drop);
-      setTimeout(() => drop.remove(), 7000);
+      setTimeout(() => drop.remove(), 5500);
     }
   }
 
@@ -7830,7 +7832,10 @@ function buildGenericInteriors(scene, enterables, _SO) {
     Bar:          [[ 0, -5],  [3, -2],   [-4, -6]],
     Gallery:      [[-2,  0],  [4, -2],   [ 0,  5]],
     Laundry:      [[ 2,  3],  [-2, 5],   [ 4, -2]],
-    Pharmacy:     [[ 3,  2],  [-3, -2],  [ 0,  6]],
+    // Pharmacy aisles run x = -6, -3, 0, 3, 6 (each ~0.7 wide, z=[-4,4]).
+    // NPCs MUST spawn between aisles so they don't end up clipping into a
+    // shelf. Aisle gaps are at x=±4.5 and ±1.5; +z=6 is past the shelves.
+    Pharmacy:     [[ 4.5, 2],  [-4.5, -2],  [ 0,  6]],
     'Hotel Lobby':[[ 0,  3],  [-4,  0],  [ 4, -4]],
     KFC:          [[-5,  5],  [ 5,  5],  [ 0,  2]],
     Bodega:       [[-5,  5],  [ 5,  5],  [-5,  0]],
@@ -11470,16 +11475,40 @@ if (_mapDynCanvas) {
     const rect = _mapDynCanvas.getBoundingClientRect();
     const cx = ((e.clientX - rect.left) / rect.width)  * MAP_SIZE;
     const cy = ((e.clientY - rect.top)  / rect.height) * MAP_SIZE;
+    // Pick the station whose dot center is CLOSEST to the click cursor
+    // (after testing the click is inside its radius). Old code returned
+    // on the first match, which let the player's CURRENT station win
+    // when its hit-zone overlapped the click target — blocking teleport
+    // to a nearby destination. Closest-wins resolves that.
+    const me = _displayPos();
+    let best = null, bestDist2 = Infinity;
     for (const hit of _mapStationHits) {
       const dx = cx - hit.cx, dy = cy - hit.cy;
-      if (dx * dx + dy * dy <= hit.r * hit.r) {
-        // Don't teleport to the station the player is standing at
-        const me = _displayPos();
-        if (Math.hypot(me.x - hit.st.x, me.z - hit.st.z) < 4) return;
-        _teleportToStation(hit.st);
-        return;
+      const d2 = dx * dx + dy * dy;
+      if (d2 <= hit.r * hit.r && d2 < bestDist2) {
+        bestDist2 = d2;
+        best = hit;
       }
     }
+    if (!best) return;
+    // If the closest match IS the station the player's standing at, find
+    // the next-closest one that ISN'T — that's almost certainly what the
+    // player meant to click.
+    if (Math.hypot(me.x - best.st.x, me.z - best.st.z) < 4) {
+      let alt = null, altDist2 = Infinity;
+      for (const hit of _mapStationHits) {
+        if (hit === best) continue;
+        const dx = cx - hit.cx, dy = cy - hit.cy;
+        const d2 = dx * dx + dy * dy;
+        if (d2 <= hit.r * hit.r && d2 < altDist2) {
+          altDist2 = d2;
+          alt = hit;
+        }
+      }
+      if (!alt) return;            // really did click the station they're at
+      best = alt;
+    }
+    _teleportToStation(best.st);
   });
   // Make the dynamic canvas pick up clicks even though it sits over the
   // static one (the dyn canvas is on top in the DOM).
