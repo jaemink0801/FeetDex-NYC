@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T004329';
+  var BAKED = '20260509T005944';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2312,7 +2312,25 @@ class Player {
     // pants, pelvis, torso) built upward, so the soles rest flat on
     // the floor — no phasing.
     if (this._legs && this._legs.parent !== this.camera) {
-      const BODY_OFFSET_BACK = 0.06;
+      // The camera is pushed FAR forward of the body's xz so when the
+      // player pitches all the way down, every piece of upper-body
+      // geometry (pelvis, torso cone, hip caps) sits OUTSIDE the FOV
+      // cone — the legs naturally fade out at the top edge of the
+      // screen rather than ending at a visible model boundary, and the
+      // feet are revealed cleanly.
+      //
+      // Math (camera FOV is 70° vertical, half = 35°, tan = 0.700):
+      // at pitch -90° the camera looks straight down from y=1.60.
+      // Pelvis sits at y=0.92, so its front-bottom corner is at
+      // (z=BODY_OFFSET_BACK-0.05, y=0.85). For that corner to fall
+      // outside the vertical FOV cone, the inequality
+      //   (BODY_OFFSET_BACK - 0.05) / (1.60 - 0.85)  >  tan(35°)
+      // must hold, giving BODY_OFFSET_BACK > 0.575. We use 0.65 for
+      // a visible margin so no pelvis edge sneaks back into view at
+      // wide aspect ratios. Feet remain fully visible (foot world z
+      // = 0.65 - 0.13 = 0.52, vertical angle from -Y ≈ 18°, well
+      // inside the 35° FOV half-angle).
+      const BODY_OFFSET_BACK = 0.65;
       // Player faces (-sin(yaw), 0, -cos(yaw)); back is the negation.
       const bx = Math.sin(this.yaw) * BODY_OFFSET_BACK;
       const bz = Math.cos(this.yaw) * BODY_OFFSET_BACK;
