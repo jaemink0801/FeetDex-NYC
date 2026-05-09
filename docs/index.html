@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T234312';
+  var BAKED = '20260509T234913';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -3669,6 +3669,7 @@ class NPCManager {
   update(elapsedTime, playerPos) {
     let closest     = null;
     let closestDist = Infinity;
+    const inRange   = [];
 
     for (const npc of this.npcs) {
       const d = playerPos.distanceTo(npc.group.position);
@@ -3678,8 +3679,18 @@ class NPCManager {
       // closer than ~2u, so a tighter limit would lock them out).
       const range = (npc.feetId === 'shopkeeper_morton' ||
                      npc.feetId === 'shopkeeper_fleetfeet') ? 4.5 : 2.5;
-      if (d < range && d < closestDist) { closestDist = d; closest = npc; }
+      if (d < range) {
+        inRange.push(npc);
+        if (d < closestDist) { closestDist = d; closest = npc; }
+      }
     }
+
+    // Stash the full in-range set so the cursor-aim interaction picker
+    // (in main.js) can iterate over EVERY reachable NPC instead of being
+    // forced to use `closest`. Without this, aiming at a farther but
+    // visible NPC while a different one stood closer made E pick the
+    // wrong target.
+    this.inRange = inRange;
 
     if (this._highlighted !== closest) {
       if (this._highlighted) this._highlighted.setHighlighted(false);
@@ -10275,14 +10286,14 @@ document.addEventListener('pointerlockchange', () => {
       // Defer slightly so the lock-overlay fade doesn't visually race with it
       setTimeout(() => {
         ui.showTip('OBJECTIVE',
-          "Collect all <b style=\"color:#FFD700\">18 feet</b> across NYC by talking to colorful <b>characters</b>, " +
+          "Collect all <b style=\"color:#FFD700\">18 feet</b> by talking to <b>characters</b> " +
           "and beating the <b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b> you find along the way."
         );
         // After OBJECTIVE is dismissed, show the Feet God's first directive.
         _afterTipCallback = () => {
           if (!tutorial.active) return;
           ui.openFeetGodDialogue(
-            "Start with the <b>Empire State Building</b> right ahead — head inside."
+            "Start with the <b>Empire State Building</b> right ahead."
           );
         };
       }, 250);
@@ -10523,20 +10534,22 @@ function _handleE() {
 
     case 'playing':
     case 'interior': {
-      // Cursor-aim interaction: E only fires the target the player is
-      // actually LOOKING at. Anything within the proximity ring AND
-      // within a ~60° cone of the camera's forward axis is eligible;
-      // among multiple eligible targets, the one most directly under
-      // the cursor (highest aim dot) wins. Things essentially at the
-      // player's feet (<0.5 m away) bypass the cone — you'd be standing
-      // on top of them and direction is meaningless.
+      // Cursor-aim interaction: E fires the target the player is actually
+      // LOOKING at. EVERY in-range NPC, entry door, and subway is eligible
+      // — not just the nearest — so aiming at a slightly-farther NPC while
+      // a closer one stands beside you still picks the one under your
+      // cursor. Eligibility = within proximity range AND within a 60°
+      // cone of the camera's forward axis. Among multiple eligible
+      // targets, the one most directly under the cursor (highest aim
+      // dot) wins. Targets within 0.5 m bypass the cone — when you're
+      // standing on something, direction is meaningless.
       const fwd = new THREE.Vector3();
       camera.getWorldDirection(fwd);
-      const AIM_COS = 0.5;          // cos(60°) — half-cone half-angle
+      const AIM_COS = 0.5;          // cos(60°)
       const _aimDot = (tx, tz) => {
         const dx = tx - player.position.x, dz = tz - player.position.z;
         const len = Math.hypot(dx, dz);
-        if (len < 0.5) return 1;    // standing on it — always aimed
+        if (len < 0.5) return 1;
         return (dx / len) * fwd.x + (dz / len) * fwd.z;
       };
 
@@ -10550,9 +10563,12 @@ function _handleE() {
 
       // Build candidate list of cursor-aimed interactions.
       const candidates = [];
-      if (_nearestNPC) {
-        const d = _aimDot(_nearestNPC.group.position.x, _nearestNPC.group.position.z);
-        if (d >= AIM_COS) candidates.push({ kind: 'npc', dot: d });
+      // ALL in-range NPCs — not just the nearest. The cursor decides
+      // which one E targets when multiple are reachable.
+      const inRangeNpcs = npcMgr.inRange ?? (_nearestNPC ? [_nearestNPC] : []);
+      for (const npc of inRangeNpcs) {
+        const d = _aimDot(npc.group.position.x, npc.group.position.z);
+        if (d >= AIM_COS) candidates.push({ kind: 'npc', npc, dot: d });
       }
       if (proxDoor && proxDoor.action === 'near-entry') {
         const d = _aimDot(proxDoor.pos.x, proxDoor.pos.z);
@@ -10568,21 +10584,22 @@ function _handleE() {
       const top = candidates[0];
 
       if (top.kind === 'npc') {
+        const targetNpc = top.npc;
         // Morton routes to the shop UI instead of the discovery dialogue flow.
-        if (_nearestNPC.feetId === 'shopkeeper_morton') {
-          _activeNPC = _nearestNPC;
+        if (targetNpc.feetId === 'shopkeeper_morton') {
+          _activeNPC = targetNpc;
           Audio.interact();
           _openShop();
           return;
         }
         // Vance routes to the Fleet Feet cosmetic shop UI.
-        if (_nearestNPC.feetId === 'shopkeeper_fleetfeet') {
-          _activeNPC = _nearestNPC;
+        if (targetNpc.feetId === 'shopkeeper_fleetfeet') {
+          _activeNPC = targetNpc;
           Audio.interact();
           _openFleet();
           return;
         }
-        _activeNPC = _nearestNPC;
+        _activeNPC = targetNpc;
         if (_activeNPC.rarity === 'legendary') Audio.legendaryFanfare();
         else Audio.interact();
 
@@ -10653,9 +10670,8 @@ function _handleE() {
         ui.updateGold(feetdex.gold, _nextBoosterTarget());
         setTimeout(() => {
           ui.openFeetGodDialogue(
-            "Every foot you collect pays you in <b>gold</b>, " +
-            "and your next affordable tool is always marked in the <b>top right corner</b> so you know what to save toward. " +
-            "When you're ready, head to <b>Morton's Shop</b> — press <b>[M]</b> to open the map and find your way there."
+            "Feet pay <b>gold</b>, and your next tool is marked in the <b>top right</b> so you know what to save toward — " +
+            "open the <b>[M]</b> map to find <b>Morton's Shop</b>."
           );
         }, 600);
       }
@@ -10838,15 +10854,15 @@ function _runMortonTutorial() {
   const lines = [
     {
       title: 'MORTON',
-      body: "Name's Morton. Every foot you collect out there pays in <b style=\"color:#FFD700\">gold</b>, and you bring that gold here to buy <b>tools</b> — gear that helps you find feet faster, fight tougher, or move quicker through the city."
+      body: "Name's Morton. Bring me your <b style=\"color:#FFD700\">gold</b> and I'll trade you <b>tools</b> — gear that helps you find feet faster or fight tougher."
     },
     {
       title: 'MORTON',
-      body: "Catch is, the gold pile only stretches so far. Every coin you put toward one tool is a coin you can't put toward another — that's what folks call <b>opportunity cost</b>, and it's the whole reason smart spending matters. Pick the tools that fit how you play, and don't lose sleep skipping the rest."
+      body: "Catch is, every coin spent on one tool is a coin you can't spend on another — folks call that <b>opportunity cost</b>, and it's why picking the right tools matters more than buying them all."
     },
     {
       title: 'MORTON',
-      body: "Welcome gift: <b style=\"color:#FFD700\">+20g</b> on the house. Try the <b>Sprint Feet</b> first — they're cheap, they save you a lot of walking, and they're a clean look at how a small investment pays you back the rest of the run."
+      body: "Welcome gift: <b style=\"color:#FFD700\">+20g</b> on the house. Try the <b>Sprint Feet</b> first — small price, and they pay you back the rest of the run."
     },
   ];
   let i = 0;
@@ -11073,23 +11089,23 @@ function _onUnequipCosmetic() {
   ui.refreshFleetFeetShop?.();
 }
 // One-line how-to tips, shown once on first purchase. Each one reads as
-// a sentence, not a stat sheet — the player learns what the tool does
-// and how to use it in the same breath.
+// a single flowing sentence — the player learns what the tool does and
+// how to use it in the same breath.
 const BOOSTER_TIPS = {
   sprint_feet:    { title: 'SPRINT FEET',
-    body: 'Hold <b>SHIFT</b> while moving and you\'ll break into a sprint.' },
+    body: 'Hold <b>SHIFT</b> to break into a sprint.' },
   radar:          { title: 'RADAR',
-    body: 'Common, rare, and epic characters now show up as colored dots on both the minimap and the [M] map, anywhere in the city.' },
+    body: 'Common, rare, and epic characters now show as colored dots on the map and minimap.' },
   compass:        { title: 'COMPASS',
-    body: 'A needle in the top-left twitches toward the nearest <b>mythic</b> or <b>legendary</b> — it points the way without telling you who or how far.' },
+    body: 'A top-left needle now twitches toward the nearest <b>mythic</b> or <b>legendary</b>.' },
   armor:          { title: 'ARMOR',
-    body: 'Your HP doubles and you take 30% less damage from mythics and legendaries.' },
+    body: 'HP doubles and mythics and legendaries hit 30% softer.' },
   lightsaber:     { title: 'LIGHTSABER',
-    body: 'Your strikes deal <b>double damage</b> at <b>double speed</b> — and against <b>mythics</b> and <b>legendaries</b> the bonus doubles again, hitting <b>4×</b>.' },
+    body: 'Strikes do <b>2×</b> damage at <b>2×</b> speed — and <b>4×</b> of both against mythics and legendaries.' },
   metrocard:      { title: 'METROCARD',
-    body: 'Walk up to any subway and press <b>[E]</b>. The map opens with the <b style="color:#0066ff">blue dots</b> — click one and the train takes you straight there.' },
+    body: 'Press <b>[E]</b> at any subway, then click a <b style="color:#0066ff">blue dot</b> on the map to ride.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
-    body: 'A gold <b>★</b> now marks where The Ancient One is hiding — just follow it.' },
+    body: 'A gold <b>★</b> now marks The Ancient One — just follow it.' },
 };
 let _shownTips = new Set();
 let _afterTipCallback = null;     // run after the tip is dismissed (countdown chains here)
@@ -11132,16 +11148,14 @@ function _onBuyBooster(id) {
         _showBoosterTip('sprint_feet');
         _afterTipCallback = () => {
           ui.openFeetGodDialogue(
-            "Optional <b>missions</b> will start showing up in the corner — small side jobs that pay extra gold when you finish them. " +
-            "Take the ones that interest you and skip the rest; they're never required."
+            "Optional <b>missions</b> will pop up in the corner for extra gold — take the ones you want, skip the rest."
           );
           _afterTipCallback = () => {
             _revealMissions();
             // Fleet Feet intro — last lesson before the celebration.
             ui.openFeetGodDialogue(
-              "One last thing — once you've covered the tools you actually need, " +
-              "you can drop by <b>Fleet Feet</b> to spend leftover gold on cosmetic skins of any foot you've collected. " +
-              "Treat it as the dessert after dinner: nice to have, but only after the essentials are handled."
+              "Last thing — once your tools are covered, <b>Fleet Feet</b> sells skins of any foot you've collected. " +
+              "It's the dessert after dinner: only worth it once the essentials are handled."
             );
             _afterTipCallback = () => {
               // NOW the tutorial is done. Celebrate.
@@ -11294,9 +11308,8 @@ function _enterLandmark(id, name) {
       tutorial.advance('enter-esb');
       setTimeout(() => {
         ui.openFeetGodDialogue(
-          "Buildings you can step into glow <b style=\"color:#ffd700\">yellow</b> on the map and on the minimap, " +
-          "and their entrance doors glow the same color up close. " +
-          "Find the character waiting inside this one, walk up, and press <b>[E]</b> to talk."
+          "<b style=\"color:#ffd700\">Yellow</b> dots on the map and yellow doors up close mean you can enter — " +
+          "find the character inside and press <b>[E]</b> to talk."
         );
       }, 450);
     }
@@ -11340,12 +11353,12 @@ const FIGHT_TUTORIAL = {
   mythic: {
     title: 'MYTHIC FIGHT',
     theme: 'mythic',
-    body : 'Use <b>WASD</b> to move and <b>LEFT CLICK</b> to punch — step out of range to dodge their swings.',
+    body : '<b>WASD</b> to move, <b>LEFT CLICK</b> to punch — step away to dodge.',
   },
   legendary: {
     title: 'LEGENDARY FIGHT',
     theme: 'legendary',
-    body : 'Legendaries hit harder — beat this one <b>three times</b> before they\'ll hand over their feet.',
+    body : 'Legendaries hit harder — beat this one <b>three times</b> to claim their feet.',
   },
 };
 let _firstMythicFought    = false;
