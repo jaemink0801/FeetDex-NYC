@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T010804';
+  var BAKED = '20260509T012340';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -654,6 +654,9 @@
       85%  { opacity:1; }
       100% { transform:translateY(110vh) rotate(540deg); opacity:0; }
     }
+    /* Firework bursts — rendered behind feet-rain (lower z) so the falling
+       feet read clearly on top of the colored star bursts. */
+    #firework-canvas { position:fixed; inset:0; pointer-events:none; z-index:199; }
 
     /* Tutorial Complete fullscreen banner */
     #tutorial-complete { position:fixed; inset:0; z-index:210;
@@ -770,6 +773,9 @@
 
   <!-- Feet rain container -->
   <div id="feet-rain"></div>
+
+  <!-- Firework bursts canvas (rendered behind the feet rain) -->
+  <canvas id="firework-canvas"></canvas>
 
   <!-- Compass destination picker [C] -->
   <div id="compass-picker">
@@ -1052,52 +1058,65 @@ function sweep(freqStart, freqEnd, duration, type = 'sine', gainVal = 0.18, star
 //      randomly-spaced metallic "ping" tones sprinkled on top, so it
 //      reads as actual sparks falling rather than a single noise burst.
 function _firework(c, t) {
-  // ── 1. WHISTLE (rising rocket) ──
-  const whF0 = 540 + Math.random() * 220;
-  const whF1 = whF0 + 1500 + Math.random() * 700;
-  const whDur = 0.42;
+  // ── 1. WHISTLE (rising rocket) ── more dramatic ascent: starts lower,
+  // climbs to a brighter peak, with deeper vibrato so the "fwheeeee"
+  // really sings instead of sounding like a synth ramp.
+  const whF0 = 380 + Math.random() * 180;            // start ~380-560 Hz
+  const whF1 = whF0 + 2400 + Math.random() * 900;    // peak ~2.8-3.9 kHz
+  const whDur = 0.50;
   const wOsc = c.createOscillator(); wOsc.type = 'sine';
   wOsc.frequency.setValueAtTime(whF0, t);
   wOsc.frequency.exponentialRampToValueAtTime(whF1, t + whDur);
 
-  // 6 Hz vibrato — gives the whistle the wobbly "fwheeee" quality.
+  // 7 Hz vibrato with deeper swing — wobbly "fwheeee" quality.
   const vibratoLFO  = c.createOscillator(); vibratoLFO.type = 'sine';
-  vibratoLFO.frequency.value = 6;
-  const vibratoGain = c.createGain(); vibratoGain.gain.value = 24; // ±24 Hz
+  vibratoLFO.frequency.value = 7;
+  const vibratoGain = c.createGain(); vibratoGain.gain.value = 38; // ±38 Hz
   vibratoLFO.connect(vibratoGain); vibratoGain.connect(wOsc.frequency);
 
   const wGain = c.createGain();
   wGain.gain.setValueAtTime(0.0001, t);
-  wGain.gain.linearRampToValueAtTime(0.20, t + 0.06);
-  wGain.gain.linearRampToValueAtTime(0.16, t + whDur - 0.02);
+  wGain.gain.linearRampToValueAtTime(0.26, t + 0.06);
+  wGain.gain.linearRampToValueAtTime(0.20, t + whDur - 0.02);
   wGain.gain.exponentialRampToValueAtTime(0.0001, t + whDur);
   wOsc.connect(wGain); wGain.connect(masterGain);
   wOsc.start(t); wOsc.stop(t + whDur + 0.02);
   vibratoLFO.start(t); vibratoLFO.stop(t + whDur + 0.02);
 
-  // ── 2. BANG (impulse + low thud) ──
+  // ── 2. BANG (impulse + low thud) ── louder and chestier than before
+  // so each shell pops distinctly instead of getting buried in tail noise.
   const bangAt = t + whDur;
   const thud = c.createOscillator(); thud.type = 'sine';
-  thud.frequency.setValueAtTime(140, bangAt);
-  thud.frequency.exponentialRampToValueAtTime(40, bangAt + 0.18);
+  thud.frequency.setValueAtTime(160, bangAt);
+  thud.frequency.exponentialRampToValueAtTime(35, bangAt + 0.22);
   const thudG = c.createGain();
-  thudG.gain.setValueAtTime(0.45, bangAt);
-  thudG.gain.exponentialRampToValueAtTime(0.0001, bangAt + 0.20);
+  thudG.gain.setValueAtTime(0.70, bangAt);
+  thudG.gain.exponentialRampToValueAtTime(0.0001, bangAt + 0.26);
   thud.connect(thudG); thudG.connect(masterGain);
-  thud.start(bangAt); thud.stop(bangAt + 0.22);
+  thud.start(bangAt); thud.stop(bangAt + 0.28);
 
-  // Bright crack
-  const crackLen = Math.floor(c.sampleRate * 0.05);
+  // Sub-bass kick reinforces the chest-thump of the bang
+  const sub = c.createOscillator(); sub.type = 'sine';
+  sub.frequency.setValueAtTime(70, bangAt);
+  sub.frequency.exponentialRampToValueAtTime(28, bangAt + 0.20);
+  const subG = c.createGain();
+  subG.gain.setValueAtTime(0.55, bangAt);
+  subG.gain.exponentialRampToValueAtTime(0.0001, bangAt + 0.24);
+  sub.connect(subG); subG.connect(masterGain);
+  sub.start(bangAt); sub.stop(bangAt + 0.26);
+
+  // Bright crack — punchier with a wider noise burst window
+  const crackLen = Math.floor(c.sampleRate * 0.07);
   const crackBuf = c.createBuffer(1, crackLen, c.sampleRate);
   const crackData = crackBuf.getChannelData(0);
   for (let i = 0; i < crackLen; i++) {
-    crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 1.2);
+    crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 1.0);
   }
   const crackSrc = c.createBufferSource(); crackSrc.buffer = crackBuf;
-  const crackHP  = c.createBiquadFilter(); crackHP.type = 'highpass'; crackHP.frequency.value = 1500;
-  const crackG   = c.createGain(); crackG.gain.value = 0.55;
+  const crackHP  = c.createBiquadFilter(); crackHP.type = 'highpass'; crackHP.frequency.value = 1200;
+  const crackG   = c.createGain(); crackG.gain.value = 0.80;
   crackSrc.connect(crackHP); crackHP.connect(crackG); crackG.connect(masterGain);
-  crackSrc.start(bangAt); crackSrc.stop(bangAt + 0.06);
+  crackSrc.start(bangAt); crackSrc.stop(bangAt + 0.08);
 
   // ── 3. CRACKLE TAIL (sizzle + sparkle pings) ──
   const tailDur = 0.55 + Math.random() * 0.25;
@@ -2523,8 +2542,12 @@ const SPECIAL_DEFS = [
   { name: 'Captain Brianna',   pos: [3600, 0,   0], rarity: 'rare',   feetId: 'rare_cheerleader',  minigame: null,  bodyScale: 1.00 },
   // Ronin — Grand Central interior (custom ox=1800). The lost samurai's storyline
   // ends in a transit hub: he wandered from Kyoto, ended up here, doesn't know
-  // where to go next.
-  { name: 'Ronin',             pos: [1800, 0,   0], rarity: 'common', feetId: 'common_samurai',    minigame: null,  bodyScale: 1.00 },
+  // where to go next. Placed SOUTH of the central information-booth desk
+  // (booth occupies ±1.7 in xz around the room center) so the player walking
+  // in from the entry door at z=+9.85 sees Ronin immediately and can reach
+  // him without the booth blocking the path. Previously sat at (1800,0,0)
+  // which is inside the booth's solid AABB — making Ronin unreachable.
+  { name: 'Ronin',             pos: [1800, 0,   3], rarity: 'common', feetId: 'common_samurai',    minigame: null,  bodyScale: 1.00 },
   // Grey — 1WTC lobby (interior x=2400). Grey is obsessed with Pantone 18-0306
   // pewter and "the most underappreciated grey"; the polished black-granite,
   // brushed-steel, and blue-glass palette of 1WTC is exactly their aesthetic.
@@ -4748,6 +4771,10 @@ class UI {
     const wrap = document.getElementById('feet-rain');
     if (!wrap) return;
     Audio.fireworks?.(4.3);  // 0.8× the previous 5.4s duration
+    // Visual firework bursts layered behind the falling feet — timed to
+    // match the audio "pops" so the explosion you SEE coincides with the
+    // BANG you HEAR. Heavier celebrations (count >= 30) get more shells.
+    _spawnFireworkBursts(count >= 30 ? 4.3 : 1.5, count >= 30 ? 6 : 2);
     for (let i = 0; i < count; i++) {
       const sz = 30 + Math.random() * 36;
       const drop = document.createElement('div');
@@ -5564,6 +5591,96 @@ class UI {
       this.onWinClose?.();
     });
   }
+}
+
+// ── Firework bursts (celebrations) ────────────────────────────────────────────
+// Renders colorful star-shell explosions on a fullscreen canvas, layered
+// behind the falling-foot rain. Each burst is timed to match the audio
+// _firework() bang (whistle ≈ 0.50 s, then BANG); shells are spaced
+// ~0.85 s apart to mirror the audio's ~5 s volley pacing. Multiple
+// concurrent calls coexist — particles share one canvas and one rAF loop.
+const _FW_PALETTE = [
+  '#ff3b6b', '#ffd23f', '#3cd6ff', '#9d4eff',
+  '#3aff8b', '#ff8a3c', '#ff6bff', '#ffffff',
+];
+let _fwParticles  = [];
+let _fwRunning    = false;
+
+function _spawnFireworkBursts(durationSec, shellCount) {
+  const canvas = document.getElementById('firework-canvas');
+  if (!canvas) return;
+  // Resize canvas to viewport whenever a new volley starts — covers
+  // window resizes between celebrations without needing a listener.
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+
+  const WHISTLE_LEAD = 500;            // ms — matches audio whistle dur
+  const interval    = (durationSec * 1000) / Math.max(1, shellCount);
+  for (let i = 0; i < shellCount; i++) {
+    const at = i * interval + Math.random() * 280;
+    setTimeout(() => {
+      const cx = canvas.width  * (0.12 + Math.random() * 0.76);
+      const cy = canvas.height * (0.10 + Math.random() * 0.45);
+      const color = _FW_PALETTE[Math.floor(Math.random() * _FW_PALETTE.length)];
+      // Two-tone bursts: most particles in the shell color + a few
+      // gold/white sparks for a real-firework "core flash" look.
+      const PARTICLES = 44;
+      for (let k = 0; k < PARTICLES; k++) {
+        const ang = (k / PARTICLES) * Math.PI * 2 + Math.random() * 0.18;
+        const speed = 2.4 + Math.random() * 4.6;
+        const isSpark = Math.random() < 0.18;
+        _fwParticles.push({
+          x: cx, y: cy,
+          vx: Math.cos(ang) * speed,
+          vy: Math.sin(ang) * speed,
+          color: isSpark ? '#fff8c8' : color,
+          radius: isSpark ? 1.6 : 2.6 + Math.random() * 1.2,
+          life: 0.95 + Math.random() * 0.35,    // 1.0 = fresh, 0 = dead
+        });
+      }
+      _fwAnimate(canvas, ctx);
+    }, at + WHISTLE_LEAD);
+  }
+}
+
+function _fwAnimate(canvas, ctx) {
+  if (_fwRunning) return;
+  _fwRunning = true;
+  (function frame() {
+    // Use a translucent fade-fill instead of clearRect for trailing
+    // tracers — gives each particle a comet-like streak as it falls.
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.globalCompositeOperation = 'lighter';
+    let alive = 0;
+    for (const p of _fwParticles) {
+      if (p.life <= 0) continue;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.07;       // gravity
+      p.vx *= 0.985;      // air drag
+      p.vy *= 0.985;
+      p.life -= 0.018;
+      if (p.life > 0) {
+        alive++;
+        ctx.globalAlpha = Math.min(1, p.life);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    if (alive > 0) {
+      requestAnimationFrame(frame);
+    } else {
+      _fwParticles.length = 0;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      _fwRunning = false;
+    }
+  })();
 }
 
 // ── Confetti (win screen) ─────────────────────────────────────────────────────
@@ -8373,7 +8490,12 @@ function buildLandmarkDoors(scene) {
     { id: 'esb',      name: 'Empire State Building', pos: new THREE.Vector3( 0,  1.5,   8.2) },
     { id: 'chrysler', name: 'Chrysler Building',      pos: new THREE.Vector3(40,  1.5,  27.15) },
     { id: 'wtc',      name: 'One World Trade Center', pos: new THREE.Vector3( 0,  1.5, -165.9) },
-    { id: 'gc',       name: 'Grand Central Terminal', pos: new THREE.Vector3(75,  1.5, -24.8) },
+    // Grand Central — door is positioned ABOVE the entrance steps (y=2.9
+    // so the door's bottom edge at y=1.4 sits flush with the top step at
+    // y=1.405) and flush with the building's north face (z=-25.0). The
+    // player has to climb the steps to reach it; getFloorY raises them
+    // step-by-step so it Just Works without explicit step-up logic.
+    { id: 'gc',       name: 'Grand Central Terminal', pos: new THREE.Vector3(75,  2.9, -25.0) },
   ];
 
   const mat = new THREE.MeshStandardMaterial({
@@ -9837,6 +9959,30 @@ class World {
     // South ramp: linear slope from z=-128 (y=0) to z=-114 (y=BRIDGE_DECK_Y)
     if (x >= -63 && x <= -57 && z >= -128 && z <= -114)
       return Math.max(0, ((z + 128) / 14) * BRIDGE_DECK_Y);
+    // Grand Central front steps. Width 14 in x (68..82), 4 ascending tiers
+    // each 0.5m deep × 0.35m tall, climbing from world z=-23 (street side,
+    // step 0 top y=0.355) up to z=-25.5 (terminal threshold, step 3 top
+    // y=1.405). Floor returned = step-top y based on which tier the
+    // player's z lands in. Implemented as terrain (not solid colliders)
+    // so the player auto-rises while walking up — no jumping required.
+    if (x >= 68 && x <= 82 && z >= -25.5 && z <= -23.0) {
+      // Step centers (world z) and tops (world y):
+      //   s=0 center -23.5 (top y 0.355)
+      //   s=1 center -24.0 (top y 0.705)
+      //   s=2 center -24.5 (top y 1.055)
+      //   s=3 center -25.0 (top y 1.405)
+      // Steps overlap by 0.5 in z; for any z, return the highest tier
+      // that contains it so adjacent overlap reads as a clean stair tread.
+      let stepY = 0;
+      for (let s = 0; s < 4; s++) {
+        const cz = -23.5 - s * 0.5;
+        if (z >= cz - 0.5 && z <= cz + 0.5) {
+          const top = s * 0.35 + 0.355;
+          if (top > stepY) stepY = top;
+        }
+      }
+      return stepY;
+    }
     return 0;
   }
 
@@ -10210,6 +10356,11 @@ function _handleE() {
   // Shop overlay: E closes it
   if (state === 'shop') { _closeShop(); _activeNPC = null; return; }
   if (state === 'fleet') { _closeFleet(); _activeNPC = null; return; }
+
+  // Subway map: E acts as a "put it away" toggle, mirroring how E
+  // OPENED it from a station. Players naturally try the same key to
+  // dismiss it; without this they were stuck reaching for M/ESC.
+  if (_mapOpen) { _closeMap(true); return; }
 
   switch (state) {
 
@@ -11548,40 +11699,42 @@ if (_mapDynCanvas) {
     const rect = _mapDynCanvas.getBoundingClientRect();
     const cx = ((e.clientX - rect.left) / rect.width)  * MAP_SIZE;
     const cy = ((e.clientY - rect.top)  / rect.height) * MAP_SIZE;
-    // Pick the station whose dot center is CLOSEST to the click cursor,
-    // accepting clicks on EITHER the dot (within hit.r) or the station's
-    // text label box. The label can be pushed 30+ px from the dot by the
-    // anti-overlap placer, so dot-only hit zones miss most label clicks
-    // and the teleport silently does nothing — the user's reported
-    // "can't go to that station" symptom.
-    const _hitMatches = (hit, x, y) => {
-      const dx = x - hit.cx, dy = y - hit.cy;
-      if (dx * dx + dy * dy <= hit.r * hit.r) return true;
-      const lb = hit.labelBox;
-      return !!(lb && x >= lb.x && x <= lb.x + lb.w && y >= lb.y && y <= lb.y + lb.h);
-    };
-    const me = _displayPos();
+
+    // Click resolution policy: ALWAYS resolve to the nearest station whose
+    // dot center is within CLICK_TOLERANCE_PX of the cursor. The earlier
+    // bug class (multiple times reported by the user) was that strict
+    // hit-zones — dot-only, then dot+label-box — kept missing clicks made
+    // anywhere "near" a station: in the gap between dot and label, on a
+    // leader line, on the colored building marker next to a station, etc.
+    // Stations are >200 px apart on the map, so a 100 px tolerance never
+    // creates ambiguity (closest-wins handles overlap regions cleanly),
+    // and it covers every reasonable click a user might intend as "that
+    // station." The label-box and dot-radius logic is still respected as
+    // a tighter inner ring (closer matches preferred) but the tolerance
+    // is what guarantees the click lands on a station.
+    const CLICK_TOLERANCE_PX = 100;
     let best = null, bestDist2 = Infinity;
     for (const hit of _mapStationHits) {
-      if (!_hitMatches(hit, cx, cy)) continue;
       const dx = cx - hit.cx, dy = cy - hit.cy;
       const d2 = dx * dx + dy * dy;
       if (d2 < bestDist2) { bestDist2 = d2; best = hit; }
     }
-    if (!best) return;
-    // If the closest match IS the station the player's standing at, find
-    // the next-closest one that ISN'T — that's almost certainly what the
-    // player meant to click.
+    if (!best || bestDist2 > CLICK_TOLERANCE_PX * CLICK_TOLERANCE_PX) return;
+
+    // If the closest station IS where the player is currently standing,
+    // resolve to the SECOND-closest within tolerance instead — the user
+    // is asking to leave, not stay. If no alternative is within tolerance
+    // (they really did just click their own station), silently no-op.
+    const me = _displayPos();
     if (Math.hypot(me.x - best.st.x, me.z - best.st.z) < 4) {
       let alt = null, altDist2 = Infinity;
       for (const hit of _mapStationHits) {
         if (hit === best) continue;
-        if (!_hitMatches(hit, cx, cy)) continue;
         const dx = cx - hit.cx, dy = cy - hit.cy;
         const d2 = dx * dx + dy * dy;
         if (d2 < altDist2) { altDist2 = d2; alt = hit; }
       }
-      if (!alt) return;            // really did click the station they're at
+      if (!alt || altDist2 > CLICK_TOLERANCE_PX * CLICK_TOLERANCE_PX) return;
       best = alt;
     }
     _teleportToStation(best.st);
