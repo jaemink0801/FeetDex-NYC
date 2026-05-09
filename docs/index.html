@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260508T193714';
+  var BAKED = '20260509T004329';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1918,24 +1918,32 @@ class Player {
     // collected foot through Fleet Feet recolors this.
     this._defaultShoeMat = new THREE.MeshLambertMaterial({ color: 0xcca888 });
 
-    // Pelvis + slim torso column — bridges the legs all the way up to just
-    // below eye level so the lower body visually connects to the user's
-    // viewpoint instead of floating detached. The pelvis is kept SHALLOW
-    // (10 cm front-to-back, was 18 cm) so it doesn't form a wide lid over
-    // the feet — toes now poke past its forward edge and are visible when
-    // the camera pitches down. The torso column above is narrow at the top
-    // (~5 cm radius) so looking straight down it appears as a small disc
-    // rather than filling the view.
+    // Pelvis + tapered torso. The torso is a cone that runs from the hip
+    // line UP THROUGH and PAST the camera's eye level (top at y=1.78,
+    // 0.18m above eyes at 1.60), tapering to a near-point at the top so
+    // there's no flat horizontal surface anywhere near the camera. The
+    // top cap therefore sits in +Y world (above the camera) and is out
+    // of FOV at every downward pitch — the camera looking down only sees
+    // the cone's curved sidewall receding into the distance toward the
+    // feet, exactly the perspective the user wants ("legs getting wider
+    // toward the camera, naturally cutting off from the screen when
+    // pitched as far down as possible"). The body is also shifted ~5 cm
+    // BEHIND the player's xz in _updateCamera (eyes are at the FRONT of
+    // the head, body sits behind them) so when the player looks forward
+    // there is no body geometry intruding on the forward FOV.
     const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.10), pantMat);
     pelvis.position.set(0, 0.92, 0);
     this._legs.add(pelvis);
 
     const torsoMat = new THREE.MeshLambertMaterial({ color: 0x3a3a4a });
     const torso = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.05, 0.11, 0.50, 8),
+      // (radTop, radBottom, height, radialSegs) — narrow apex at top so
+      // the cap is essentially a point and is occluded by being above
+      // the camera; broad at bottom to merge cleanly into the pelvis.
+      new THREE.CylinderGeometry(0.015, 0.13, 0.86, 12),
       torsoMat,
     );
-    torso.position.set(0, 1.24, 0);   // bottom y≈0.99 (above pelvis), top y≈1.49 (below eyes 1.6)
+    torso.position.set(0, 1.35, 0);   // bottom y≈0.92 (pelvis), top y≈1.78 (above eyes 1.60)
     this._legs.add(torso);
 
     for (const side of [-1, 1]) {
@@ -2295,11 +2303,24 @@ class Player {
     this.camera.rotation.x = this.pitch;
 
     // Anchor the legs/body group to the player's WORLD position (and yaw
-    // only) so the camera's pitch doesn't rotate it. Legs origin sits at
-    // ground level, with everything (feet, shins, pants, pelvis, torso)
-    // built upward, so the soles rest flat on the floor — no phasing.
+    // only) so the camera's pitch doesn't rotate it. The body is offset
+    // BEHIND the player's xz by BODY_OFFSET_BACK so the camera (= eyes)
+    // sits at the front of the head — looking forward the body is out
+    // of FOV, looking down the body comes in from the screen edge as
+    // the legs recede toward the feet (the perspective the user wants).
+    // Legs origin sits at ground level, with everything (feet, shins,
+    // pants, pelvis, torso) built upward, so the soles rest flat on
+    // the floor — no phasing.
     if (this._legs && this._legs.parent !== this.camera) {
-      this._legs.position.set(this.position.x, this.position.y, this.position.z);
+      const BODY_OFFSET_BACK = 0.06;
+      // Player faces (-sin(yaw), 0, -cos(yaw)); back is the negation.
+      const bx = Math.sin(this.yaw) * BODY_OFFSET_BACK;
+      const bz = Math.cos(this.yaw) * BODY_OFFSET_BACK;
+      this._legs.position.set(
+        this.position.x + bx,
+        this.position.y,
+        this.position.z + bz,
+      );
       this._legs.rotation.y = this.yaw;
     }
   }
