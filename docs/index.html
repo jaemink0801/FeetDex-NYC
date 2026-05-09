@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T233239';
+  var BAKED = '20260509T234027';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -10275,14 +10275,14 @@ document.addEventListener('pointerlockchange', () => {
       // Defer slightly so the lock-overlay fade doesn't visually race with it
       setTimeout(() => {
         ui.showTip('OBJECTIVE',
-          "Collect all <b style=\"color:#FFD700\">18 feet</b>. Talk to colorful <b>characters</b>; " +
-          "fight <b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b>."
+          "Collect all <b style=\"color:#FFD700\">18 feet</b> across NYC by talking to colorful <b>characters</b>, " +
+          "and beating the <b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b> you find along the way."
         );
         // After OBJECTIVE is dismissed, show the Feet God's first directive.
         _afterTipCallback = () => {
           if (!tutorial.active) return;
           ui.openFeetGodDialogue(
-            "Enter the <b>Empire State Building</b> ahead."
+            "Start with the <b>Empire State Building</b> right ahead — head inside."
           );
         };
       }, 250);
@@ -10653,8 +10653,9 @@ function _handleE() {
         ui.updateGold(feetdex.gold, _nextBoosterTarget());
         setTimeout(() => {
           ui.openFeetGodDialogue(
-            "Feet earn <b>gold</b>. Your next tool is marked at the <b>top right</b>. " +
-            "Find <b>Morton's Shop</b> — press <b>[M]</b> for the map."
+            "Every foot you collect pays you in <b>gold</b>, " +
+            "and your next affordable tool is always marked in the <b>top right corner</b> so you know what to save toward. " +
+            "When you're ready, head to <b>Morton's Shop</b> — press <b>[M]</b> to open the map and find your way there."
           );
         }, 600);
       }
@@ -10744,19 +10745,22 @@ function _checkSecretUnlock() { /* no-op */ }
 
 // ── Morton's Shop ─────────────────────────────────────────────────────────────
 
-// First-visit greeting is always the introduction.
+// First-visit greeting is always the introduction. Note this line is
+// only used when the player walks back into the shop AFTER the tutorial
+// has finished — the very first meeting runs through _runMortonTutorial.
 const MORTON_FIRST_LINE =
-  "First time, eh? I'm Morton. Whatever's in your pocket, I've got something for it. Work the streets right and you can have it all — just pick what helps you most, right now.";
+  "First time, eh? Name's Morton, and whatever's in your pocket, I've got something for it. Work the streets right and you can stack the whole shelf — but every coin you put toward one tool is a coin you can't put toward another, so pick what helps you most right now.";
 
 // Fallback rotating wisdom for return visits when no contextual line fits.
+// Each one carries a money concept under casual shopkeeper voice.
 const MORTON_LINES = [
-  "Coin you spend twice is coin you don't have.",
-  "Cheap thing today, expensive lesson tomorrow.",
-  "Money buys time. Time buys money. Pick which way you're going.",
-  "Some folks save for the big one. Some grab three small ones. Both work.",
-  "Best customers are the patient ones.",
-  "Whatever you don't buy is what you keep.",
-  "Boosters compound. So do mistakes.",
+  "Coin you spend twice is coin you don't have — that's the whole game in one sentence.",
+  "Cheap thing today, expensive lesson tomorrow — be careful what you skip.",
+  "Money buys you time, and time buys you more money. Pick which way you're going.",
+  "Some folks save up for the big one, some grab three small ones — both can work, just don't do half of each.",
+  "My best customers are the patient ones. Patience earns interest in its own way.",
+  "Every gold you don't spend is gold you still have for the next opportunity.",
+  "Tools compound the rest of your run. So do the mistakes — pick wisely.",
 ];
 let _mortonVisits = 0;
 
@@ -10773,22 +10777,22 @@ function _mortonGreeting() {
 
   // Highest-priority observations — only one fires per visit.
   if (ownedN >= totalN) {
-    return "You bought it all. Smart spender.";
+    return "Cleared the whole shelf. Smart spender — you'll feel the difference out there.";
   }
   if (gold === 0) {
-    return "Window-shopping is fine. Come back when you've got coins.";
+    return "Window-shopping's fine, but the coins are the whole conversation. Come back when you've earned a few more.";
   }
   if (ownedN === 0 && gold >= 50) {
-    return "Sitting on coin like a hen on an egg, eh? Money in your pocket isn't earning you anything.";
+    return "You're sitting on coin like a hen on an egg — money in your pocket isn't earning anything for you. Pick a tool and let it start paying you back.";
   }
   if (target && target.diff <= 0 && ownedN < totalN) {
-    return `${target.name} is in reach. Your call.`;
+    return `The ${target.name} is in reach right now — and remember, every coin you spend on it is a coin you can't spend on anything else. That's opportunity cost, and it's how grown folks decide.`;
   }
   if (target && target.diff > 0 && target.diff <= 20) {
-    return `${target.diff} short of the ${target.name}. Almost there.`;
+    return `Only ${target.diff} short of the ${target.name}. Patience pays better than impulse here — couple more feet and it's yours.`;
   }
   if (gold >= 480 && !feetdex.hasBooster('ancient_tracker')) {
-    return "20 short of the Tracker. Hold tight — that one pays itself back.";
+    return "Twenty short of the Tracker. Hold tight on the small stuff — saving for the big one earns you more in the long run.";
   }
   // Fallback: rotate the generic wisdom lines
   return MORTON_LINES[(_mortonVisits - 2) % MORTON_LINES.length];
@@ -10806,13 +10810,13 @@ function _nextBoosterTarget() {
 }
 function _mortonOnPurchase(boosterId) {
   const lines = {
-    sprint_feet:    "Smart pick. Your legs will thank you.",
-    radar:          "Now you'll see who's worth your time.",
-    armor:          "Keeps you upright. Stay upright, stay rich.",
-    lightsaber:     "Hits like a paid invoice. They'll feel that one.",
-    ancient_tracker:"Big spender. Hope you know what you're doing — that star is patient but the gold isn't.",
+    sprint_feet:    "Smart pick — small price, and your legs'll thank you the rest of the run. That's the kind of buy that pays itself back twice over.",
+    radar:          "Now you'll see who's worth your time, which means less wandering and more earning. Time saved is money earned.",
+    armor:          "Keeps you upright when the big ones swing — and staying upright is how you stay rich. Good investment.",
+    lightsaber:     "Hits like a paid invoice — they'll feel that one. Spend less time fighting, more time collecting.",
+    ancient_tracker:"Big-ticket buy, but you knew that. The patient spenders save up for these and skip the small stuff in between — that's how the math works out.",
   };
-  return lines[boosterId] ?? "Smart pick.";
+  return lines[boosterId] ?? "Smart pick. Every gold spent here is gold doing work for you out there.";
 }
 
 function _openShop() {
@@ -10834,15 +10838,15 @@ function _runMortonTutorial() {
   const lines = [
     {
       title: 'MORTON',
-      body: "Spend <b style=\"color:#FFD700\">gold</b> here on <b>tools</b> that help you find or fight."
+      body: "Name's Morton. Every foot you collect out there pays in <b style=\"color:#FFD700\">gold</b>, and you bring that gold here to buy <b>tools</b> — gear that helps you find feet faster, fight tougher, or move quicker through the city."
     },
     {
       title: 'MORTON',
-      body: "You can't afford every tool. Pick the ones that fit your style."
+      body: "Catch is, the gold pile only stretches so far. Every coin you put toward one tool is a coin you can't put toward another — that's what folks call <b>opportunity cost</b>, and it's the whole reason smart spending matters. Pick the tools that fit how you play, and don't lose sleep skipping the rest."
     },
     {
       title: 'MORTON',
-      body: "Welcome gift: <b style=\"color:#FFD700\">+20g</b>. Try the <b>Sprint Feet</b>."
+      body: "Welcome gift: <b style=\"color:#FFD700\">+20g</b> on the house. Try the <b>Sprint Feet</b> first — they're cheap, they save you a lot of walking, and they're a clean look at how a small investment pays you back the rest of the run."
     },
   ];
   let i = 0;
@@ -10876,18 +10880,33 @@ function _closeShop() {
 }
 
 // ── Fleet Feet (cosmetic shop) ──────────────────────────────────────────────
+// Vance plays the "sneakerhead with money sense" — casual voice, but every
+// line slips in a budgeting angle (opportunity cost, essentials-vs-luxuries,
+// diminishing returns, surplus spending). The lines stay short so the
+// concepts land naturally instead of reading as a lecture.
 const VANCE_FIRST_LINE =
-  "Welcome to FLEET FEET. Buy skins of any feet you've collected — cosmetic only.";
+  "Yo, welcome to FLEET FEET. Skins are pure flex — the fun side of any budget — but the play is always tools first at Morton's, drip second. Cover what earns you gold before you spend it on what just looks good.";
 
+// Generic rotation lines — each carries a budgeting concept under the
+// streetwear voice. Used as a fallback after the smart context-aware
+// greetings below.
 const VANCE_LINES = [
-  "Drip is forever. Boosters wear off, fits don't.",
-  "You earned it once. Spend it on something fun.",
-  "Smart spender saves first, then treats themselves.",
-  "Customize loud — the streets remember.",
-  "If you bought every skin you'd be broke. So pick one.",
-  "Every gold here is gold you DIDN'T put toward tools.",
+  "Tools pay you back over the rest of the run; skins just look back at you in the mirror. Different jobs, both fine.",
+  "Essentials first, treats after — same way you'd run any budget.",
+  "Every gold dropped in here is a gold not over at Morton's, so price each fit against a tool before you cop.",
+  "Drip's the dessert, my guy. You eaten dinner yet?",
+  "Three pairs in the rotation is plenty — past that, each new fit gives you less drip per dollar.",
+  "Once your toolkit's stacked, surplus spending here is healthy. Treat yourself.",
 ];
 let _vanceVisits = 0;
+
+// Cheapest unowned booster, or null if every tool's already bought.
+function _cheapestUnownedBooster() {
+  const unowned = BOOSTER_DEFS.filter(b => !feetdex.hasBooster(b.id));
+  if (unowned.length === 0) return null;
+  unowned.sort((a, b) => a.price - b.price);
+  return unowned[0];
+}
 
 function _vanceGreeting() {
   if (_vanceVisits === 0) { _vanceVisits++; return VANCE_FIRST_LINE; }
@@ -10896,26 +10915,69 @@ function _vanceGreeting() {
   const collectedN = feetdex.count;
   const ownedSkins = feetdex.cosmetics.size;
   const equipped   = feetdex.equippedCosmetic;
-  const boostersN  = feetdex.boosters.size;
-  const totalBoost = BOOSTER_DEFS.length;
+  const cheapTool  = _cheapestUnownedBooster();
+  const gold       = feetdex.gold;
+  const skinsSpent = feetdex.totalSpentSkins;
+  const toolsSpent = feetdex.totalSpentTools;
 
   if (collectedN === 0) {
-    return "Empty FeetDex, empty rack. Go find some pairs first.";
+    return "Empty FeetDex, empty rack — can't buy what you ain't found yet, so go scoop up some pairs first.";
   }
-  if (boostersN === 0 && feetdex.gold >= 50) {
-    return "Hey — Morton's right there. Maybe grab a tool before you blow it on shoes?";
+  // Most-important rule: if there's an affordable tool sitting at Morton's,
+  // call it out by name and price every visit. The user's skin gold COULD
+  // be a tool — make that trade-off visible.
+  if (cheapTool && gold >= cheapTool.price && feetdex.boosters.size === 0) {
+    return `Hold up — you're sitting on ${gold}g with zero tools to your name. The ${cheapTool.name} runs ${cheapTool.price}g at Morton's, and that's the kind of buy that pays itself back the rest of the run. Get that first, then come back for drip.`;
   }
-  if (boostersN < Math.ceil(totalBoost / 2) && feetdex.totalSpentSkins > feetdex.totalSpentTools) {
-    return "Looking sharp, but you're spending more on drip than tools. That's a vibe, not a strategy.";
+  if (cheapTool && gold >= cheapTool.price) {
+    return `Real talk before you cop: the ${cheapTool.name} is sitting at Morton's for ${cheapTool.price}g — same money you'd spend on a skin here. Tool's the long play, skin's the instant flex. Just know which trade you're making.`;
+  }
+  // Imbalanced spend — drip more than tools.
+  if (cheapTool && skinsSpent > toolsSpent && skinsSpent > 0) {
+    return `Looking sharp, but ${skinsSpent}g on drip and only ${toolsSpent}g on tools tells a story — drip is nice, tools are how you actually win the run. Maybe flip that ratio next time.`;
+  }
+  // Tool just out of reach.
+  if (cheapTool && gold >= cheapTool.price * 0.6) {
+    const need = cheapTool.price - gold;
+    return `Heads up — the ${cheapTool.name} is only ${need}g away from being yours. Might be worth holding off on a skin and saving up for that first.`;
+  }
+  // Everything checked off — guilt-free spend zone.
+  if (!cheapTool) {
+    return "Toolkit's full top to bottom, so this is the surplus zone — cop whatever fits, no guilt about it. You earned the splurge.";
   }
   if (equipped) {
     const e = feetdex.getEntry(equipped);
-    if (e) return `Those ${e.name.toUpperCase()} look CLEAN on you.`;
+    if (e) return `${e.name.toUpperCase()} hit clean on you. Heads up though, past three or four pairs each new fit gives you less drip per dollar — diminishing returns is a real thing.`;
   }
-  if (ownedSkins === 0 && feetdex.gold >= 10) {
-    return "First skin's the hardest to commit to. Just do it.";
+  if (ownedSkins === 0 && gold >= 10) {
+    return "First skin's a milestone — and the rule of thumb is essentials before luxuries. If you've got both ends covered, that's a real budget. Pick something fly.";
   }
   return VANCE_LINES[(_vanceVisits - 2) % VANCE_LINES.length];
+}
+
+// Post-purchase Vance line — picks the most teachable angle for THIS buy.
+function _vanceOnBuy(price) {
+  const cheap = _cheapestUnownedBooster();
+  const skins = feetdex.cosmetics.size;          // already incremented
+  const skinsTotal = feetdex.totalSpentSkins;
+  const toolsTotal = feetdex.totalSpentTools;
+
+  if (skins === 1) {
+    return `Clean — and that's your first fit, which is its own little milestone. The lesson behind it: essentials before luxuries, every time. You did it in the right order.`;
+  }
+  if (cheap && price >= cheap.price) {
+    return `Sharp pick. Just so you know — that same ${price}g would've grabbed you the ${cheap.name} over at Morton's. That's the trade you made, and that's exactly what opportunity cost looks like.`;
+  }
+  if (!cheap) {
+    return `${price}g of pure flex with every tool already stacked — that's textbook surplus spending. No guilt about it.`;
+  }
+  if (skins >= 4) {
+    return `That's pair #${skins} in the rotation. After three or four, each new fit gives you less drip per dollar — that's diminishing returns in action.`;
+  }
+  if (skinsTotal > toolsTotal) {
+    return `Looks fresh, but you're now ${skinsTotal}g deep on skins versus only ${toolsTotal}g on tools. Worth flipping that ratio on the next trip out.`;
+  }
+  return `Solid ${price}g pick. Just remember it's gold not sitting at Morton's — skin's the dessert, not the meal.`;
 }
 
 function _openFleet() {
@@ -10951,7 +11013,7 @@ function _onBuyCosmetic(footId) {
   feetdex.equipCosmetic(footId);
   _applyEquippedCosmetic();
   ui.updateGold(feetdex.gold, _nextBoosterTarget());
-  ui.setFleetLine(`That's a ${price}⛂ statement piece. Looks fresh.`);
+  ui.setFleetLine(_vanceOnBuy(price));
   Audio.uiClick();
   ui.refreshFleetFeetShop?.();
 }
@@ -10970,22 +11032,24 @@ function _onUnequipCosmetic() {
   Audio.uiClick();
   ui.refreshFleetFeetShop?.();
 }
-// One-line how-to tips, shown once on first purchase.
+// One-line how-to tips, shown once on first purchase. Each one reads as
+// a sentence, not a stat sheet — the player learns what the tool does
+// and how to use it in the same breath.
 const BOOSTER_TIPS = {
   sprint_feet:    { title: 'SPRINT FEET',
-    body: 'Hold <b>SHIFT</b> to sprint.' },
+    body: 'Hold <b>SHIFT</b> while moving and you\'ll break into a sprint.' },
   radar:          { title: 'RADAR',
-    body: 'Common, rare, and epic characters now appear as dots on the map.' },
+    body: 'Common, rare, and epic characters now show up as colored dots on both the minimap and the [M] map, anywhere in the city.' },
   compass:        { title: 'COMPASS',
-    body: 'Top-left needle points toward <b>mythics</b> and <b>legendaries</b>.' },
+    body: 'A needle in the top-left twitches toward the nearest <b>mythic</b> or <b>legendary</b> — it points the way without telling you who or how far.' },
   armor:          { title: 'ARMOR',
-    body: '2× HP and 30% less damage taken.' },
+    body: 'Your HP doubles and you take 30% less damage from mythics and legendaries.' },
   lightsaber:     { title: 'LIGHTSABER',
-    body: '<b>2×</b> damage and attack speed. <b>4×</b> against mythics and legendaries.' },
+    body: 'Your strikes deal <b>double damage</b> at <b>double speed</b> — and against <b>mythics</b> and <b>legendaries</b> the bonus doubles again, hitting <b>4×</b>.' },
   metrocard:      { title: 'METROCARD',
-    body: 'Press <b>[E]</b> at any subway. Click a blue dot on the map to ride.' },
+    body: 'Walk up to any subway and press <b>[E]</b>. The map opens with the <b style="color:#0066ff">blue dots</b> — click one and the train takes you straight there.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
-    body: 'A gold <b>★</b> now marks The Ancient One.' },
+    body: 'A gold <b>★</b> now marks where The Ancient One is hiding — just follow it.' },
 };
 let _shownTips = new Set();
 let _afterTipCallback = null;     // run after the tip is dismissed (countdown chains here)
@@ -11016,7 +11080,7 @@ function _onBuyBooster(id) {
     setTimeout(() => {
       if (state === 'shop') _closeShop();
       ui.showTip('MORTON',
-        "Good luck, kid."
+        "Good luck out there, kid — spend smart and the city's yours."
       );
       _afterTipCallback = () => {
         // Tutorial order (everything below is still PART OF the tutorial —
@@ -11028,13 +11092,16 @@ function _onBuyBooster(id) {
         _showBoosterTip('sprint_feet');
         _afterTipCallback = () => {
           ui.openFeetGodDialogue(
-            "Optional <b>missions</b> appear in the corner. Finish for bonus gold. Skip if you want."
+            "Optional <b>missions</b> will start showing up in the corner — small side jobs that pay extra gold when you finish them. " +
+            "Take the ones that interest you and skip the rest; they're never required."
           );
           _afterTipCallback = () => {
             _revealMissions();
             // Fleet Feet intro — last lesson before the celebration.
             ui.openFeetGodDialogue(
-              "<b>Fleet Feet</b> sells skins of any foot you've collected. Spend gold there any time."
+              "One last thing — once you've covered the tools you actually need, " +
+              "you can drop by <b>Fleet Feet</b> to spend leftover gold on cosmetic skins of any foot you've collected. " +
+              "Treat it as the dessert after dinner: nice to have, but only after the essentials are handled."
             );
             _afterTipCallback = () => {
               // NOW the tutorial is done. Celebrate.
@@ -11187,7 +11254,9 @@ function _enterLandmark(id, name) {
       tutorial.advance('enter-esb');
       setTimeout(() => {
         ui.openFeetGodDialogue(
-          "<b>Yellow</b> doors = enterable. Find the character inside, walk up, press <b>[E]</b>."
+          "Buildings you can step into glow <b style=\"color:#ffd700\">yellow</b> on the map and on the minimap, " +
+          "and their entrance doors glow the same color up close. " +
+          "Find the character waiting inside this one, walk up, and press <b>[E]</b> to talk."
         );
       }, 450);
     }
@@ -11231,12 +11300,12 @@ const FIGHT_TUTORIAL = {
   mythic: {
     title: 'MYTHIC FIGHT',
     theme: 'mythic',
-    body : '<b>LEFT CLICK</b> to punch. Step away to dodge.',
+    body : 'Use <b>WASD</b> to move and <b>LEFT CLICK</b> to punch — step out of range to dodge their swings.',
   },
   legendary: {
     title: 'LEGENDARY FIGHT',
     theme: 'legendary',
-    body : 'Defeat this legendary <b>3 times</b> to claim their feet.',
+    body : 'Legendaries hit harder — beat this one <b>three times</b> before they\'ll hand over their feet.',
   },
 };
 let _firstMythicFought    = false;
