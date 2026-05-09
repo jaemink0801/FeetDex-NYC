@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T005944';
+  var BAKED = '20260509T010804';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1757,10 +1757,15 @@ const SHOE_STYLES = {
     { type:'box', s:[0.18, 0.05, 0.06], color:0xa86b3f, pos:[0,  0.01, 0.10] },
   ] },
   common_gymrat:   { color: 0x39ff14, extras: [
-    // Neon green sneakers with three white side stripes
-    { type:'box', s:[0.005, 0.025, 0.16], color:0xffffff, pos:[0.085, 0.00, 0.05] },
-    { type:'box', s:[0.005, 0.025, 0.04], color:0xffffff, pos:[0.085, -0.015, 0.10] },
-    { type:'box', s:[0.005, 0.025, 0.04], color:0xffffff, pos:[0.085,  0.015, 0.10] },
+    // Neon green sneakers with three white side stripes. Stripes sit on
+    // the OUTER side of each sneaker — note the negative x: the foot
+    // group is rotated 180° around Y so toes face the player's forward,
+    // which also flips the X-axis. To land the stripes on the outer side
+    // of the rotated foot, the spec uses -0.085 (mirrored back to outer
+    // by the rotation).
+    { type:'box', s:[0.005, 0.025, 0.16], color:0xffffff, pos:[-0.085, 0.00, 0.05] },
+    { type:'box', s:[0.005, 0.025, 0.04], color:0xffffff, pos:[-0.085, -0.015, 0.10] },
+    { type:'box', s:[0.005, 0.025, 0.04], color:0xffffff, pos:[-0.085,  0.015, 0.10] },
   ] },
   common_50shades: { color: 0x080808, extras: [
     // Glossy formal shoe — silver toe-cap + heel block
@@ -1801,9 +1806,12 @@ const SHOE_STYLES = {
   ] },
   // Epic
   epic_lebron:     { color: 0x552583, extras: [
-    // Purple high-tops — tall ankle wrap + gold "23"
+    // Purple high-tops — tall ankle wrap + gold "23". The "23" decal
+    // belongs on the OUTER side of each high-top; spec.x is negative
+    // here because the foot group is rotated 180° around Y, which flips
+    // the X-axis (see common_gymrat above).
     { type:'box', s:[0.16, 0.10, 0.10], color:0x552583, pos:[0, 0.05, -0.02] },
-    { type:'box', s:[0.04, 0.025, 0.005], color:0xffd700, pos:[0.06, 0.05, 0.04] },
+    { type:'box', s:[0.04, 0.025, 0.005], color:0xffd700, pos:[-0.06, 0.05, 0.04] },
   ] },
   epic_sonion:     { color: 0x000000, extras: [
     // Deep purple glow strip along the toe
