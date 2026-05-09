@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T203411';
+  var BAKED = '20260509T233239';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -646,7 +646,7 @@
       overflow:hidden; }
     .foot-drop { position:absolute; top:-80px; opacity:0;
       filter:drop-shadow(2px 2px 3px rgba(0,0,0,.5));
-      animation:foot-fall 4.3s ease-in forwards; }
+      animation:foot-fall 2.15s ease-in forwards; }
     .foot-drop svg { width:100%; height:100%; }
     @keyframes foot-fall {
       0%   { transform:translateY(0) rotate(0deg);     opacity:0; }
@@ -1205,25 +1205,33 @@ const Audio = {
     tone(f * 2,    0.11, 'triangle', 0.12);
   },
 
-  // Fireworks sound for celebrations. Stages many individual "pops" over
-  // the duration: each pop is a quick whistle (pitch sweep) followed by a
-  // short noisy crackle and (sometimes) a low boom — like overlapping
-  // firework shells. The whole thing respects masterGain (volume slider).
-  fireworks(duration = 5.4) {
+  // Short satisfying celebration chime — used by spawnFeetRain (feetfetti).
+  // Three quickly-staggered ascending bell tones (perfect-fifth, octave,
+  // upper third) layered over a soft sine wash. Total ~0.9 s — short and
+  // sweet, won't overstay its welcome.
+  feetfettiChime() {
     const c = getCtx();
-    const t0 = c.currentTime;
-    // ~1 shell every 0.85s. Each shell is whistle (~420ms) + bang + tail
-    // (~600ms) so spacing them out lets the whistle and bang be heard
-    // distinctly rather than blurring into noise.
-    const popCount = Math.max(4, Math.round(duration / 0.85));
-    for (let i = 0; i < popCount; i++) {
-      const at = t0 + (i * (duration / popCount)) + Math.random() * 0.28;
-      _firework(c, at);
+    const t = c.currentTime;
+    // Bell-like notes: G5, D6, B6 — rising arpeggio, exponential decay.
+    const notes = [
+      { f: 783.99, at: 0.00, dur: 0.55, gain: 0.22 },
+      { f: 1174.7, at: 0.10, dur: 0.55, gain: 0.20 },
+      { f: 1568.0, at: 0.20, dur: 0.55, gain: 0.16 },
+    ];
+    for (const n of notes) {
+      // Bright fundamental
+      tone(n.f, n.dur, 'sine', n.gain, n.at);
+      // Sub-octave warmth
+      tone(n.f * 0.5, n.dur * 0.9, 'triangle', n.gain * 0.45, n.at);
     }
+    // Brief sparkle on top — high triangle stacked above the run.
+    tone(2349.3, 0.25, 'triangle', 0.10, 0.32);
   },
   // Back-compat alias — older callers (mission completion) still use the
-  // older name. Both produce the firework volley.
-  rainShower(duration = 3.6) { this.fireworks(duration); },
+  // older name. Now plays the simple celebration chime instead of the
+  // overstuffed firework volley.
+  rainShower() { this.feetfettiChime(); },
+  fireworks() { this.feetfettiChime(); },
 
   // Lightsaber swing — movie-style "vwoom". Three layers stacked:
   //   1. SAWTOOTH HUM — low fundamental (~140 Hz dropping to ~70 Hz) with
@@ -1957,8 +1965,15 @@ function _makeExtraMesh(spec, sx = 1) {
   return mesh;
 }
 
-// Circle vs AABB overlap — closest point on box to circle center
-function _overlapsAABB(px, pz, radius, box) {
+// Circle vs AABB overlap — closest point on box to circle center.
+// If `box` carries optional yMin/yMax bounds AND a player y is provided,
+// the test additionally requires the player's vertical extent to overlap
+// the box — used by elevated colliders (bridge-deck rails) so the player
+// can pass underneath without being blocked.
+function _overlapsAABB(px, pz, radius, box, py) {
+  if (box.yMin !== undefined && py !== undefined) {
+    if (py + PLAYER_H < box.yMin || py > box.yMax) return false;
+  }
   const nearX = Math.max(box.minX, Math.min(px, box.maxX));
   const nearZ = Math.max(box.minZ, Math.min(pz, box.maxZ));
   const dx = px - nearX;
@@ -2381,7 +2396,7 @@ class Player {
     if (dx !== 0) {
       let blocked = false;
       for (const s of solids) {
-        if (_overlapsAABB(nx, this.position.z, PLAYER_R, s)) {
+        if (_overlapsAABB(nx, this.position.z, PLAYER_R, s, this.position.y)) {
           nx = this.position.x; this.velocity.x = 0; blocked = true; break;
         }
       }
@@ -2402,7 +2417,7 @@ class Player {
     if (dz !== 0) {
       let blocked = false;
       for (const s of solids) {
-        if (_overlapsAABB(nx, nz, PLAYER_R, s)) {
+        if (_overlapsAABB(nx, nz, PLAYER_R, s, this.position.y)) {
           nz = this.position.z; this.velocity.z = 0; blocked = true; break;
         }
       }
@@ -4884,16 +4899,14 @@ class UI {
     if (svg) svg.style.transform = `rotate(${dirDeg}deg)`;
   }
 
-  // Spawn falling 2D feet for celebrations. Each foot picks from the
-  // palette so the rain mixes skin tones with bright festive colors.
+  // Spawn falling 2D feet for celebrations. Plays a short satisfying
+  // chime; falling feet duration is HALF the previous (~1.7-2.5 s per
+  // drop, max delay 0.4 s) so the celebration is brief and snappy.
+  // Visual firework bursts removed — feetfetti shower only.
   spawnFeetRain(count = 40) {
     const wrap = document.getElementById('feet-rain');
     if (!wrap) return;
-    Audio.fireworks?.(4.3);  // 0.8× the previous 5.4s duration
-    // Visual firework bursts layered behind the falling feet — timed to
-    // match the audio "pops" so the explosion you SEE coincides with the
-    // BANG you HEAR. Heavier celebrations (count >= 30) get more shells.
-    _spawnFireworkBursts(count >= 30 ? 4.3 : 1.5, count >= 30 ? 6 : 2);
+    Audio.feetfettiChime?.();
     for (let i = 0; i < count; i++) {
       const sz = 30 + Math.random() * 36;
       const drop = document.createElement('div');
@@ -4901,14 +4914,14 @@ class UI {
       drop.style.left   = `${Math.random() * 100}vw`;
       drop.style.width  = `${sz * 0.7}px`;
       drop.style.height = `${sz}px`;
-      drop.style.animationDelay    = `${Math.random() * 0.8}s`;
-      drop.style.animationDuration = `${3.4 + Math.random() * 1.6}s`;
+      drop.style.animationDelay    = `${Math.random() * 0.4}s`;
+      drop.style.animationDuration = `${1.7 + Math.random() * 0.8}s`;
       const color = FOOT_RAIN_PALETTE[Math.floor(Math.random() * FOOT_RAIN_PALETTE.length)];
       let svg = _footSVG(color);
       if (i % 2) svg = svg.replace('<svg ', '<svg style="transform:scaleX(-1)" ');
       drop.innerHTML = svg;
       wrap.appendChild(drop);
-      setTimeout(() => drop.remove(), 5500);
+      setTimeout(() => drop.remove(), 2750);
     }
   }
 
@@ -5966,13 +5979,20 @@ function inLandmarkZone(cx, cz) {
 }
 
 // Push a flat AABB into the solid-objects registry used by player collision.
-function registerSolid(solidObjects, cx, cz, halfW, halfD, padding = 0.05) {
-  solidObjects.push({
+// Y bounds are optional — if yMin/yMax are passed, the collider only blocks
+// when the player's vertical extent overlaps that range. Used by elevated
+// structures (e.g., bridge-deck rails) so the player can walk below them.
+function registerSolid(solidObjects, cx, cz, halfW, halfD, padding = 0.05,
+                      yMin, yMax) {
+  const entry = {
     minX: cx - halfW - padding,
     maxX: cx + halfW + padding,
     minZ: cz - halfD - padding,
     maxZ: cz + halfD + padding,
-  });
+  };
+  if (yMin !== undefined) entry.yMin = yMin;
+  if (yMax !== undefined) entry.yMax = yMax;
+  solidObjects.push(entry);
 }
 
 // Global Box3 collider registry — {box, mesh, isStatic} entries.
@@ -7207,16 +7227,25 @@ function buildBrooklynBridge(scene, solidObjects) {
   scene.add(group);
 
   // ── Tower + anchorage player collision ────────────────────────────────────
+  // Towers run all the way to the ground (no underpass possible).
   registerSolid(solidObjects, -67, -80, 2.5, 2.5);  // left tower
   registerSolid(solidObjects, -53, -80, 2.5, 2.5);  // right tower
-  // Anchorages split into left/right halves — center road lane (x=-63 to -57) must stay open.
+  // Anchorages are stone blocks flanking each ramp foot. The center
+  // road lane (x=-63 to -57) stays open between them on both bridge
+  // and ground level — the player can walk under the bridge here.
   registerSolid(solidObjects, -66, -110, 3, 4);      // south anchorage left
   registerSolid(solidObjects, -54, -110, 3, 4);      // south anchorage right
   registerSolid(solidObjects, -66,  -50, 3, 4);      // north anchorage left
   registerSolid(solidObjects, -54,  -50, 3, 4);      // north anchorage right
-  // Bridge deck side railing walls — keep player on the road surface
-  registerSolid(solidObjects, -67.5, -80, 0.5, 32); // left deck edge rail (world z -112 to -48)
-  registerSolid(solidObjects, -52.5, -80, 0.5, 32); // right deck edge rail
+  // Bridge deck side railing walls — keep the player on the road surface
+  // when they're ON the deck, but DON'T block them when they're walking
+  // on the road BELOW the bridge. The y-bounded form of registerSolid
+  // makes these rails only collide when the player's vertical extent
+  // overlaps the bridge-deck height (≈ y=5..9).
+  registerSolid(solidObjects, -67.5, -80, 0.5, 32, 0.05,
+                BRIDGE_DECK_Y - 1, BRIDGE_DECK_Y + 4); // left deck edge rail
+  registerSolid(solidObjects, -52.5, -80, 0.5, 32, 0.05,
+                BRIDGE_DECK_Y - 1, BRIDGE_DECK_Y + 4); // right deck edge rail
 
   const roadMat = lm(0x9A8A70);  // match bridge deck color
 
@@ -7247,10 +7276,13 @@ function buildBrooklynBridge(scene, solidObjects) {
   scene.add(uLine);
 
   // ── Ramp guardrails (prevent player walking off ramp sides) ──────────────
-  registerSolid(solidObjects, -63.25, -38, 0.25, 8);   // north ramp left edge
-  registerSolid(solidObjects, -56.75, -38, 0.25, 8);   // north ramp right edge
-  registerSolid(solidObjects, -63.25,-120, 0.25, 6);   // south ramp left edge
-  registerSolid(solidObjects, -56.75,-120, 0.25, 6);   // south ramp right edge
+  // Y-bounded to the ramp's vertical span so the player can also walk
+  // UNDER the ramps along the road below without being clipped by the
+  // rails on either side.
+  registerSolid(solidObjects, -63.25, -38, 0.25, 8, 0.05, 0, BRIDGE_DECK_Y + 1);
+  registerSolid(solidObjects, -56.75, -38, 0.25, 8, 0.05, 0, BRIDGE_DECK_Y + 1);
+  registerSolid(solidObjects, -63.25,-120, 0.25, 6, 0.05, 0, BRIDGE_DECK_Y + 1);
+  registerSolid(solidObjects, -56.75,-120, 0.25, 6, 0.05, 0, BRIDGE_DECK_Y + 1);
 
   // ── NPC spawn-exclusion colliders ─────────────────────────────────────────
   const colliders = [];
@@ -10069,15 +10101,23 @@ class World {
 
   // ── Terrain elevation for ramps and bridge deck ──────────────────────────
   getFloorY(x, z, currentY = 0) {
-    // North ramp: linear slope from z=-32 (y=0) to z=-46 (y=BRIDGE_DECK_Y)
-    if (x >= -63 && x <= -57 && z >= -46 && z <= -32)
-      return Math.max(0, ((-z - 32) / 14) * BRIDGE_DECK_Y);
+    // North ramp: linear slope from z=-32 (y=0) to z=-46 (y=BRIDGE_DECK_Y).
+    // Mirrors the bridge-deck underpass logic: if the player's currentY is
+    // well below the ramp surface (>1.5m gap) treat the ramp as overhead
+    // and return ground level so they can walk UNDER the ramp.
+    if (x >= -63 && x <= -57 && z >= -46 && z <= -32) {
+      const rampY = Math.max(0, ((-z - 32) / 14) * BRIDGE_DECK_Y);
+      return currentY >= rampY - 1.5 ? rampY : 0;
+    }
     // Bridge deck + anchorages: flat at BRIDGE_DECK_Y; ground level when underneath
     if (x >= -71 && x <= -49 && z >= -114 && z <= -46)
       return currentY >= BRIDGE_DECK_Y - 1.5 ? BRIDGE_DECK_Y : 0;
-    // South ramp: linear slope from z=-128 (y=0) to z=-114 (y=BRIDGE_DECK_Y)
-    if (x >= -63 && x <= -57 && z >= -128 && z <= -114)
-      return Math.max(0, ((z + 128) / 14) * BRIDGE_DECK_Y);
+    // South ramp: linear slope from z=-128 (y=0) to z=-114 (y=BRIDGE_DECK_Y).
+    // Same underpass behavior as the north ramp.
+    if (x >= -63 && x <= -57 && z >= -128 && z <= -114) {
+      const rampY = Math.max(0, ((z + 128) / 14) * BRIDGE_DECK_Y);
+      return currentY >= rampY - 1.5 ? rampY : 0;
+    }
     // Grand Central front steps. Width 14 in x (68..82), 4 ascending tiers
     // each 0.5m deep × 0.35m tall, climbing from world z=-23 (street side,
     // step 0 top y=0.355) up to z=-25.5 (terminal threshold, step 3 top
@@ -10235,16 +10275,14 @@ document.addEventListener('pointerlockchange', () => {
       // Defer slightly so the lock-overlay fade doesn't visually race with it
       setTimeout(() => {
         ui.showTip('OBJECTIVE',
-          "Discover all <b style=\"color:#FFD700\">18 unique feet</b> across NYC by interacting with <b>characters</b> " +
-          "(they look very different from the everyday crowd). " +
-          "Fight <b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b> " +
-          "and defeat them to claim their feet."
+          "Collect all <b style=\"color:#FFD700\">18 feet</b>. Talk to colorful <b>characters</b>; " +
+          "fight <b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b>."
         );
         // After OBJECTIVE is dismissed, show the Feet God's first directive.
         _afterTipCallback = () => {
           if (!tutorial.active) return;
           ui.openFeetGodDialogue(
-            "Your first character waits inside the <b>Empire State Building</b> — the tall one straight ahead. Step inside."
+            "Enter the <b>Empire State Building</b> ahead."
           );
         };
       }, 250);
@@ -10485,30 +10523,51 @@ function _handleE() {
 
     case 'playing':
     case 'interior': {
-      // Cursor-based prioritization: when the player is in range of BOTH
-      // an NPC and a door, look at where the camera is aimed and let
-      // whichever is closer to the cursor win. Avoids accidentally
-      // opening dialogue when the player meant to enter a building.
-      const _doorHere = world.checkDoorProximity(player.position);
-      if (_nearestNPC && _doorHere && _doorHere.action === 'near-entry') {
-        const fwd = new THREE.Vector3();
-        camera.getWorldDirection(fwd);
-        const npcDx = _nearestNPC.group.position.x - player.position.x;
-        const npcDz = _nearestNPC.group.position.z - player.position.z;
-        const doorDx = (_doorHere.pos?.x ?? 0) - player.position.x;
-        const doorDz = (_doorHere.pos?.z ?? 0) - player.position.z;
-        const npcLen  = Math.hypot(npcDx, npcDz)   || 1;
-        const doorLen = Math.hypot(doorDx, doorDz) || 1;
-        const npcDot  = (npcDx / npcLen) * fwd.x  + (npcDz / npcLen) * fwd.z;
-        const doorDot = (doorDx / doorLen) * fwd.x + (doorDz / doorLen) * fwd.z;
-        if (doorDot > npcDot) {
-          _enterLandmark(_doorHere.id, _doorHere.name);
-          return;
-        }
-        // else fall through to NPC interaction
+      // Cursor-aim interaction: E only fires the target the player is
+      // actually LOOKING at. Anything within the proximity ring AND
+      // within a ~60° cone of the camera's forward axis is eligible;
+      // among multiple eligible targets, the one most directly under
+      // the cursor (highest aim dot) wins. Things essentially at the
+      // player's feet (<0.5 m away) bypass the cone — you'd be standing
+      // on top of them and direction is meaningless.
+      const fwd = new THREE.Vector3();
+      camera.getWorldDirection(fwd);
+      const AIM_COS = 0.5;          // cos(60°) — half-cone half-angle
+      const _aimDot = (tx, tz) => {
+        const dx = tx - player.position.x, dz = tz - player.position.z;
+        const len = Math.hypot(dx, dz);
+        if (len < 0.5) return 1;    // standing on it — always aimed
+        return (dx / len) * fwd.x + (dz / len) * fwd.z;
+      };
+
+      // Exit door is exempt from cursor-aim — you should always be able
+      // to leave a building, regardless of which way you're facing.
+      const proxDoor = world.checkDoorProximity(player.position);
+      if (proxDoor && proxDoor.action === 'near-exit') {
+        _exitLandmark();
+        return;
       }
-      // Priority 1: NPC interaction
+
+      // Build candidate list of cursor-aimed interactions.
+      const candidates = [];
       if (_nearestNPC) {
+        const d = _aimDot(_nearestNPC.group.position.x, _nearestNPC.group.position.z);
+        if (d >= AIM_COS) candidates.push({ kind: 'npc', dot: d });
+      }
+      if (proxDoor && proxDoor.action === 'near-entry') {
+        const d = _aimDot(proxDoor.pos.x, proxDoor.pos.z);
+        if (d >= AIM_COS) candidates.push({ kind: 'door', door: proxDoor, dot: d });
+      }
+      const station = _nearestSubway();
+      if (station) {
+        const d = _aimDot(station.x, station.z);
+        if (d >= AIM_COS) candidates.push({ kind: 'subway', station, dot: d });
+      }
+      if (candidates.length === 0) break;     // nothing aimed at — no-op
+      candidates.sort((a, b) => b.dot - a.dot);
+      const top = candidates[0];
+
+      if (top.kind === 'npc') {
         // Morton routes to the shop UI instead of the discovery dialogue flow.
         if (_nearestNPC.feetId === 'shopkeeper_morton') {
           _activeNPC = _nearestNPC;
@@ -10543,17 +10602,11 @@ function _handleE() {
         _activeNPC.isInDialogue = true;
         return;
       }
-      // Priority 2: landmark door
-      const door = world.checkDoorProximity(player.position);
-      if (door) {
-        if (door.action === 'near-entry') _enterLandmark(door.id, door.name);
-        else if (door.action === 'near-exit') _exitLandmark();
+      if (top.kind === 'door') {
+        _enterLandmark(top.door.id, top.door.name);
         return;
       }
-      // Priority 3: subway access — pressing E at a station with the
-      // MetroCard owned opens the map so the player can pick a destination.
-      const station = _nearestSubway();
-      if (station && feetdex.hasBooster('metrocard')) {
+      if (top.kind === 'subway' && feetdex.hasBooster('metrocard')) {
         Audio.interact();
         _subwayMarkersBlink = true;     // make blue dots pulse on the map
         _openMap();
@@ -10600,9 +10653,8 @@ function _handleE() {
         ui.updateGold(feetdex.gold, _nextBoosterTarget());
         setTimeout(() => {
           ui.openFeetGodDialogue(
-            "Each foot you collect earns you <b>gold</b>. " +
-            "The big pointing hand next to your gold counter marks your next tool. " +
-            "Head to <b>Morton's Shop</b> — open the <b>[M]</b> map to find your way."
+            "Feet earn <b>gold</b>. Your next tool is marked at the <b>top right</b>. " +
+            "Find <b>Morton's Shop</b> — press <b>[M]</b> for the map."
           );
         }, 600);
       }
@@ -10782,19 +10834,15 @@ function _runMortonTutorial() {
   const lines = [
     {
       title: 'MORTON',
-      body: "First time, eh? I'm Morton. Save up the <b style=\"color:#FFD700\">gold</b> those feet pay you and you can buy <b>tools</b> here — " +
-            "stuff that helps you find feet faster, or fight bosses tougher. The richer you are, the more options you've got."
+      body: "Spend <b style=\"color:#FFD700\">gold</b> here on <b>tools</b> that help you find or fight."
     },
     {
       title: 'MORTON',
-      body: "Catch is, you can't buy them all. Every coin you spend on one tool is a coin you can't spend on another. " +
-            "Fancy folks call that <b>opportunity cost</b>. You don't need every tool to win this — " +
-            "pick the ones that fit your style and skip the rest. <i>Spend wisely.</i>"
+      body: "You can't afford every tool. Pick the ones that fit your style."
     },
     {
       title: 'MORTON',
-      body: "On the house — here's <b style=\"color:#FFD700\">+20g</b> for visiting. " +
-            "Try the <b>Sprint Feet</b>. They'll save you a lot of walking."
+      body: "Welcome gift: <b style=\"color:#FFD700\">+20g</b>. Try the <b>Sprint Feet</b>."
     },
   ];
   let i = 0;
@@ -10829,7 +10877,7 @@ function _closeShop() {
 
 // ── Fleet Feet (cosmetic shop) ──────────────────────────────────────────────
 const VANCE_FIRST_LINE =
-  "Yo welcome to FLEET FEET! Found a cool pair out there? Bring 'em here, I'll get you the skin so you can rock 'em. Cosmetic only — no boost, all flex.";
+  "Welcome to FLEET FEET. Buy skins of any feet you've collected — cosmetic only.";
 
 const VANCE_LINES = [
   "Drip is forever. Boosters wear off, fits don't.",
@@ -10922,22 +10970,22 @@ function _onUnequipCosmetic() {
   Audio.uiClick();
   ui.refreshFleetFeetShop?.();
 }
-// One- or two-sentence how-to tips, shown once on first purchase.
+// One-line how-to tips, shown once on first purchase.
 const BOOSTER_TIPS = {
   sprint_feet:    { title: 'SPRINT FEET',
-    body: 'Hold <b>SHIFT</b> while moving to break into a sprint.' },
+    body: 'Hold <b>SHIFT</b> to sprint.' },
   radar:          { title: 'RADAR',
-    body: 'All <b>common</b>, <b>rare</b>, and <b>epic</b> characters now show as colored dots on both the minimap and the <b>[M]</b> map — anywhere in the city.' },
+    body: 'Common, rare, and epic characters now appear as dots on the map.' },
   compass:        { title: 'COMPASS',
-    body: 'A needle now twitches in the top-left toward powerful presences — <b>mythics</b> and <b>legendaries</b>. It can\'t tell you who or how far, just which way.' },
+    body: 'Top-left needle points toward <b>mythics</b> and <b>legendaries</b>.' },
   armor:          { title: 'ARMOR',
-    body: 'Your HP is doubled and you take 30% less damage from mythics and legendaries.' },
+    body: '2× HP and 30% less damage taken.' },
   lightsaber:     { title: 'LIGHTSABER',
-    body: 'Your strikes deal <b>double damage</b>, knock enemies back hard, and swing <b>twice as fast</b>. Against <b>mythics</b> and <b>legendaries</b> the bonuses double again — <b>4× damage</b> and <b>4× attack speed</b>.' },
+    body: '<b>2×</b> damage and attack speed. <b>4×</b> against mythics and legendaries.' },
   metrocard:      { title: 'METROCARD',
-    body: 'Walk up to any subway station and press <b>[E]</b> to ride. The map opens with the <b style="color:#0066ff">blue dots</b> — click any station and the subway takes you straight there. Hop between stations to cross the city in seconds.' },
+    body: 'Press <b>[E]</b> at any subway. Click a blue dot on the map to ride.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
-    body: 'A gold <b>★</b> now marks The Ancient One\'s hideout — just follow it.' },
+    body: 'A gold <b>★</b> now marks The Ancient One.' },
 };
 let _shownTips = new Set();
 let _afterTipCallback = null;     // run after the tip is dismissed (countdown chains here)
@@ -10968,7 +11016,7 @@ function _onBuyBooster(id) {
     setTimeout(() => {
       if (state === 'shop') _closeShop();
       ui.showTip('MORTON',
-        "Good luck out there, kid. Go discover all you can in the feet world."
+        "Good luck, kid."
       );
       _afterTipCallback = () => {
         // Tutorial order (everything below is still PART OF the tutorial —
@@ -10980,17 +11028,13 @@ function _onBuyBooster(id) {
         _showBoosterTip('sprint_feet');
         _afterTipCallback = () => {
           ui.openFeetGodDialogue(
-            "Optional missions have appeared in the corner — three at a time. " +
-            "Some send you searching for a character in a landmark; others ask you to chat with locals who'll teach you about business and the city. " +
-            "They're side gold, not required to win — skip any you don't feel like. Finish one and a fresh mission slides in."
+            "Optional <b>missions</b> appear in the corner. Finish for bonus gold. Skip if you want."
           );
           _afterTipCallback = () => {
             _revealMissions();
             // Fleet Feet intro — last lesson before the celebration.
             ui.openFeetGodDialogue(
-              "One last thing. You're walking around BAREFOOT. " +
-              "Every foot you collect can also be worn as a SKIN — visit <b>Fleet Feet</b> on the map and trade gold for the kicks of any character you've discovered. " +
-              "You can stop by Fleet Feet any time you have gold. Mix and match, look fly out there."
+              "<b>Fleet Feet</b> sells skins of any foot you've collected. Spend gold there any time."
             );
             _afterTipCallback = () => {
               // NOW the tutorial is done. Celebrate.
@@ -11143,8 +11187,7 @@ function _enterLandmark(id, name) {
       tutorial.advance('enter-esb');
       setTimeout(() => {
         ui.openFeetGodDialogue(
-          "Buildings you can enter glow <b>yellow</b> on the map and minimap — same with their doors. " +
-          "Find the character inside this landmark. Walk up to them and press <b>E</b> to speak."
+          "<b>Yellow</b> doors = enterable. Find the character inside, walk up, press <b>[E]</b>."
         );
       }, 450);
     }
@@ -11188,14 +11231,12 @@ const FIGHT_TUTORIAL = {
   mythic: {
     title: 'MYTHIC FIGHT',
     theme: 'mythic',
-    body : '<b>WASD</b> to move. <b>LEFT CLICK</b> to punch. Step away to dodge.<br/><br/>' +
-           'Lightsaber and Armor make this much easier.',
+    body : '<b>LEFT CLICK</b> to punch. Step away to dodge.',
   },
   legendary: {
     title: 'LEGENDARY FIGHT',
     theme: 'legendary',
-    body : '<b>WASD</b> to move. <b>LEFT CLICK</b> to punch. Step away to dodge.<br/><br/>' +
-           'Legendaries are stronger — find and defeat this one three times to claim their feet.',
+    body : 'Defeat this legendary <b>3 times</b> to claim their feet.',
   },
 };
 let _firstMythicFought    = false;
