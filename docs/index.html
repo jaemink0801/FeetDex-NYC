@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T234027';
+  var BAKED = '20260509T234312';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -10897,6 +10897,7 @@ const VANCE_LINES = [
   "Drip's the dessert, my guy. You eaten dinner yet?",
   "Three pairs in the rotation is plenty — past that, each new fit gives you less drip per dollar.",
   "Once your toolkit's stacked, surplus spending here is healthy. Treat yourself.",
+  "If there's one specific pair in here you actually want, save toward THAT one — and put the gold you'd waste on cheap fits in between toward tools instead. Patience plus tools is how you get the best of both.",
 ];
 let _vanceVisits = 0;
 
@@ -10906,6 +10907,22 @@ function _cheapestUnownedBooster() {
   if (unowned.length === 0) return null;
   unowned.sort((a, b) => a.price - b.price);
   return unowned[0];
+}
+
+// Highest-rarity foot the player has DISCOVERED but NOT yet bought as a
+// skin — i.e. the "trophy pair" sitting in their FeetDex they could be
+// saving toward. Used by Vance to coach the "save for the one you really
+// want" budgeting habit instead of impulse-grabbing every cheap fit.
+function _trophyUnboughtSkin() {
+  const tier = { common: 1, rare: 2, epic: 3, mythic: 4, legendary: 5, secret: 6 };
+  let best = null, bestT = 0;
+  for (const e of feetdex.getAll()) {
+    if (!e.collected) continue;
+    if (feetdex.hasCosmetic(e.id)) continue;
+    const t = tier[e.rarity] || 0;
+    if (t > bestT) { bestT = t; best = e; }
+  }
+  return best;   // { id, name, rarity, ... } or null
 }
 
 function _vanceGreeting() {
@@ -10945,6 +10962,16 @@ function _vanceGreeting() {
   if (!cheapTool) {
     return "Toolkit's full top to bottom, so this is the surplus zone — cop whatever fits, no guilt about it. You earned the splurge.";
   }
+  // Player has impulse-stacked cheap pairs while a higher-rarity trophy
+  // skin sits unowned in their dex. Coach the save-up habit AND the
+  // companion habit of routing in-between gold to Morton's instead of
+  // burning it on more cheap fits.
+  const trophy = _trophyUnboughtSkin();
+  const trophyTier = trophy ? { common: 1, rare: 2, epic: 3, mythic: 4, legendary: 5, secret: 6 }[trophy.rarity] : 0;
+  if (trophy && trophyTier >= 3 && ownedSkins >= 2) {
+    const tprice = COSMETIC_PRICES[trophy.rarity];
+    return `Real talk — you've got the ${trophy.name} sitting in your FeetDex, and that's the heavyweight pair on this rack (${tprice}g). Save toward THAT one instead of stacking more cheap fits, and let the in-between gold go toward tools at Morton's. Patience and priorities, my guy.`;
+  }
   if (equipped) {
     const e = feetdex.getEntry(equipped);
     if (e) return `${e.name.toUpperCase()} hit clean on you. Heads up though, past three or four pairs each new fit gives you less drip per dollar — diminishing returns is a real thing.`;
@@ -10961,9 +10988,22 @@ function _vanceOnBuy(price) {
   const skins = feetdex.cosmetics.size;          // already incremented
   const skinsTotal = feetdex.totalSpentSkins;
   const toolsTotal = feetdex.totalSpentTools;
+  // The "trophy" skin lookup runs AFTER the buy is committed, so the pair
+  // they just bought is already excluded — anything it returns is a still-
+  // unowned higher-rarity skin sitting in their FeetDex.
+  const trophy = _trophyUnboughtSkin();
+  const tierVal = { common: 1, rare: 2, epic: 3, mythic: 4, legendary: 5, secret: 6 };
+  const trophyT = trophy ? tierVal[trophy.rarity] : 0;
 
   if (skins === 1) {
     return `Clean — and that's your first fit, which is its own little milestone. The lesson behind it: essentials before luxuries, every time. You did it in the right order.`;
+  }
+  // If they bought a low-tier skin while a higher-rarity pair waits in
+  // their dex, coach them to save up for the trophy and route the in-
+  // between gold to Morton's. This is the SAVE-UP advice in action.
+  if (trophy && trophyT >= 3 && price <= 20) {
+    const tp = COSMETIC_PRICES[trophy.rarity];
+    return `Sharp grab. One thing though — the ${trophy.name} is sitting in your dex, and that's the pair worth saving toward (${tp}g). Stack a few small ones in a row and you'll have spent that money without ever scratching the real itch. Save up for the one you really want, and any gold in between can do work for you at Morton's.`;
   }
   if (cheap && price >= cheap.price) {
     return `Sharp pick. Just so you know — that same ${price}g would've grabbed you the ${cheap.name} over at Morton's. That's the trade you made, and that's exactly what opportunity cost looks like.`;
