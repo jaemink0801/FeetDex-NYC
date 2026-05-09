@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T012340';
+  var BAKED = '20260509T203411';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1225,13 +1225,72 @@ const Audio = {
   // older name. Both produce the firework volley.
   rainShower(duration = 3.6) { this.fireworks(duration); },
 
-  // Lightsaber swing — quick swooping sweep with a thin metallic harmonic
-  // ride on top. Quick attack envelope, ~180ms, fits the sword's faster
-  // attack cadence without becoming droning.
+  // Lightsaber swing — movie-style "vwoom". Three layers stacked:
+  //   1. SAWTOOTH HUM — low fundamental (~140 Hz dropping to ~70 Hz) with
+  //      a fast tremolo LFO so it gets that throbbing electric "buzz" the
+  //      Star Wars sabers are known for. Run through a bandpass that
+  //      sweeps DOWN as the swing follows through, mimicking the
+  //      Doppler-like tonal shift as the blade passes the listener.
+  //   2. SQUARE OVERTONE — adds the high "ee" metallic ring that sits
+  //      on top of the hum and gives the blade its "energy" character.
+  //   3. FILTERED NOISE WHOOSH — a brief band-limited noise burst whose
+  //      center frequency sweeps so it reads as the blade slicing the
+  //      air rather than as static hiss.
   lightsaberSwing() {
-    sweep(820, 220, 0.16, 'sawtooth', 0.20, 0);    // descending swoosh
-    sweep(440, 180, 0.16, 'triangle', 0.10, 0.01); // octave ride
-    tone(1800, 0.05, 'sine', 0.10, 0);             // crispy tip flick
+    const c = getCtx();
+    const t = c.currentTime;
+    const dur = 0.34;
+
+    // 1. Hum fundamental
+    const hum = c.createOscillator();
+    hum.type = 'sawtooth';
+    hum.frequency.setValueAtTime(140, t);
+    hum.frequency.exponentialRampToValueAtTime(72, t + dur);
+    // Tremolo LFO that wobbles the fundamental — gives the throb.
+    const trem = c.createOscillator(); trem.type = 'sine';
+    trem.frequency.value = 16;
+    const tremG = c.createGain(); tremG.gain.value = 22;  // ±22 Hz wobble
+    trem.connect(tremG); tremG.connect(hum.frequency);
+    // Sweeping bandpass on the hum
+    const humBP = c.createBiquadFilter(); humBP.type = 'bandpass';
+    humBP.Q.value = 5;
+    humBP.frequency.setValueAtTime(1800, t);
+    humBP.frequency.exponentialRampToValueAtTime(450, t + dur);
+    const humG = c.createGain();
+    humG.gain.setValueAtTime(0.0001, t);
+    humG.gain.linearRampToValueAtTime(0.22, t + 0.04);
+    humG.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    hum.connect(humBP); humBP.connect(humG); humG.connect(masterGain);
+    hum.start(t); hum.stop(t + dur + 0.02);
+    trem.start(t); trem.stop(t + dur + 0.02);
+
+    // 2. Metallic overtone — square wave gives the bright "ee" ring
+    const over = c.createOscillator();
+    over.type = 'square';
+    over.frequency.setValueAtTime(520, t);
+    over.frequency.exponentialRampToValueAtTime(240, t + dur);
+    const overG = c.createGain();
+    overG.gain.setValueAtTime(0.0001, t);
+    overG.gain.linearRampToValueAtTime(0.07, t + 0.05);
+    overG.gain.exponentialRampToValueAtTime(0.0001, t + dur - 0.02);
+    over.connect(overG); overG.connect(masterGain);
+    over.start(t); over.stop(t + dur);
+
+    // 3. Whoosh — band-limited noise burst, sweeping center frequency
+    const whLen = Math.floor(c.sampleRate * dur);
+    const whBuf = c.createBuffer(1, whLen, c.sampleRate);
+    const whData = whBuf.getChannelData(0);
+    for (let i = 0; i < whLen; i++) {
+      whData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / whLen, 0.7);
+    }
+    const wh = c.createBufferSource(); wh.buffer = whBuf;
+    const whBP = c.createBiquadFilter(); whBP.type = 'bandpass';
+    whBP.Q.value = 4;
+    whBP.frequency.setValueAtTime(2600, t);
+    whBP.frequency.exponentialRampToValueAtTime(700, t + dur);
+    const whG = c.createGain(); whG.gain.value = 0.18;
+    wh.connect(whBP); whBP.connect(whG); whG.connect(masterGain);
+    wh.start(t); wh.stop(t + dur);
   },
 
   gameWin() {
@@ -1497,8 +1556,8 @@ const BOOSTER_DEFS = [
     desc:'Doubles HP and reduces damage taken in combat.' },
   { id:'radar',          name:'Radar',          price:100,
     desc:'Common, rare, and epic characters show on minimap and map.' },
-  { id:'sword',          name:'Sword',          price:100,
-    desc:'Doubles damage, knockback, and your attack speed in combat.' },
+  { id:'lightsaber',     name:'Lightsaber',     price:100,
+    desc:'Doubles damage, knockback, and attack speed. Quadruples them against mythics and legendaries.' },
   { id:'ancient_tracker',name:'Ancient Tracker',price:500,
     desc:'A guiding star points to The Ancient One.' },
 ];
@@ -2044,7 +2103,7 @@ class Player {
       else             this._rightHip = hip;
     }
 
-    // ── Lightsaber (visible when the Sword booster is owned) ──
+    // ── Lightsaber (visible when the Lightsaber booster is owned) ──
     // Anchored to the camera lower-right like a hand-held weapon. Hidden
     // by default; setLightsaberVisible(true) reveals it. swingLightsaber()
     // plays a quick swing animation + audio cue.
@@ -2074,19 +2133,40 @@ class Player {
     blade.rotation.x = Math.PI / 2;
     blade.position.set(0, 0, -0.69);
     this._saber.add(blade);
+    this._saberBladeMat = bladeMat;       // exposed so the swing animation
+                                          // can flash emissive intensity
 
     // Soft halo around the blade for the glow look
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: 0x88eeff, transparent: true, opacity: 0.25,
+    });
     const halo = new THREE.Mesh(
       new THREE.CylinderGeometry(0.045, 0.045, 1.2, 12),
-      new THREE.MeshBasicMaterial({ color: 0x88eeff, transparent: true, opacity: 0.25 }),
+      haloMat,
     );
     halo.rotation.x = Math.PI / 2;
     halo.position.set(0, 0, -0.69);
     this._saber.add(halo);
+    this._saberHaloMat = haloMat;
+
+    // Wide motion-trail blade — invisible at rest, briefly bloomed during
+    // the swing strike so the flashy diagonal arc reads even at a glance.
+    const trailMat = new THREE.MeshBasicMaterial({
+      color: 0xbbf2ff, transparent: true, opacity: 0,
+    });
+    const trail = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.13, 1.25, 16),
+      trailMat,
+    );
+    trail.rotation.x = Math.PI / 2;
+    trail.position.set(0, 0, -0.69);
+    this._saber.add(trail);
+    this._saberTrailMat = trailMat;
 
     this._saber.visible = false;
     this._saberSwingT  = 0;       // 0..1 progress of current swing
-    this._saberRestRotX = -0.30;  // resting tilt — the value set on this._saber.rotation.x above
+    // Resting transform (used as the target by the idle drift-back).
+    this._saberRest = { rx: -0.30, ry: 0.15, rz: 0.05, py: -0.30, pz: -0.55 };
 
     window.addEventListener('keydown', e => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this._sprint = true;
@@ -2126,8 +2206,9 @@ class Player {
     this._rightHip.rotation.x = -swing;
   }
 
-  // Show / hide the lightsaber. Called from main.js when sword is bought
-  // and on game-state transitions where weapons should not display.
+  // Show / hide the lightsaber. Called from main.js when the lightsaber
+  // booster is bought and on game-state transitions where weapons should
+  // not display.
   setLightsaberVisible(on) {
     if (this._saber) this._saber.visible = !!on;
   }
@@ -2141,19 +2222,50 @@ class Player {
 
   _animateLightsaber(dt) {
     if (!this._saber || !this._saber.visible) return;
+    const rest = this._saberRest;
     if (this._saberSwingT > 0) {
-      this._saberSwingT = Math.max(0, this._saberSwingT - dt * 4.5);
+      // Slightly slower decay than before (was 4.5) so the diagonal arc
+      // is actually visible — players couldn't catch the previous swing.
+      this._saberSwingT = Math.max(0, this._saberSwingT - dt * 3.6);
       const phase = 1 - this._saberSwingT;        // 0..1 forward
-      const swing = Math.sin(phase * Math.PI);    // 0 → 1 → 0
-      // Sweep right-to-left horizontally + tip forward thrust
-      this._saber.rotation.z = this._saberRestRotX + swing *  0.95;
-      this._saber.rotation.y = 0.15 + swing * -0.6;
-      this._saber.position.z = -0.55 - swing * 0.18;
+      const arc   = Math.sin(phase * Math.PI);    // 0 → 1 → 0  (peaks mid-swing)
+      const chop  = -Math.cos(phase * Math.PI);   // -1 → +1   (windup → follow-through)
+
+      // DIAGONAL DOWNWARD SLASH from upper-right to lower-left:
+      //   - rotation.x sweeps from windup (tip raised back, x more negative)
+      //     through chop forward (x positive = blade tip forward + down).
+      //   - rotation.z leans the blade across the body — positive at windup
+      //     (right-shoulder side) to negative at follow-through (left hip).
+      //   - rotation.y keeps a small forward presentation.
+      //   - position dips during the chop so the blade visibly rises then
+      //     descends through the camera frame, NOT a side-to-side wipe.
+      this._saber.rotation.x = rest.rx + chop * 1.10;          // up→down chop
+      this._saber.rotation.z = rest.rz + chop * -0.65;         // diagonal lean
+      this._saber.rotation.y = rest.ry + arc * 0.10;           // tiny present
+      this._saber.position.z = rest.pz - arc * 0.28;           // forward thrust
+      this._saber.position.y = rest.py + chop * -0.18;         // up then down
+
+      // FLASH — emissive intensity peaks at mid-swing and the wide trail
+      // mesh briefly blooms, leaving an obvious cyan slash arc.
+      if (this._saberBladeMat) {
+        this._saberBladeMat.emissiveIntensity = 1.2 + arc * 3.0;
+      }
+      if (this._saberHaloMat) {
+        this._saberHaloMat.opacity = 0.25 + arc * 0.40;
+      }
+      if (this._saberTrailMat) {
+        this._saberTrailMat.opacity = arc * 0.45;
+      }
     } else {
-      // Idle — drift back to rest
-      this._saber.rotation.z *= 0.85;
-      this._saber.rotation.y += (0.15 - this._saber.rotation.y) * 0.15;
-      this._saber.position.z += (-0.55 - this._saber.position.z) * 0.15;
+      // Idle — drift back to rest (and dim flash effects).
+      this._saber.rotation.x += (rest.rx - this._saber.rotation.x) * 0.20;
+      this._saber.rotation.y += (rest.ry - this._saber.rotation.y) * 0.20;
+      this._saber.rotation.z += (rest.rz - this._saber.rotation.z) * 0.20;
+      this._saber.position.y += (rest.py - this._saber.position.y) * 0.20;
+      this._saber.position.z += (rest.pz - this._saber.position.z) * 0.20;
+      if (this._saberBladeMat) this._saberBladeMat.emissiveIntensity = 1.2;
+      if (this._saberHaloMat)  this._saberHaloMat.opacity = 0.25;
+      if (this._saberTrailMat) this._saberTrailMat.opacity = 0;
     }
   }
 
@@ -3916,11 +4028,14 @@ class CombatEncounter {
     this._onLose     = onLose;
 
     // Player and NPC stats. Armor doubles HP and reduces incoming damage by
-    // 30%; Sword doubles damage, knockback, and player attack speed.
+    // 30%. Lightsaber doubles damage, knockback, and player attack speed —
+    // and DOUBLES THOSE BONUSES AGAIN against mythics and legendaries (so
+    // 4× damage and 4× attack speed when fighting elites).
     const fdex = window.gameFeetDex;
     const hasArmor = fdex?.hasBooster('armor');
     this._hasArmor  = !!hasArmor;
-    this._hasSword  = fdex?.hasBooster('sword') ?? false;
+    this._hasLightsaber  = fdex?.hasBooster('lightsaber') ?? false;
+    this._isElite        = npc.rarity === 'mythic' || npc.rarity === 'legendary';
     this._playerHP   = hasArmor ? PLAYER_MAX * 2 : PLAYER_MAX;
     this._playerMax  = this._playerHP;
     this._npcHP      = _NPC_HP[npc.rarity] ?? PLAYER_MAX;
@@ -4075,8 +4190,10 @@ class CombatEncounter {
   playerAttack() {
     if (!this._active || this._koTime > 0) return;
     const now = Date.now();
-    // Sword halves the swing cooldown (2× attack speed)
-    const cooldown = this._hasSword ? HIT_CD / 2 : HIT_CD;
+    // Lightsaber halves the swing cooldown (2× attack speed); against
+    // mythics/legendaries the bonus doubles AGAIN (4× attack speed).
+    const lsSpeedMult = this._hasLightsaber ? (this._isElite ? 4 : 2) : 1;
+    const cooldown = HIT_CD / lsSpeedMult;
     if (now - this._lastHit < cooldown) return;
     this._lastHit = now;
 
@@ -4094,15 +4211,17 @@ class CombatEncounter {
     const dot = (dx * lookX + dz * lookZ) / (dist || 1);
     if (dot < 0.35) return;  // ~70° cone in front of player
 
-    // Sword booster doubles damage and knockback
-    const dmg    = this._hasSword ? PLAYER_DMG * 2 : PLAYER_DMG;
-    const recoil = this._hasSword ? 1.5 : 0.55;
+    // Lightsaber booster doubles damage and knockback; doubles AGAIN
+    // against mythics/legendaries (4× damage when slicing elites).
+    const lsDmgMult = this._hasLightsaber ? (this._isElite ? 4 : 2) : 1;
+    const dmg    = PLAYER_DMG * lsDmgMult;
+    const recoil = this._hasLightsaber ? (this._isElite ? 2.4 : 1.5) : 0.55;
     this._npcHP = Math.max(0, this._npcHP - dmg);
     this._flashScreen('rgba(255,255,80,0.18)');
     this._renderNpcBar();
 
     // ── Hit feedback: SFX, NPC hurt SFX, scale-pulse, recoil push ──
-    if (this._hasSword) {
+    if (this._hasLightsaber) {
       try { Audio.lightsaberSwing(); } catch (_) {}
       this._player?.swingLightsaber?.();
     } else {
@@ -4858,7 +4977,7 @@ class UI {
     const lineEl  = document.getElementById('ms-morton-line');
     if (!overlay || !cards) return;
 
-    const ICONS = { sprint_feet:'👟', metrocard:'🚇', radar:'📡', compass:'🧭', armor:'🛡', sword:'⚔', ancient_tracker:'⭐' };
+    const ICONS = { sprint_feet:'👟', metrocard:'🚇', radar:'📡', compass:'🧭', armor:'🛡', lightsaber:'🗡', ancient_tracker:'⭐' };
     const render = () => {
       goldEl.textContent = `Your gold: ${feetdex.gold} ⛂`;
       cards.innerHTML = '';
@@ -8082,12 +8201,12 @@ function buildGenericInteriors(scene, enterables, _SO) {
         _b(grp, 0xC9A24A, 5, 1.95, -3, 0.7, 0.2, 0.5);   // top register drawer trim
         // Glowing demo "products" along the inner shelf — one per booster,
         // each color-keyed to its shop card (Sprint = green, Radar = cyan,
-        // Armor = grey-blue, Sword = silver, Tracker = gold)
+        // Armor = grey-blue, Lightsaber = cyan glow, Tracker = gold)
         const PROD = [
           { col:0x44dd66, x:-7,  z:-9.2 },   // Sprint Feet
           { col:0x66ccdd, x:-3.5,z:-9.2 },   // Radar
           { col:0x6688aa, x: 0,  z:-9.2 },   // Armor
-          { col:0xcccccc, x: 3.5,z:-9.2 },   // Sword
+          { col:0x66e8ff, x: 3.5,z:-9.2 },   // Lightsaber (cyan blade glow)
           { col:0xFFD700, x: 7,  z:-9.2 },   // Ancient Tracker
         ];
         for (const p of PROD) {
@@ -10638,7 +10757,7 @@ function _mortonOnPurchase(boosterId) {
     sprint_feet:    "Smart pick. Your legs will thank you.",
     radar:          "Now you'll see who's worth your time.",
     armor:          "Keeps you upright. Stay upright, stay rich.",
-    sword:          "Hits like a paid invoice. They'll feel that one.",
+    lightsaber:     "Hits like a paid invoice. They'll feel that one.",
     ancient_tracker:"Big spender. Hope you know what you're doing — that star is patient but the gold isn't.",
   };
   return lines[boosterId] ?? "Smart pick.";
@@ -10813,8 +10932,8 @@ const BOOSTER_TIPS = {
     body: 'A needle now twitches in the top-left toward powerful presences — <b>mythics</b> and <b>legendaries</b>. It can\'t tell you who or how far, just which way.' },
   armor:          { title: 'ARMOR',
     body: 'Your HP is doubled and you take 30% less damage from mythics and legendaries.' },
-  sword:          { title: 'SWORD',
-    body: 'Your punches now deal double damage, knock enemies back hard, and strike twice as fast.' },
+  lightsaber:     { title: 'LIGHTSABER',
+    body: 'Your strikes deal <b>double damage</b>, knock enemies back hard, and swing <b>twice as fast</b>. Against <b>mythics</b> and <b>legendaries</b> the bonuses double again — <b>4× damage</b> and <b>4× attack speed</b>.' },
   metrocard:      { title: 'METROCARD',
     body: 'Walk up to any subway station and press <b>[E]</b> to ride. The map opens with the <b style="color:#0066ff">blue dots</b> — click any station and the subway takes you straight there. Hop between stations to cross the city in seconds.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
@@ -11070,7 +11189,7 @@ const FIGHT_TUTORIAL = {
     title: 'MYTHIC FIGHT',
     theme: 'mythic',
     body : '<b>WASD</b> to move. <b>LEFT CLICK</b> to punch. Step away to dodge.<br/><br/>' +
-           'Sword and Armor make this much easier.',
+           'Lightsaber and Armor make this much easier.',
   },
   legendary: {
     title: 'LEGENDARY FIGHT',
@@ -12149,10 +12268,10 @@ function gameLoop() {
   if (input.justPressed('KeyC'))   _handleC();
   if (input.justPressed('Escape')) _handleESC();
 
-  // Show the lightsaber any time the sword booster is owned and the
+  // Show the lightsaber any time the lightsaber booster is owned and the
   // player is in actively-played states (not paused, etc.)
   player.setLightsaberVisible?.(
-    feetdex.hasBooster('sword') &&
+    feetdex.hasBooster('lightsaber') &&
     (state === 'playing' || state === 'interior' || state === 'combat'),
   );
 
