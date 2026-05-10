@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T004120';
+  var BAKED = '20260510T005720';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -658,6 +658,22 @@
        feet read clearly on top of the colored star bursts. */
     #firework-canvas { position:fixed; inset:0; pointer-events:none; z-index:199; }
 
+    /* Holy radiance overlay — golden pillar-of-light gradient layered on
+       the screen during the Ancient One battle. Pulses subtly so the
+       arena feels alive. */
+    #holy-radiance { position:fixed; inset:0; pointer-events:none; z-index:34;
+      opacity:0; transition:opacity 0.9s ease-out;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255,232,140,0.55) 0%, rgba(255,210,80,0.18) 35%, rgba(0,0,0,0) 70%),
+        radial-gradient(ellipse 100% 100% at 50% 100%, rgba(80,55,15,0.28) 0%, rgba(0,0,0,0) 70%);
+      mix-blend-mode:screen;
+      animation:holy-pulse 4s ease-in-out infinite; }
+    #holy-radiance.active { opacity:1; }
+    @keyframes holy-pulse {
+      0%,100% { filter:brightness(1.0); }
+      50%     { filter:brightness(1.18); }
+    }
+
     /* Tutorial Complete fullscreen banner */
     #tutorial-complete { position:fixed; inset:0; z-index:210;
       display:none; align-items:center; justify-content:center;
@@ -776,6 +792,9 @@
 
   <!-- Firework bursts canvas (rendered behind the feet rain) -->
   <canvas id="firework-canvas"></canvas>
+
+  <!-- Holy radiance overlay (Ancient One battle) -->
+  <div id="holy-radiance"></div>
 
   <!-- Compass destination picker [C] -->
   <div id="compass-picker">
@@ -1299,6 +1318,88 @@ const Audio = {
     const whG = c.createGain(); whG.gain.value = 0.18;
     wh.connect(whBP); whBP.connect(whG); whG.connect(masterGain);
     wh.start(t); wh.stop(t + dur);
+  },
+
+  // Ancient One kick impact — deep low whoosh + meaty thud + brief
+  // shimmer above. Lands harder than a punch (feels heavier on screen
+  // hit) without sounding like a mythic punch.
+  ancientKick() {
+    const c = getCtx();
+    const t = c.currentTime;
+    // Whoosh — sweeping band-passed noise, leg-through-air feel.
+    const len = Math.floor(c.sampleRate * 0.18);
+    const buf = c.createBuffer(1, len, c.sampleRate);
+    const dat = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) {
+      dat[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 0.5);
+    }
+    const src = c.createBufferSource(); src.buffer = buf;
+    const bp  = c.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4;
+    bp.frequency.setValueAtTime(1400, t);
+    bp.frequency.exponentialRampToValueAtTime(280, t + 0.18);
+    const wg  = c.createGain(); wg.gain.value = 0.32;
+    src.connect(bp); bp.connect(wg); wg.connect(masterGain);
+    src.start(t); src.stop(t + 0.20);
+    // Thud — sub-bass kick, very short, very low.
+    const thud = c.createOscillator(); thud.type = 'sine';
+    thud.frequency.setValueAtTime(150, t + 0.05);
+    thud.frequency.exponentialRampToValueAtTime(35, t + 0.30);
+    const thG = c.createGain();
+    thG.gain.setValueAtTime(0.0001, t + 0.05);
+    thG.gain.linearRampToValueAtTime(0.85, t + 0.07);
+    thG.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+    thud.connect(thG); thG.connect(masterGain);
+    thud.start(t + 0.05); thud.stop(t + 0.34);
+    // Bright shimmer — high triangle accent, ride on top.
+    tone(2200, 0.06, 'triangle', 0.12, 0.06);
+  },
+
+  // Played when the player is teleported into the holy arena. Long
+  // ascending choir-pad sweep with a bell shimmer on top — sets the
+  // "you've stepped onto sacred ground" mood instantly.
+  holyArrival() {
+    const c = getCtx();
+    const t = c.currentTime;
+    // Choir-pad: layered detuned saws, slow attack, swelling.
+    const fundamentals = [220, 277.18, 329.63];   // A3, C#4, E4 (A major)
+    for (const f of fundamentals) {
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f * 0.998, t);
+      o.frequency.linearRampToValueAtTime(f * 1.002, t + 1.6);
+      const lp = c.createBiquadFilter(); lp.type = 'lowpass';
+      lp.frequency.setValueAtTime(900, t);
+      lp.frequency.linearRampToValueAtTime(2400, t + 1.4);
+      lp.Q.value = 0.7;
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.10, t + 0.6);
+      g.gain.linearRampToValueAtTime(0.06, t + 1.6);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.0);
+      o.connect(lp); lp.connect(g); g.connect(masterGain);
+      o.start(t); o.stop(t + 2.05);
+    }
+    // Bell shimmer — three rising sine pings on top.
+    [880, 1318.5, 1760].forEach((f, i) => {
+      tone(f, 0.7, 'sine', 0.10, 0.18 + i * 0.18);
+    });
+  },
+
+  // Played at the moment of victory over the Ancient One. Bigger version
+  // of legendaryFanfare — full choir-bell ascent with triumphant root.
+  holyAscension() {
+    const c = getCtx();
+    const t = c.currentTime;
+    // C major triad ascending into the high octave.
+    const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+    notes.forEach((f, i) => {
+      tone(f,        0.55, 'sine',     0.22, i * 0.12);
+      tone(f * 0.5,  0.55, 'triangle', 0.10, i * 0.12);
+    });
+    // Sustained low pad underneath
+    tone(65.41,  3.0, 'triangle', 0.18, 0);   // C2
+    tone(130.81, 3.0, 'sine',     0.10, 0);   // C3
+    // Final bell ring at the top
+    tone(2093.0, 1.4, 'sine', 0.16, 0.95);
   },
 
   gameWin() {
@@ -4051,9 +4152,12 @@ function showHUDMessage(text, durationMs = 2500) {
 
 // ── Combat encounter ──────────────────────────────────────────────────────────
 
-// Legendary HP = 2× mythic.
-const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 200 };
-const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 37  };
+// HP and damage scale linearly through the boss tiers:
+//   mythic  → legendary  → secret (Ancient One)
+//   100      200          300       (HP, +100 each step)
+//    25       37           50       (dmg, ~+12 each step)
+const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 200, secret: 300 };
+const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 37,  secret: 50  };
 const PLAYER_DMG  = 10;
 const PLAYER_MAX  = 100;
 const HIT_CD      = 500;   // ms between player attacks
@@ -4079,15 +4183,17 @@ class CombatEncounter {
     const hasArmor = fdex?.hasBooster('armor');
     this._hasArmor  = !!hasArmor;
     this._hasLightsaber  = fdex?.hasBooster('lightsaber') ?? false;
-    this._isElite        = npc.rarity === 'mythic' || npc.rarity === 'legendary';
+    this._isElite        = npc.rarity === 'mythic' || npc.rarity === 'legendary' || npc.rarity === 'secret';
+    this._isAncient      = npc.rarity === 'secret';
     this._playerHP   = hasArmor ? PLAYER_MAX * 2 : PLAYER_MAX;
     this._playerMax  = this._playerHP;
     this._npcHP      = _NPC_HP[npc.rarity] ?? PLAYER_MAX;
     this._npcMaxHP   = this._npcHP;
 
-    // Per-rarity attack-speed multiplier. Legendaries swing 1.25× faster
-    // than mythics (mythic baseline 1.65× → legendary 2.0625×).
-    const speedMult = npc.rarity === 'legendary' ? 1.65 * 1.25
+    // Per-rarity attack-speed multiplier. Each tier is 1.25× the previous:
+    //   mythic 1.65× → legendary 2.06× → secret 2.58×.
+    const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 1.25
+                     : npc.rarity === 'legendary' ? 1.65 * 1.25
                      : npc.rarity === 'mythic'    ? 1.65
                      : 1;
     this._atkCd  = NPC_ATK_CD / speedMult;
@@ -4099,9 +4205,10 @@ class CombatEncounter {
     this._nextSwing     = Date.now() + 1200;
     this._koTime        = 0;        // when NPC HP hit 0
     this._active        = true;
-    // Mythics chase at 8.1 m/s; legendaries 1.5× faster (≈12.15) — they
-    // hunt you down much more aggressively as the endgame challenge.
-    this._chaseSpeed    = (npc.rarity === 'legendary') ? 8.1 * 1.5 : 8.1;
+    // Chase speed scales with tier: mythic 8.1 → legendary 12.15 → ancient 16.2.
+    this._chaseSpeed    = npc.rarity === 'secret'    ? 8.1 * 2.0
+                        : npc.rarity === 'legendary' ? 8.1 * 1.5
+                        : 8.1;
     this._origGroupY    = npc.group.position.y;
     this._origGroupRotX = npc.group.rotation.x;
     this._bodyScale     = npc.group.scale.x;
@@ -4184,36 +4291,84 @@ class CombatEncounter {
       npc.group.scale.set(this._bodyScale, this._bodyScale, this._bodyScale);
     }
 
-    // ── Swing: anticipation → strike, with body lean ─────────────────────
+    // ── Swing/kick: anticipation → strike → recovery ─────────────────────
     if (this._swingStart > 0) {
       const t = (now - this._swingStart) / this._windup;     // 0..1+
-      if (t < 0.55) {
-        const k = t / 0.55;
-        npc.group.rotation.x = this._origGroupRotX + 0.32 * k;
-        if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.55 * k;
-      } else if (t < 1) {
-        const k = (t - 0.55) / 0.45;
-        npc.group.rotation.x = this._origGroupRotX + 0.32 * (1 - k) - 0.18 * k;
-        if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.55 - 2.0 * k;
-      } else {
-        npc.group.rotation.x = this._origGroupRotX;
-        if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
-        this._swingStart = 0;
+      if (this._isAncient) {
+        // Ancient One uses a KICK: leans backward in anticipation (the
+        // signature "I'm about to swing my leg" tell), then snaps forward
+        // with a hard hip thrust on strike. Combined with a giant foot
+        // flashing across the player's screen at impact and the existing
+        // camera-shake, it reads as a high-priest-roundhouse-kick.
+        if (t < 0.65) {
+          const k = t / 0.65;
+          // Lean back hard. Body tilts backward (negative pitch beyond rest).
+          npc.group.rotation.x = this._origGroupRotX - 0.55 * k;
+          // Right arm wings out for balance / dramatic flair.
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = -0.45 * k;
+          if (npc._leftArmPivot)  npc._leftArmPivot.rotation.x  = -0.45 * k;
+          // Lift the body slightly as if loading the leg.
+          npc.group.position.y = this._origGroupY + 0.10 * k;
+        } else if (t < 1) {
+          const k = (t - 0.65) / 0.35;
+          // Snap forward and DOWN with the kick.
+          npc.group.rotation.x = this._origGroupRotX - 0.55 * (1 - k) + 0.40 * k;
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = -0.45 + 0.45 * k;
+          if (npc._leftArmPivot)  npc._leftArmPivot.rotation.x  = -0.45 + 0.45 * k;
+          npc.group.position.y = this._origGroupY + 0.10 * (1 - k);
+        } else {
+          npc.group.rotation.x = this._origGroupRotX;
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
+          if (npc._leftArmPivot)  npc._leftArmPivot.rotation.x  = 0;
+          npc.group.position.y = this._origGroupY;
+          this._swingStart = 0;
 
-        if (dist <= NPC_HIT_RANGE) {
-          // Armor reduces incoming damage by 30%
-          let dmg = _NPC_DMG[npc.rarity] ?? 25;
-          if (this._hasArmor) dmg = Math.round(dmg * 0.70);
-          this._playerHP = Math.max(0, this._playerHP - dmg);
-          this._flashScreen('rgba(220,0,0,0.32)');
-          this._shakeUntil = now + 260;
-          try { Audio.playerHurt(); } catch (_) {}
-          this._renderHearts();
-          if (this._playerHP <= 0) { this._end(false); return; }
+          if (dist <= NPC_HIT_RANGE * 1.15) {     // slightly longer kick reach
+            let dmg = _NPC_DMG[npc.rarity] ?? 25;
+            if (this._hasArmor) dmg = Math.round(dmg * 0.70);
+            this._playerHP = Math.max(0, this._playerHP - dmg);
+            // Holy-gold tint + giant foot flash on the player's screen.
+            this._flashScreen('rgba(255, 200, 60, 0.45)');
+            this._showKickOverlay();
+            this._shakeUntil = now + 380;
+            // Knockback — push the player back in the kick direction.
+            this._kickbackPlayer(player, npc, 1.2);
+            try { Audio.ancientKick?.() ?? Audio.playerHurt(); } catch (_) {}
+            this._renderHearts();
+            if (this._playerHP <= 0) { this._end(false); return; }
+          }
+          this._nextSwing = now + this._atkCd;
         }
-        this._nextSwing = now + this._atkCd;
+      } else {
+        // Standard mythic / legendary punch swing.
+        if (t < 0.55) {
+          const k = t / 0.55;
+          npc.group.rotation.x = this._origGroupRotX + 0.32 * k;
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.55 * k;
+        } else if (t < 1) {
+          const k = (t - 0.55) / 0.45;
+          npc.group.rotation.x = this._origGroupRotX + 0.32 * (1 - k) - 0.18 * k;
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.55 - 2.0 * k;
+        } else {
+          npc.group.rotation.x = this._origGroupRotX;
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
+          this._swingStart = 0;
+
+          if (dist <= NPC_HIT_RANGE) {
+            // Armor reduces incoming damage by 30%
+            let dmg = _NPC_DMG[npc.rarity] ?? 25;
+            if (this._hasArmor) dmg = Math.round(dmg * 0.70);
+            this._playerHP = Math.max(0, this._playerHP - dmg);
+            this._flashScreen('rgba(220,0,0,0.32)');
+            this._shakeUntil = now + 260;
+            try { Audio.playerHurt(); } catch (_) {}
+            this._renderHearts();
+            if (this._playerHP <= 0) { this._end(false); return; }
+          }
+          this._nextSwing = now + this._atkCd;
+        }
       }
-    } else if (now >= this._nextSwing && dist <= NPC_HIT_RANGE) {
+    } else if (now >= this._nextSwing && dist <= NPC_HIT_RANGE * (this._isAncient ? 1.15 : 1)) {
       this._swingStart = now;
     }
 
@@ -4324,6 +4479,61 @@ class CombatEncounter {
     this._flash.style.background = color;
     this._flash.style.opacity    = '1';
     setTimeout(() => { if (this._flash) this._flash.style.opacity = '0'; }, 130);
+  }
+
+  // Giant foot-sole flashes across the screen at the moment a kick connects.
+  // Pulled from a hidden DOM element built once on demand. The "splat" animation
+  // scales in fast and fades out so it reads as an impact, not a sticker.
+  _showKickOverlay() {
+    let el = document.getElementById('kick-overlay');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'kick-overlay';
+      // Inline-styled so we don't have to depend on CSS being present.
+      Object.assign(el.style, {
+        position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '500',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: '0', transition: 'opacity 90ms ease-out',
+      });
+      el.innerHTML = `
+        <svg viewBox="0 0 100 140" width="62vmin" height="86vmin"
+             style="filter:drop-shadow(0 0 30px #ffd866) drop-shadow(0 0 60px #fff7c8);">
+          <ellipse cx="50" cy="92" rx="32" ry="42" fill="#ffe680" stroke="#a87c0a" stroke-width="3"/>
+          <circle cx="50" cy="32" r="11" fill="#ffe680" stroke="#a87c0a" stroke-width="2.5"/>
+          <circle cx="32" cy="46" r="7"  fill="#ffe680" stroke="#a87c0a" stroke-width="2"/>
+          <circle cx="22" cy="58" r="6"  fill="#ffe680" stroke="#a87c0a" stroke-width="2"/>
+          <circle cx="16" cy="70" r="5"  fill="#ffe680" stroke="#a87c0a" stroke-width="2"/>
+          <circle cx="14" cy="82" r="4"  fill="#ffe680" stroke="#a87c0a" stroke-width="2"/>
+        </svg>`;
+      document.body.appendChild(el);
+    }
+    const svg = el.querySelector('svg');
+    if (svg) {
+      svg.style.transition = 'transform 0ms';
+      svg.style.transform  = 'scale(0.55) rotate(-12deg)';
+    }
+    el.style.opacity = '1';
+    requestAnimationFrame(() => {
+      if (svg) {
+        svg.style.transition = 'transform 220ms cubic-bezier(.2,1.4,.4,1)';
+        svg.style.transform  = 'scale(1.18) rotate(8deg)';
+      }
+    });
+    setTimeout(() => { el.style.opacity = '0'; }, 220);
+  }
+
+  // Push the player back in the direction of the kick (NPC → player).
+  // Adds an instantaneous offset to the player's position via the same
+  // recoil math used for NPC pushback when the player lands a hit.
+  _kickbackPlayer(player, npc, magnitude) {
+    const dx = player.position.x - npc.group.position.x;
+    const dz = player.position.z - npc.group.position.z;
+    const len = Math.hypot(dx, dz) || 1;
+    player.position.x += (dx / len) * magnitude;
+    player.position.z += (dz / len) * magnitude;
+    // Also kill forward momentum so the kick reads as a real impact.
+    player.velocity.x *= 0.2;
+    player.velocity.z *= 0.2;
   }
 
   _renderHearts() {
@@ -4777,8 +4987,8 @@ function _getSecretLines() {
     "I've been here since before the city. I'll be here after. The feet are the oldest part of a person. They carry everything the mind has already forgotten.",
     "Every blister tells you where you've pushed too hard. Every callus tells you where you kept going. The arch tells you who raised you. The toes tell you where you're going.",
     "You've collected quite a few feet. I've been watching your progress. Not in a strange way. In the way that oceans watch ships.",
-    "These? These feet have walked the ancient roads. They've been dust and bone and healed again. They carry no brand. They answer to no cobbler.",
-    "Look. Take your time. There is nothing that cannot be helped by looking more carefully at what carries you.",
+    "But wisdom does not pass without a test. The feet you've gathered must be earned a final time — against mine.",
+    "Stand. The ground will rise to meet us. Show me what the city has shaped in you.",
   ];
 }
 
@@ -5380,7 +5590,7 @@ class UI {
       const isLast = (this._dlgIdx === this._dlgLines.length - 1);
       if (isLast) {
         const r = this._dlgNPC.rarity;
-        if      (r === 'mythic')    this._el.dlgHint.textContent = '[E] Accept Challenge';
+        if      (r === 'mythic' || r === 'secret') this._el.dlgHint.textContent = '[E] Accept Challenge';
         else if (r === 'none' || r === 'legendary')
                                     this._el.dlgHint.textContent = '[E] Close';
       }
@@ -5390,8 +5600,8 @@ class UI {
     // Past the last line — resolve outcome
     const r = this._dlgNPC?.rarity;  // capture before closeDialogue nulls _dlgNPC
     this.closeDialogue();
-    if (r === 'mythic')                             return 'challenge';
-    if (['common','rare','epic','secret'].includes(r)) return 'discover';
+    if (r === 'mythic' || r === 'secret')           return 'challenge';
+    if (['common','rare','epic'].includes(r))       return 'discover';
     if (r === 'legendary')                          return 'legendary_done';
     return 'done';
   }
@@ -5484,6 +5694,67 @@ class UI {
   closePause() { this._el.pauseMenu.classList.remove('active'); }
 
   get isPauseOpen() { return this._el.pauseMenu.classList.contains('active'); }
+
+  // ── Ancient One end-credits scene ─────────────────────────────────────────
+  // Plays after the player defeats the Ancient One. A holy fade-in title
+  // card with congratulations + "New York is yours" prose, then calls
+  // back when the player presses any key / clicks (or after a fallback
+  // timer) so main.js can chain the discovery overlay + spawn return.
+  showAncientWinCredits(onDone) {
+    let el = document.getElementById('ancient-credits');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ancient-credits';
+      Object.assign(el.style, {
+        position: 'fixed', inset: '0', zIndex: '600',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        background: 'radial-gradient(ellipse at top, #fff8d8 0%, #f3deaf 35%, #6a4f1a 75%, #1a1208 100%)',
+        color: '#3a2a08', fontFamily: 'Georgia, serif', textAlign: 'center',
+        padding: '40px', opacity: '0', transition: 'opacity 1.2s ease-out',
+        pointerEvents: 'auto',
+      });
+      el.innerHTML = `
+        <div style="font-size:14px; letter-spacing:8px; color:#8a6a1a; margin-bottom:18px;">
+          THE ANCIENT ONE FALLS
+        </div>
+        <h1 style="font-size:54px; margin:0 0 12px; letter-spacing:5px;
+                   color:#5d4037; text-shadow:0 0 18px rgba(255,220,140,0.85);">
+          CONGRATULATIONS
+        </h1>
+        <div style="font-size:22px; line-height:1.7; max-width:680px; color:#4a3010;
+                    font-style:italic; margin-bottom:24px;">
+          You've walked every street, met every soul, claimed every pair.<br/>
+          From the Ancient One's last breath, the city itself bows.<br/>
+          <b style="font-style:normal;">New York is yours, mortal.</b>
+        </div>
+        <div style="font-size:14px; letter-spacing:3px; opacity:.55; margin-top:14px;">
+          press any key to claim his feet
+        </div>`;
+      document.body.appendChild(el);
+    }
+    el.style.display = 'flex';
+    requestAnimationFrame(() => { el.style.opacity = '1'; });
+
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('keydown',   finish);
+      window.removeEventListener('mousedown', finish);
+      el.style.opacity = '0';
+      setTimeout(() => { el.style.display = 'none'; }, 600);
+      try { onDone?.(); } catch (_) {}
+    };
+    // Slight delay before listening so the player doesn't dismiss it on
+    // the same click that just won the fight.
+    setTimeout(() => {
+      window.addEventListener('keydown',   finish, { once: true });
+      window.addEventListener('mousedown', finish, { once: true });
+      // Auto-advance fallback after 14s in case the player walks away.
+      setTimeout(finish, 14000);
+    }, 600);
+  }
 
   // ── Win screen ────────────────────────────────────────────────────────────
 
@@ -9283,6 +9554,81 @@ function buildSecretAlley(scene, solidObjects) {
   return colliders;
 }
 
+// ── Ancient One battle arena ──────────────────────────────────────────────
+// A holy circular arena far from the city. Player and Ancient One are
+// teleported here for the final fight; geometry is built once at world
+// init. No solid colliders so the player can move freely.
+function buildAncientArena(scene) {
+  const ox = 1500, oz = 1500;
+
+  // Floor — pale-gold marble disk, slightly emissive so it glows softly
+  // against the high ambient. 30u radius gives plenty of arena room.
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(30, 48),
+    new THREE.MeshStandardMaterial({
+      color: 0xf6e4ad, emissive: 0x4a3010, emissiveIntensity: 0.35,
+      roughness: 0.45, metalness: 0.15,
+    }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(ox, 0.02, oz);
+  scene.add(floor);
+
+  // Concentric gold ring inlay (decorative).
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(18, 18.6, 64),
+    new THREE.MeshStandardMaterial({
+      color: 0xffd166, emissive: 0xffaa33, emissiveIntensity: 0.8, side: THREE.DoubleSide,
+    }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(ox, 0.04, oz);
+  scene.add(ring);
+
+  // Eight glowing white pillars around the perimeter.
+  const pillarMat = new THREE.MeshStandardMaterial({
+    color: 0xfff8e0, emissive: 0xffe9a8, emissiveIntensity: 0.65,
+    roughness: 0.4,
+  });
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const px = ox + Math.cos(a) * 26, pz = oz + Math.sin(a) * 26;
+    const pillar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.7, 0.9, 14, 16), pillarMat,
+    );
+    pillar.position.set(px, 7, pz);
+    scene.add(pillar);
+    // Capital cap
+    const cap = new THREE.Mesh(
+      new THREE.BoxGeometry(2.4, 0.5, 2.4),
+      new THREE.MeshStandardMaterial({
+        color: 0xffd866, emissive: 0xffb84d, emissiveIntensity: 0.6,
+      }),
+    );
+    cap.position.set(px, 14.3, pz);
+    scene.add(cap);
+  }
+
+  // Central pillar of light — a tall translucent cone over the arena
+  // center, from ground up to ~30u, giving the "pillar of holy light"
+  // visual the player walks INTO when teleported.
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.5, 6.0, 30, 24, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff5c8, transparent: true, opacity: 0.18, side: THREE.DoubleSide,
+      depthWrite: false,
+    }),
+  );
+  beam.position.set(ox, 15, oz);
+  scene.add(beam);
+
+  // Bright point light at the top of the beam — spills warm gold over
+  // the arena floor and the combatants.
+  const light = new THREE.PointLight(0xffe0a0, 1.6, 80, 1.2);
+  light.position.set(ox, 24, oz);
+  scene.add(light);
+}
+
 // ── Lighting ──────────────────────────────────────────────────────────────────
 
 function setupLighting(scene) {
@@ -10099,6 +10445,12 @@ class World {
     const alleyColliders    = buildSecretAlley(scene, SO);
     for (const c of alleyColliders) this.colliders.push(c);
 
+    // Ancient One battle arena — built far from the city at (1500, 0, 1500).
+    // Players are teleported here for the final fight, then returned to
+    // spawn after win/loss. Standalone meshes; no integration with the
+    // main city colliders since it's outside the navigable map.
+    buildAncientArena(scene);
+
     const boundaryColliders = buildCityBoundary(scene, SO);
     for (const c of boundaryColliders) this.colliders.push(c);
 
@@ -10764,9 +11116,9 @@ function _handleDialogueResult(result) {
       requestLock();
       return;
     }
-    // Mythic NPCs get real-time combat (with tutorial+countdown wrapper);
-    // others get RPS
-    if (_activeNPC?.rarity === 'mythic') {
+    // Mythic + secret (Ancient One) get real-time combat with the
+    // tutorial+countdown wrapper; everyone else gets the RPS minigame.
+    if (_activeNPC?.rarity === 'mythic' || _activeNPC?.rarity === 'secret') {
       _startBattle(_activeNPC);
     } else {
       _openMinigame(_activeNPC);
@@ -11448,6 +11800,11 @@ const FIGHT_TUTORIAL = {
     theme: 'legendary',
     body : 'Legendaries hit harder — beat this one <b>three times</b> to claim their feet.',
   },
+  secret: {
+    title: 'THE ANCIENT ONE',
+    theme: 'legendary',
+    body : 'The final test. The ground rises to meet you. Their <b>kicks</b> hit hard and knock you back — circle, dodge, and strike when the leg lifts.',
+  },
 };
 let _firstMythicFought    = false;
 let _firstLegendaryFought = false;
@@ -11458,13 +11815,22 @@ let _firstLegendaryFought = false;
 // no spacing teleport — so the countdown→fight transition feels grounded.
 function _startBattle(npc) {
   const tutorialKey = npc.rarity === 'legendary' ? 'legendary'
+                    : npc.rarity === 'secret'    ? 'secret'
                     : npc.rarity === 'mythic'    ? 'mythic'
                     : null;
   const showTutorial =
     (tutorialKey === 'mythic'    && !_firstMythicFought)    ||
-    (tutorialKey === 'legendary' && !_firstLegendaryFought);
+    (tutorialKey === 'legendary' && !_firstLegendaryFought) ||
+    (tutorialKey === 'secret');                              // always shown
 
-  const proceed = () => _runCountdownAndFight(npc);
+  // Ancient One battle gets a special teleport-to-holy-arena entrance
+  // before the countdown. Save the player's current position so we can
+  // return them to spawn on win/loss, and translate the NPC into the
+  // arena so the fight happens in a clean dedicated space.
+  const proceed = () => {
+    if (npc.rarity === 'secret') _enterAncientArena(npc);
+    _runCountdownAndFight(npc);
+  };
 
   if (showTutorial && tutorialKey) {
     if (tutorialKey === 'mythic')    _firstMythicFought    = true;
@@ -11473,10 +11839,53 @@ function _startBattle(npc) {
     ui.showTip(t.title, t.body, t.theme);
     state = 'pre-combat';                   // E dismissal handled by the
     _afterTipCallback = proceed;            // generic-tip dismiss path
-    // Pointer lock stays — the tutorial accepts only E, no mouse needed,
-    // and re-acquiring lock from a timer would fail browser security checks.
   } else {
     proceed();
+  }
+}
+
+// ── Ancient One arena ────────────────────────────────────────────────────────
+// Coordinates of the arena (must match buildAncientArena in world.js).
+const ANCIENT_ARENA = { x: 1500, z: 1500 };
+let _ancientPreBattle = null;   // { player.pos, player.yaw, npc.pos, currentInteriorId }
+
+function _enterAncientArena(npc) {
+  // Snapshot pre-battle state so we can restore on loss / fully reset on win.
+  _ancientPreBattle = {
+    px: player.position.x, py: player.position.y, pz: player.position.z,
+    pyaw: player.yaw, ppitch: player.pitch,
+    nx: npc.group.position.x, nz: npc.group.position.z,
+    interior: currentInteriorId,
+  };
+  currentInteriorId = null;     // pull out of any interior — fight is on the arena.
+  // Drop player onto the arena facing the NPC, who waits at the center.
+  player.position.set(ANCIENT_ARENA.x, 0, ANCIENT_ARENA.z + 6);
+  player.velocity.set(0, 0, 0);
+  player.yaw   = Math.PI;       // face -Z (toward arena center)
+  player.pitch = 0;
+  npc.group.position.set(ANCIENT_ARENA.x, npc.group.position.y, ANCIENT_ARENA.z);
+  _ancientHolyOn();
+  try { Audio.holyArrival?.(); } catch (_) {}
+}
+
+// Activate / deactivate the screen-level holy radiance overlay.
+function _ancientHolyOn()  { document.getElementById('holy-radiance')?.classList.add('active'); }
+function _ancientHolyOff() { document.getElementById('holy-radiance')?.classList.remove('active'); }
+
+// Restore arena state after the Ancient fight. Player respawn is opt-in
+// (loss already routes through _triggerDeath, which respawns) so we
+// don't double-teleport.
+function _exitAncientArena({ npc, won, respawnPlayer = true }) {
+  _ancientHolyOff();
+  if (_ancientPreBattle && !won && npc) {
+    // On loss the Ancient One goes back to his alley so the player can
+    // try again. On win the NPC stays kod where he fell.
+    npc.group.position.set(_ancientPreBattle.nx, npc.group.position.y, _ancientPreBattle.nz);
+  }
+  _ancientPreBattle = null;
+  if (respawnPlayer) {
+    player.respawn();
+    currentInteriorId = null;
   }
 }
 
@@ -11520,6 +11929,39 @@ function _closeCombat() {
 // Exported so Prompt 05 mini-game modules can call back into the state machine.
 function handleMinigameResult(npc, won) {
   _closeMinigame();
+
+  // ── Ancient One (secret) — endgame branch ───────────────────────────
+  // Special-case before the regular win/loss flow because the Ancient
+  // fight uses a teleport-arena and triggers the end-credits scene.
+  if (npc?.rarity === 'secret') {
+    if (won) {
+      Audio.gameWin();
+      try { Audio.holyAscension?.(); } catch (_) {}
+      const entry = feetdex.getEntry(npc.feetId);
+      // Show end credits → claim feet → teleport to spawn.
+      ui.showAncientWinCredits?.(() => {
+        if (entry && !feetdex.has(entry.id)) {
+          ui.showDiscovery(entry, npc);
+          _activeNPC = npc;
+          state = 'discovery';
+        } else {
+          state = 'playing';
+          _activeNPC = null;
+          requestLock();
+        }
+        _exitAncientArena({ npc, won: true });
+      });
+      return;
+    } else {
+      Audio.gameLose();
+      // _triggerDeath does the respawn — let it handle that so we don't
+      // double-teleport.
+      _exitAncientArena({ npc, won: false, respawnPlayer: false });
+      _triggerDeath();
+      return;
+    }
+  }
+
   if (won) {
     Audio.gameWin();
 
