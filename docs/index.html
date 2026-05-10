@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T003517';
+  var BAKED = '20260510T003833';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -10800,21 +10800,21 @@ function _checkSecretUnlock() { /* no-op */ }
 
 // ── Morton's Shop ─────────────────────────────────────────────────────────────
 
-// First-visit greeting is always the introduction. Note this line is
-// only used when the player walks back into the shop AFTER the tutorial
-// has finished — the very first meeting runs through _runMortonTutorial.
+// First-visit greeting is only used when the player walks back into the
+// shop AFTER the tutorial has finished — the very first meeting runs
+// through _runMortonTutorial.
 const MORTON_FIRST_LINE =
-  "First time, eh? Name's Morton, and whatever's in your pocket, I've got something for it. Work the streets right and you can stack the whole shelf — but every coin you put toward one tool is a coin you can't put toward another, so pick what helps you most right now.";
+  "First time, huh? Name's Morton — whatever's in your pocket, I got somethin' for it. Work the streets right and you can stack the whole shelf, but every coin you drop on one tool is a coin you can't drop on another. So pick what helps you most right now, kid.";
 
 // Fallback rotating wisdom for return visits when no contextual line fits.
 // Each one carries a money concept under casual shopkeeper voice.
 const MORTON_LINES = [
-  "Coin you spend twice is coin you don't have — that's the whole game in one sentence.",
-  "Cheap thing today, expensive lesson tomorrow — be careful what you skip.",
-  "Money buys you time, and time buys you more money. Pick which way you're going.",
-  "Some folks save up for the big one, some grab three small ones — both can work, just don't do half of each.",
-  "My best customers are the patient ones. Patience earns interest in its own way.",
-  "Every gold you don't spend is gold you still have for the next opportunity.",
+  "Look — coin you spend twice is coin you don't have. Whole game right there.",
+  "Cheap thing today, expensive lesson tomorrow. Watch what you skip on, kid.",
+  "Money buys time. Time buys money. Pick which way you're going.",
+  "Some folks save up for the big one, some grab three small ones. Both can work — just don't do half of each.",
+  "My best customers? The patient ones. Patience earns interest in its own way.",
+  "Every gold you don't spend is gold you still got for the next move.",
   "Tools compound the rest of your run. So do the mistakes — pick wisely.",
 ];
 let _mortonVisits = 0;
@@ -10832,16 +10832,16 @@ function _mortonGreeting() {
 
   // Highest-priority observations — only one fires per visit.
   if (ownedN >= totalN) {
-    return "Cleared the whole shelf. Smart spender — you'll feel the difference out there.";
+    return "Well look at that — cleared the whole shelf. Smart spender, kid. You'll feel the difference out there.";
   }
   if (gold === 0) {
-    return "Window-shopping's fine, but the coins are the whole conversation. Come back when you've earned a few more.";
+    return "Hey, window-shopping's fine, but the coins are the whole conversation here. Come back when you got a few more.";
   }
   if (ownedN === 0 && gold >= 50) {
-    return "You're sitting on coin like a hen on an egg — money in your pocket isn't earning anything for you. Pick a tool and let it start paying you back.";
+    return "Hey now — you're sittin' on coin like a hen on an egg. Money in your pocket isn't earnin' you anything. Pick a tool, let it start paying you back.";
   }
   if (target && target.diff <= 0 && ownedN < totalN) {
-    return `The ${target.name} is in reach right now — and remember, every coin you spend on it is a coin you can't spend on anything else. That's opportunity cost, and it's how grown folks decide.`;
+    return `Look at that — the ${target.name}'s in reach right now. Just remember, every coin you spend on it is a coin you can't spend on anything else. That's opportunity cost, kid. How grown folks decide.`;
   }
   if (target && target.diff > 0 && target.diff <= 20) {
     return `Only ${target.diff} short of the ${target.name}. Patience pays better than impulse here — couple more feet and it's yours.`;
@@ -10865,13 +10865,13 @@ function _nextBoosterTarget() {
 }
 function _mortonOnPurchase(boosterId) {
   const lines = {
-    sprint_feet:    "Smart pick — small price, and your legs'll thank you the rest of the run. That's the kind of buy that pays itself back twice over.",
-    radar:          "Now you'll see who's worth your time, which means less wandering and more earning. Time saved is money earned.",
-    armor:          "Keeps you upright when the big ones swing — and staying upright is how you stay rich. Good investment.",
-    lightsaber:     "Hits like a paid invoice — they'll feel that one. Spend less time fighting, more time collecting.",
-    ancient_tracker:"Big-ticket buy, but you knew that. The patient spenders save up for these and skip the small stuff in between — that's how the math works out.",
+    sprint_feet:    "There you go. Smart pick, kid — your legs'll thank you. That kinda buy pays itself back twice over.",
+    radar:          "Good move. Now you'll see who's worth your time out there. Less wandering, more earning — same thing as money in the pocket.",
+    armor:          "Solid. Keeps you upright when the big ones swing, and upright's how you stay rich. That's the play.",
+    lightsaber:     "Now we're talkin'. That thing hits like a paid invoice — they'll feel it.",
+    ancient_tracker:"Big-ticket buy, but you knew that. Patient spenders save up for these and skip the small stuff along the way. That's how the math works out, kid.",
   };
-  return lines[boosterId] ?? "Smart pick. Every gold spent here is gold doing work for you out there.";
+  return lines[boosterId] ?? "Smart pick. Every gold you spend here's a gold doin' work for you out there.";
 }
 
 function _openShop() {
@@ -10893,15 +10893,15 @@ function _runMortonTutorial() {
   const lines = [
     {
       title: 'MORTON',
-      body: "Name's Morton. Bring me your <b style=\"color:#FFD700\">gold</b> and I'll trade you <b>tools</b> — gear that helps you find feet faster or fight tougher."
+      body: "Hey, you're new — c'mere. Name's Morton, this is my shop. Way it works: bring me the <b style=\"color:#FFD700\">gold</b> those feet earn you out there, I'll trade you <b>tools</b>. Gear to help you find pairs faster, fight tougher, move quicker. Whatever you need."
     },
     {
       title: 'MORTON',
-      body: "Catch is, every coin spent on one tool is a coin you can't spend on another — folks call that <b>opportunity cost</b>, and it's why picking the right tools matters more than buying them all."
+      body: "Now I'll level with you, kid — you can't afford every tool here, not even close. Means every coin you drop on one is a coin that's gone for the next one. Fancy folks call that <b>opportunity cost</b>, and trust me, it's the whole game. Pick the tools that fit how you play, skip the rest. No shame in that."
     },
     {
       title: 'MORTON',
-      body: "Welcome gift: <b style=\"color:#FFD700\">+20g</b> on the house. Try the <b>Sprint Feet</b> first — small price, and they pay you back the rest of the run."
+      body: "Tell you what — first time's on me. <i>*slides <b style=\"color:#FFD700\">20 gold</b> across the counter*</i> Twenty on the house, kid. That's enough for the <b>Sprint Feet</b> right over there. Cheap, saves your legs, pays itself back inside ten minutes. Good place to start."
     },
   ];
   let i = 0;
@@ -10917,7 +10917,7 @@ function _runMortonTutorial() {
       Audio.goldKaching();
       ui.openShop(
         feetdex, BOOSTER_DEFS, _onBuyBooster,
-        "Try the Sprint Feet — they're glowing for a reason.",
+        "Go on, grab the Sprint Feet — they're glowing for a reason.",
         'sprint_feet'
       );
       return;
@@ -11219,7 +11219,7 @@ function _onBuyBooster(id) {
     setTimeout(() => {
       if (state === 'shop') _closeShop();
       ui.showTip('MORTON',
-        "Good luck out there, kid — spend smart and the city's yours."
+        "Alright kid — you're set. Good luck out there. Spend smart and the city's yours."
       );
       _afterTipCallback = () => {
         // Tutorial order (everything below is still PART OF the tutorial —
