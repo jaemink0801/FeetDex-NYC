@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T005720';
+  var BAKED = '20260510T005954';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -10663,7 +10663,8 @@ document.addEventListener('pointerlockchange', () => {
         _afterTipCallback = () => {
           if (!tutorial.active) return;
           ui.openFeetGodDialogue(
-            "Welcome to the <b>Feet World</b>, mortal. Begin at the <b>Empire State Building</b>, right ahead."
+            "Welcome to the <b>Feet World</b>, mortal. Walk up to the <b>Empire State Building</b>'s door, right ahead — " +
+            "press <b>[E]</b> to step inside."
           );
         };
       }, 250);
