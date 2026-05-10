@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T160525';
+  var BAKED = '20260510T160916';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1056,12 +1056,15 @@
   <!-- Win screen -->
   <div id="win-screen">
     <div id="win-title">FeetDex Complete!</div>
-    <div id="win-sub">All 18 feet collected.</div>
+    <div id="win-sub">All 18 feet collected. The city's yours — keep exploring, stack more skins, just enjoy the run.</div>
     <div id="win-list"></div>
-    <button id="win-play-again">Play Again</button>
-    <button id="win-close-btn" style="margin-top:8px;background:none;border:1px solid rgba(255,255,255,.2);
+    <!-- Primary action: keep playing — the player owns the city now,
+         can pick up skins at Fleet Feet, explore, etc. -->
+    <button id="win-close-btn">Keep Exploring</button>
+    <!-- Secondary action: reset and start over from scratch. -->
+    <button id="win-play-again" style="margin-top:8px;background:none;border:1px solid rgba(255,255,255,.2);
       color:rgba(255,255,255,.5);font-family:'Courier New',monospace;font-size:12px;
-      letter-spacing:2px;padding:10px 36px;cursor:pointer;">Close</button>
+      letter-spacing:2px;padding:10px 36px;cursor:pointer;">Start Over</button>
   </div>
 
   <script>try { localStorage.clear(); } catch (e) {}</script>
