@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T011312';
+  var BAKED = '20260510T012013';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1384,6 +1384,57 @@ const Audio = {
     });
   },
 
+  // Continuous low choir-pad hum, started when the player equips the
+  // Ancient One's feet skin and stopped when they unequip / swap. Three
+  // detuned saw-wave layers through a lowpass — soft, sustained, holy.
+  // No-op if already running so multiple calls are safe.
+  startAncientHum() {
+    if (this._ancientHum) return;
+    const c = getCtx();
+    const t = c.currentTime;
+    const out = c.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.linearRampToValueAtTime(0.10, t + 1.6);
+    out.connect(masterGain);
+    const lp = c.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 1100;
+    lp.Q.value = 0.6;
+    lp.connect(out);
+    const oscs = [];
+    // A2 + C#3 + E3 — the same A-major triad as holyArrival, sustained.
+    [110, 138.6, 164.8].forEach((f) => {
+      const o = c.createOscillator(); o.type = 'sawtooth';
+      o.frequency.value = f * (1 + (Math.random() - 0.5) * 0.004);
+      o.connect(lp);
+      o.start(t);
+      oscs.push(o);
+    });
+    // A 6 Hz tremolo on the gain so the pad gently breathes.
+    const trem = c.createOscillator(); trem.type = 'sine';
+    trem.frequency.value = 0.4;
+    const tremG = c.createGain(); tremG.gain.value = 0.025;
+    trem.connect(tremG); tremG.connect(out.gain);
+    trem.start(t);
+    this._ancientHum = { oscs, trem, out, lp };
+  },
+  stopAncientHum() {
+    const h = this._ancientHum;
+    if (!h) return;
+    this._ancientHum = null;
+    const c = getCtx();
+    const t = c.currentTime;
+    h.out.gain.cancelScheduledValues(t);
+    h.out.gain.setValueAtTime(h.out.gain.value, t);
+    h.out.gain.linearRampToValueAtTime(0.0001, t + 0.5);
+    setTimeout(() => {
+      try {
+        for (const o of h.oscs) o.stop();
+        h.trem.stop();
+      } catch (_) {}
+    }, 600);
+  },
+
   // Played at the moment of victory over the Ancient One. Bigger version
   // of legendaryFanfare — full choir-bell ascent with triumphant root.
   holyAscension() {
@@ -2466,6 +2517,7 @@ class Player {
     this._updateCamera();
     this._animateLegs(dt);
     this._animateLightsaber(dt);
+    this._animateAncient(dt);
   }
 
   // Swing the leg pivots based on horizontal velocity. Faster gait when
@@ -2565,13 +2617,18 @@ class Player {
 
   // Apply a full character-themed skin to BOTH feet — base color plus a
   // bundle of "extras" (claws, pom-poms, fluff, heels, etc.) defined in
-  // SHOE_STYLES. Pass null to clear back to barefoot.
+  // SHOE_STYLES. Pass null to clear back to barefoot. The Ancient One's
+  // skin (secret_rexey) gets a special radiant aura layered on top:
+  // glowing gold halos around each foot + orbiting sparks + a continuous
+  // holy hum (started in main.js when this returns).
   setShoeStyle(feetId) {
     // Always clear any previously-applied accessories first.
     if (this._shoeAccessories) {
       for (const m of this._shoeAccessories) m.parent?.remove(m);
       this._shoeAccessories.length = 0;
     }
+    // Clear ancient aura too — re-spawned below if the new skin is secret.
+    this._clearAncientAura();
     if (!feetId) {
       this.setShoeColor(null);  // bare again
       return;
@@ -2582,15 +2639,86 @@ class Player {
       return;
     }
     if (style.color != null) this.setShoeColor(style.color);
-    if (!style.extras || !this._feet) return;
-    // Mirror x for the left foot so accessories sit symmetrically.
-    for (const foot of this._feet) {
-      const sx = foot.userData.side ?? 1;
-      for (const ex of style.extras) {
-        const mesh = _makeExtraMesh(ex, sx);
-        foot.add(mesh);
-        this._shoeAccessories.push(mesh);
+    if (style.extras && this._feet) {
+      // Mirror x for the left foot so accessories sit symmetrically.
+      for (const foot of this._feet) {
+        const sx = foot.userData.side ?? 1;
+        for (const ex of style.extras) {
+          const mesh = _makeExtraMesh(ex, sx);
+          foot.add(mesh);
+          this._shoeAccessories.push(mesh);
+        }
       }
+    }
+    // Ancient One — the only secret skin. Build the radiant aura.
+    if (feetId === 'secret_rexey') this._buildAncientAura();
+  }
+
+  // Build per-foot golden aura: a translucent halo sphere + 6 orbiting
+  // bright sparks per foot. The orbit animation runs from update() via
+  // _animateAncient(dt) so the sparks slowly circle as the player walks.
+  _buildAncientAura() {
+    if (!this._feet || this._feet.length === 0) return;
+    this._ancientOrbits = [];   // collected sparks for animation
+    for (const foot of this._feet) {
+      // Halo sphere — translucent gold around the foot
+      const halo = new THREE.Mesh(
+        new THREE.SphereGeometry(0.18, 16, 12),
+        new THREE.MeshBasicMaterial({
+          color: 0xffe680, transparent: true, opacity: 0.32,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        }),
+      );
+      halo.position.set(0, -0.02, 0.03);
+      foot.add(halo);
+      this._shoeAccessories.push(halo);
+      // Inner brighter glow
+      const core = new THREE.Mesh(
+        new THREE.SphereGeometry(0.10, 12, 10),
+        new THREE.MeshBasicMaterial({
+          color: 0xffffe0, transparent: true, opacity: 0.45,
+          depthWrite: false, blending: THREE.AdditiveBlending,
+        }),
+      );
+      core.position.set(0, -0.02, 0.03);
+      foot.add(core);
+      this._shoeAccessories.push(core);
+      // 6 orbiting sparks around the foot
+      for (let i = 0; i < 6; i++) {
+        const spark = new THREE.Mesh(
+          new THREE.SphereGeometry(0.025, 6, 5),
+          new THREE.MeshBasicMaterial({
+            color: 0xfff8c8, transparent: true, opacity: 0.95,
+            depthWrite: false, blending: THREE.AdditiveBlending,
+          }),
+        );
+        const phase = (i / 6) * Math.PI * 2;
+        spark.userData.orbit = { phase, radius: 0.16, foot };
+        foot.add(spark);
+        this._shoeAccessories.push(spark);
+        this._ancientOrbits.push(spark);
+      }
+    }
+    this._ancientAuraTime = 0;
+  }
+
+  _clearAncientAura() {
+    this._ancientOrbits = null;
+    this._ancientAuraTime = 0;
+  }
+
+  _animateAncient(dt) {
+    if (!this._ancientOrbits || this._ancientOrbits.length === 0) return;
+    this._ancientAuraTime = (this._ancientAuraTime || 0) + dt;
+    const t = this._ancientAuraTime;
+    for (const spark of this._ancientOrbits) {
+      const o = spark.userData.orbit;
+      const ang = o.phase + t * 1.6;          // orbit speed
+      spark.position.set(
+        Math.cos(ang) * o.radius,
+        -0.02 + Math.sin(t * 2 + o.phase) * 0.04,    // gentle vertical wobble
+        0.03 + Math.sin(ang) * o.radius,
+      );
     }
   }
 
@@ -11538,7 +11666,9 @@ function _vanceGreeting() {
 }
 
 // Post-purchase Vance line — picks the most teachable angle for THIS buy.
-function _vanceOnBuy(price) {
+// `entry` is the FEET_CATALOG entry of the foot just bought, used for
+// rarity-specific branches (the Ancient One trophy gets its own line).
+function _vanceOnBuy(price, entry) {
   const cheap = _cheapestUnownedBooster();
   const skins = feetdex.cosmetics.size;          // already incremented
   const skinsTotal = feetdex.totalSpentSkins;
@@ -11550,18 +11680,38 @@ function _vanceOnBuy(price) {
   const tierVal = { common: 1, rare: 2, epic: 3, mythic: 4, legendary: 5, secret: 6 };
   const trophyT = trophy ? tierVal[trophy.rarity] : 0;
 
+  // Highest-priority branch — the Ancient One's feet are the only secret-
+  // rarity skin in the game and deserve their own line. No opportunity-
+  // cost lecture; just awe.
+  if (entry?.rarity === 'secret') {
+    return `My guy. THAT'S the relic — the Ancient One's feet, walking the city in your honor. Most players never even find the alley, let alone wear the man's soles. You earned every step. Walk loud.`;
+  }
+
   if (skins === 1) {
     return `Clean — that's your first fit. Lesson behind it: essentials before luxuries, every time. You did the order right.`;
   }
   // If they bought a low-tier skin while a higher-rarity pair waits in
   // their dex, coach them to save up for the trophy and route the in-
-  // between gold to Morton's. This is the SAVE-UP advice in action.
+  // between gold to Morton's.
   if (trophy && trophyT >= 3 && price <= 20) {
     const tp = COSMETIC_PRICES[trophy.rarity];
     return `Sharp grab. One thing though — the ${trophy.name} is sitting in your dex, and that's the pair worth saving toward (${tp}g). Stack a few small ones in a row and you'll have spent that money without ever scratching the real itch. Save up for the one you really want, and any gold in between can do work for you at Morton's.`;
   }
-  if (cheap && price >= cheap.price) {
-    return `Sharp pick. Just so you know — that same ${price}g would've grabbed you the ${cheap.name} over at Morton's. That's the trade you made, and that's exactly what opportunity cost looks like.`;
+  // Exact-match: skin price equals the cheapest unowned tool's price,
+  // so the "same money would've bought the tool" framing is literal.
+  if (cheap && price === cheap.price) {
+    return `Sharp pick. Same ${price}g would've grabbed you the ${cheap.name} at Morton's — opportunity cost in action.`;
+  }
+  // Surplus: skin cost MORE than the cheapest tool. Frame as "could've
+  // covered the tool plus change toward the next."
+  if (cheap && price > cheap.price) {
+    const left = price - cheap.price;
+    return `Sharp pick. For that ${price}g you could've covered the ${cheap.name} (${cheap.price}g) and still had ${left}g left toward the next tool. Opportunity cost gets steeper with bigger spends.`;
+  }
+  // Skin cheaper than the cheapest unowned tool — comparison wouldn't
+  // add up, so generic encouragement here.
+  if (cheap && price < cheap.price) {
+    return `Solid ${price}g pick. Cheaper than any tool in here — trade-off's mild — just don't make a habit of stacking these between bigger plays.`;
   }
   if (!cheap) {
     return `${price}g of pure flex with every tool already stacked — that's textbook surplus spending. No guilt about it.`;
@@ -11641,6 +11791,13 @@ function _applyEquippedCosmetic() {
   } else {
     player.setShoeColor(id ? (COSMETIC_SHOE_COLORS[id] ?? null) : null);
   }
+  // The Ancient One's skin gets a continuous holy hum — start it on
+  // equip, stop it on swap/unequip. Wrapped in try/catch so the audio
+  // plumbing never breaks gameplay if the audio context can't resume.
+  try {
+    if (id === 'secret_rexey') Audio.startAncientHum?.();
+    else                       Audio.stopAncientHum?.();
+  } catch (_) {}
 }
 
 function _onBuyCosmetic(footId) {
@@ -11652,7 +11809,7 @@ function _onBuyCosmetic(footId) {
   feetdex.equipCosmetic(footId);
   _applyEquippedCosmetic();
   ui.updateGold(feetdex.gold, _nextBoosterTarget());
-  ui.setFleetLine(_vanceOnBuy(price));
+  ui.setFleetLine(_vanceOnBuy(price, entry));
   Audio.uiClick();
   ui.refreshFleetFeetShop?.();
 }
