@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T153959';
+  var BAKED = '20260510T155547';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1430,38 +1430,85 @@ const Audio = {
   },
 
   // Lightsaber ignition — the iconic SHWFFFF "vwoom-up" of the blade
-  // extending. A pitched-up whoosh swelling in over ~0.55s, paired with
-  // a low harmonic so it has body. Used during the 3-2-1 countdown.
+  // extending. Layered to push the buzzy electric character closer to
+  // the films:
+  //   1. Pitched sawtooth whoosh swelling 180→1200 Hz
+  //   2. Pitched square at 60 Hz with fast tremolo for the hum/buzz
+  //   3. Sub-bass sine for chest body
+  //   4. Hot ringing partials at 880 / 1320 / 1760 Hz with vibrato so
+  //      the steady "drone" reads as energized plasma instead of synth
+  //   5. Bright tip spark
   lightsaberIgnite() {
     const c = getCtx();
     const t = c.currentTime;
     const dur = 0.55;
-    // Pitched whoosh — sawtooth swelling 200→1100 Hz through bandpass.
+
+    // 1. Whoosh
     const o = c.createOscillator(); o.type = 'sawtooth';
-    o.frequency.setValueAtTime(200, t);
-    o.frequency.exponentialRampToValueAtTime(1100, t + dur);
+    o.frequency.setValueAtTime(180, t);
+    o.frequency.exponentialRampToValueAtTime(1200, t + dur);
     const bp = c.createBiquadFilter(); bp.type = 'bandpass';
-    bp.frequency.setValueAtTime(700, t);
-    bp.frequency.exponentialRampToValueAtTime(2200, t + dur);
-    bp.Q.value = 4;
+    bp.frequency.setValueAtTime(650, t);
+    bp.frequency.exponentialRampToValueAtTime(2400, t + dur);
+    bp.Q.value = 4.5;
     const g = c.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.linearRampToValueAtTime(0.30, t + 0.10);
-    g.gain.linearRampToValueAtTime(0.18, t + dur);
+    g.gain.linearRampToValueAtTime(0.32, t + 0.10);
+    g.gain.linearRampToValueAtTime(0.20, t + dur);
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.20);
     o.connect(bp); bp.connect(g); g.connect(masterGain);
     o.start(t); o.stop(t + dur + 0.22);
-    // Low body — sub-bass sine swelling
+
+    // 2. Buzzy hum — square wave with ±18 Hz tremolo at 30 Hz so it
+    // throbs the way the saber drones in the films.
+    const buzz = c.createOscillator(); buzz.type = 'square';
+    buzz.frequency.value = 60;
+    const bzTrem = c.createOscillator(); bzTrem.type = 'sine';
+    bzTrem.frequency.value = 30;
+    const bzTremG = c.createGain(); bzTremG.gain.value = 18;
+    bzTrem.connect(bzTremG); bzTremG.connect(buzz.frequency);
+    const bzLP = c.createBiquadFilter(); bzLP.type = 'lowpass';
+    bzLP.frequency.value = 600; bzLP.Q.value = 0.8;
+    const bzG = c.createGain();
+    bzG.gain.setValueAtTime(0.0001, t);
+    bzG.gain.linearRampToValueAtTime(0.20, t + 0.18);
+    bzG.gain.linearRampToValueAtTime(0.18, t + dur + 0.40);
+    bzG.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.60);
+    buzz.connect(bzLP); bzLP.connect(bzG); bzG.connect(masterGain);
+    buzz.start(t); buzz.stop(t + dur + 0.62);
+    bzTrem.start(t); bzTrem.stop(t + dur + 0.62);
+
+    // 3. Sub-bass chest body
     const sub = c.createOscillator(); sub.type = 'sine';
     sub.frequency.setValueAtTime(70, t);
     sub.frequency.linearRampToValueAtTime(110, t + dur);
     const sg = c.createGain();
     sg.gain.setValueAtTime(0.0001, t);
-    sg.gain.linearRampToValueAtTime(0.28, t + 0.20);
+    sg.gain.linearRampToValueAtTime(0.30, t + 0.20);
     sg.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.20);
     sub.connect(sg); sg.connect(masterGain);
     sub.start(t); sub.stop(t + dur + 0.22);
-    // Bright spark on tip emergence
+
+    // 4. Plasma partials — three high sines with 8 Hz vibrato. This is
+    // the "ee" zinger that makes a saber sound like a saber rather
+    // than a generic synth swell.
+    const partVib = c.createOscillator(); partVib.type = 'sine';
+    partVib.frequency.value = 8;
+    [880, 1320, 1760].forEach((f, i) => {
+      const p = c.createOscillator(); p.type = 'sine';
+      p.frequency.value = f;
+      const vG = c.createGain(); vG.gain.value = f * 0.018;
+      partVib.connect(vG); vG.connect(p.frequency);
+      const pg = c.createGain();
+      pg.gain.setValueAtTime(0.0001, t);
+      pg.gain.linearRampToValueAtTime(0.07 - i * 0.018, t + 0.22);
+      pg.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.30);
+      p.connect(pg); pg.connect(masterGain);
+      p.start(t + 0.05 * i); p.stop(t + dur + 0.32);
+    });
+    partVib.start(t); partVib.stop(t + dur + 0.32);
+
+    // 5. Bright tip spark on emergence
     tone(2400, 0.10, 'triangle', 0.16, 0.05);
   },
 
@@ -1809,7 +1856,7 @@ const BOOSTER_DEFS = [
   { id:'metrocard',      name:'MetroCard',      price:100,
     desc:'Walk to a subway station and press [E] to ride.' },
   { id:'lightsaber',     name:'Lightsaber',     price:100,
-    desc:'2× damage and 1.5× attack speed. 4× damage and 3× attack speed against mythics and legendaries.' },
+    desc:'Cuts hard against bosses: 4× damage and 3× attack speed vs. mythics and legendaries.' },
   { id:'ancient_tracker',name:'Ancient Tracker',price:500,
     desc:'A guiding star points to The Ancient One.' },
 ];
@@ -4594,7 +4641,14 @@ class CombatEncounter {
     this._isAncient      = npc.rarity === 'secret';
     this._playerHP   = hasArmor ? PLAYER_MAX * 2 : PLAYER_MAX;
     this._playerMax  = this._playerHP;
-    this._npcHP      = _NPC_HP[npc.rarity] ?? PLAYER_MAX;
+    // For legendaries, scale HP up by the NPC's body scale so a bigger
+    // body actually feels tankier (Bigfoot at 1.27× was feeling weaker
+    // than 1.0× Margot before because he's just a larger target with
+    // identical stats). Other rarities use the flat tier number.
+    const bodyMult   = (npc.rarity === 'legendary' && npc.group?.scale?.x)
+                       ? npc.group.scale.x : 1;
+    this._sizeMult   = bodyMult;
+    this._npcHP      = Math.round((_NPC_HP[npc.rarity] ?? PLAYER_MAX) * bodyMult);
     this._npcMaxHP   = this._npcHP;
 
     // Per-rarity attack-speed multiplier. Legendaries got a 1.25× bump
@@ -4676,8 +4730,31 @@ class CombatEncounter {
     if (dist > NPC_HIT_RANGE * 0.85) {
       const nx = dx / (dist || 1);
       const nz = dz / (dist || 1);
-      npc.group.position.x += nx * this._chaseSpeed * dt;
-      npc.group.position.z += nz * this._chaseSpeed * dt;
+      const step = this._chaseSpeed * dt;
+      const targetX = npc.group.position.x + nx * step;
+      const targetZ = npc.group.position.z + nz * step;
+      // Honor solid obstacles. If a direct step would clip into a wall
+      // or building, try sliding along just X then just Z (a poor man's
+      // pathing — covers the common case of being on the wrong side of
+      // a building). If both axes are blocked, the NPC stalls for that
+      // frame, which lets the player escape.
+      const NPC_R = 0.55 * (npc.group?.scale?.x || 1);
+      const free = (x, z) => {
+        for (const entry of (window.SOLID_COLLIDERS || [])) {
+          const b = entry.box;
+          if (x + NPC_R > b.min.x && x - NPC_R < b.max.x &&
+              z + NPC_R > b.min.z && z - NPC_R < b.max.z) return false;
+        }
+        return true;
+      };
+      if (free(targetX, targetZ)) {
+        npc.group.position.x = targetX;
+        npc.group.position.z = targetZ;
+      } else if (free(targetX, npc.group.position.z)) {
+        npc.group.position.x = targetX;     // slide along X only
+      } else if (free(npc.group.position.x, targetZ)) {
+        npc.group.position.z = targetZ;     // slide along Z only
+      }
     }
     // Always face the player
     npc.group.rotation.y = Math.atan2(dx, dz);
@@ -4734,7 +4811,7 @@ class CombatEncounter {
           this._swingStart = 0;
 
           if (dist <= NPC_HIT_RANGE * 1.15) {     // slightly longer kick reach
-            let dmg = _NPC_DMG[npc.rarity] ?? 25;
+            let dmg = (_NPC_DMG[npc.rarity] ?? 25) * (this._sizeMult || 1);
             if (this._hasArmor) dmg = Math.round(dmg * 0.70);
             this._playerHP = Math.max(0, this._playerHP - dmg);
             // Holy-gold tint + giant foot flash on the player's screen.
@@ -4765,8 +4842,10 @@ class CombatEncounter {
           this._swingStart = 0;
 
           if (dist <= NPC_HIT_RANGE) {
-            // Armor reduces incoming damage by 30%
-            let dmg = _NPC_DMG[npc.rarity] ?? 25;
+            // Armor reduces incoming damage by 30%; legendary damage
+            // also scales with body size (Bigfoot hits harder than
+            // Margot because he's actually bigger).
+            let dmg = (_NPC_DMG[npc.rarity] ?? 25) * (this._sizeMult || 1);
             if (this._hasArmor) dmg = Math.round(dmg * 0.70);
             this._playerHP = Math.max(0, this._playerHP - dmg);
             this._flashScreen('rgba(220,0,0,0.32)');
@@ -4799,10 +4878,10 @@ class CombatEncounter {
   playerAttack() {
     if (!this._active || this._koTime > 0) return;
     const now = Date.now();
-    // Lightsaber attack-speed multiplier: 1.5× normal, 3× vs elites
-    // (was 2× / 4× — 25% reduction across the board to keep the
-    // weapon strong but not trivializing endgame fights).
-    const lsSpeedMult = this._hasLightsaber ? (this._isElite ? 3 : 1.5) : 1;
+    // Lightsaber attack-speed multiplier: bonus ONLY against mythic /
+    // legendary / secret bosses. Against anyone else (commons, rares,
+    // epics) the saber swings at base speed — same as bare fists.
+    const lsSpeedMult = (this._hasLightsaber && this._isElite) ? 3 : 1;
     const cooldown = HIT_CD / lsSpeedMult;
     if (now - this._lastHit < cooldown) return;
     this._lastHit = now;
@@ -4821,11 +4900,13 @@ class CombatEncounter {
     const dot = (dx * lookX + dz * lookZ) / (dist || 1);
     if (dot < 0.35) return;  // ~70° cone in front of player
 
-    // Lightsaber booster doubles damage and knockback; doubles AGAIN
-    // against mythics/legendaries (4× damage when slicing elites).
-    const lsDmgMult = this._hasLightsaber ? (this._isElite ? 4 : 2) : 1;
+    // Lightsaber damage: same as bare fists against everyone EXCEPT
+    // mythics, legendaries, and the Ancient One — where the saber's
+    // edge cuts through tougher hides for a 4× multiplier. Knockback
+    // also only boosted against elites.
+    const lsDmgMult = (this._hasLightsaber && this._isElite) ? 4 : 1;
     const dmg    = PLAYER_DMG * lsDmgMult;
-    const recoil = this._hasLightsaber ? (this._isElite ? 2.4 : 1.5) : 0.55;
+    const recoil = (this._hasLightsaber && this._isElite) ? 2.4 : 0.55;
     this._npcHP = Math.max(0, this._npcHP - dmg);
     this._flashScreen('rgba(255,255,80,0.18)');
     this._renderNpcBar();
@@ -8421,6 +8502,241 @@ function buildTimesSquare(scene, solidObjects) {
       ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
       ctx.fillText('AMERICAN EAGLE', W / 2, H - 8);
     },
+    'SPOTIFY': (ctx, W, H) => {
+      // Green circle with three rising sound-wave arcs (Spotify mark).
+      const cx = H * 0.55, cy = H / 2, r = H * 0.40;
+      ctx.fillStyle = '#1DB954';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#000000'; ctx.lineWidth = 14; ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        const ar = r * (0.45 + i * 0.18);
+        const yy = cy - 10 + i * 16;
+        ctx.beginPath();
+        ctx.arc(cx - ar * 0.15, yy, ar, Math.PI * 1.18, Math.PI * 1.82);
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 ${Math.round(H * 0.50)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('Spotify', cx + r + 30, cy);
+    },
+    'STARBUCKS': (ctx, W, H) => {
+      // Green disc + white star + ring (the Starbucks siren circle, simplified).
+      const cx = H * 0.50 + 14, cy = H / 2, r = H * 0.42;
+      ctx.fillStyle = '#00704A';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.84, 0, Math.PI * 2); ctx.stroke();
+      // 5-point star center
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rr = (i % 2 === 0) ? r * 0.50 : r * 0.20;
+        const a  = (i / 10) * Math.PI * 2 - Math.PI / 2;
+        const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.font = `bold ${Math.round(H * 0.40)}px Arial, sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('STARBUCKS', cx + r + 22, cy);
+    },
+    'MCDONALDS': (ctx, W, H) => {
+      // Golden arches.
+      ctx.save();
+      ctx.strokeStyle = '#FFC72C'; ctx.lineWidth = 28; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(W * 0.30, H * 0.85);
+      ctx.bezierCurveTo(W * 0.30, H * 0.10, W * 0.42, H * 0.10, W * 0.42, H * 0.85);
+      ctx.moveTo(W * 0.42, H * 0.85);
+      ctx.bezierCurveTo(W * 0.42, H * 0.10, W * 0.54, H * 0.10, W * 0.54, H * 0.85);
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 ${Math.round(H * 0.36)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText("McDonald's", W * 0.60, H / 2);
+    },
+    'HARD ROCK CAFE': (ctx, W, H) => {
+      // Simple black-and-yellow circular crest with bold ROCK type.
+      const cx = H * 0.55 + 6, cy = H / 2, r = H * 0.42;
+      ctx.fillStyle = '#FFD700';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#000000'; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#000000';
+      ctx.font = `900 ${Math.round(H * 0.34)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('HRC', cx, cy);
+      ctx.fillStyle = '#FFD700';
+      ctx.font = `bold ${Math.round(H * 0.34)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('HARD ROCK', cx + r + 18, cy - H * 0.16);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.round(H * 0.26)}px 'Arial Black', sans-serif`;
+      ctx.fillText('CAFE', cx + r + 18, cy + H * 0.16);
+    },
+    'ESPN ZONE': (ctx, W, H) => {
+      // Bold red ESPN block + white "ZONE".
+      ctx.fillStyle = '#CC0000';
+      ctx.fillRect(W * 0.18, H * 0.18, W * 0.40, H * 0.64);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 italic ${Math.round(H * 0.55)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('ESPN', W * 0.38, H / 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.round(H * 0.42)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillText('ZONE', W * 0.62, H / 2);
+    },
+    "M&M'S": (ctx, W, H) => {
+      // Three colored M&M's lentils.
+      const colors = ['#DA1010', '#FFE600', '#5B9CFF'];
+      const baseX = W * 0.18, sp = H * 0.36;
+      for (let i = 0; i < 3; i++) {
+        const cx = baseX + i * sp * 1.1, cy = H / 2 + (i === 1 ? -8 : 4), r = H * 0.34;
+        ctx.fillStyle = colors[i];
+        ctx.beginPath(); ctx.ellipse(cx, cy, r, r * 0.78, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = `900 ${Math.round(H * 0.36)}px 'Arial Black', sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('m', cx, cy + 2);
+      }
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 ${Math.round(H * 0.42)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillText("M&M'S", W * 0.62, H / 2);
+    },
+    'BROADWAY': (ctx, W, H) => {
+      // Theater-style with stars + serif lettering.
+      ctx.fillStyle = '#FFD700';
+      ctx.font = `bold ${Math.round(H * 0.45)}px Arial`;
+      const stars = '★ ★ ★';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillText(stars, W / 2, 14);
+      ctx.font = `900 ${Math.round(H * 0.50)}px 'Times New Roman', Georgia, serif`;
+      ctx.textBaseline = 'middle';
+      ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 8;
+      ctx.strokeText('BROADWAY', W / 2, H * 0.62);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText('BROADWAY', W / 2, H * 0.62);
+    },
+    'MOULIN ROUGE': (ctx, W, H) => {
+      // Pink heart + windmill silhouette.
+      ctx.save();
+      // Heart at left
+      const hx = H * 0.55, hy = H / 2, hr = H * 0.32;
+      ctx.fillStyle = '#FF3399';
+      ctx.beginPath();
+      ctx.moveTo(hx, hy + hr * 0.7);
+      ctx.bezierCurveTo(hx - hr, hy + hr * 0.2, hx - hr, hy - hr * 0.6, hx, hy - hr * 0.1);
+      ctx.bezierCurveTo(hx + hr, hy - hr * 0.6, hx + hr, hy + hr * 0.2, hx, hy + hr * 0.7);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+      // Title
+      ctx.fillStyle = '#FFCCEE';
+      ctx.font = `900 ${Math.round(H * 0.42)}px Georgia, serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('MOULIN ROUGE', W * 0.32, H / 2);
+    },
+    'HAMILTON': (ctx, W, H) => {
+      // Iconic silhouette star + slim title.
+      ctx.fillStyle = '#FFCC00';
+      const sx = H * 0.55, sy = H / 2, sr = H * 0.40;
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const rr = (i % 2 === 0) ? sr : sr * 0.40;
+        const a  = (i / 10) * Math.PI * 2 - Math.PI / 2;
+        const x = sx + Math.cos(a) * rr, y = sy + Math.sin(a) * rr;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#FFCC00';
+      ctx.font = `900 italic ${Math.round(H * 0.50)}px Georgia, serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('HAMILTON', W * 0.36, H / 2);
+    },
+    'PHANTOM': (ctx, W, H) => {
+      // Half-mask silhouette.
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      const cx = H * 0.55, cy = H / 2, rx = H * 0.40, ry = H * 0.50;
+      ctx.ellipse(cx, cy, rx, ry, 0, Math.PI * 0.55, Math.PI * 1.7);
+      ctx.lineTo(cx, cy + ry);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.ellipse(cx - 8, cy - 10, 18, 12, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFDD00';
+      ctx.font = `bold ${Math.round(H * 0.46)}px Georgia, serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('PHANTOM', W * 0.36, H / 2);
+    },
+    'MARRIOTT': (ctx, W, H) => {
+      // Bold M monogram.
+      ctx.fillStyle = '#A6192E';
+      ctx.fillRect(W * 0.20, H * 0.18, H * 0.64, H * 0.64);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 ${Math.round(H * 0.62)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('M', W * 0.20 + H * 0.32, H / 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.round(H * 0.42)}px Arial`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('MARRIOTT', W * 0.45, H / 2);
+    },
+    'WHOLE FOODS': (ctx, W, H) => {
+      // Apple silhouette + script.
+      ctx.fillStyle = '#48A23F';
+      const ax = H * 0.55, ay = H / 2, ar = H * 0.36;
+      ctx.beginPath(); ctx.arc(ax, ay, ar, 0, Math.PI * 2); ctx.fill();
+      // Stem + leaf
+      ctx.fillStyle = '#704020';
+      ctx.fillRect(ax - 4, ay - ar - 12, 8, 16);
+      ctx.fillStyle = '#7AC15A';
+      ctx.beginPath();
+      ctx.ellipse(ax + 18, ay - ar - 4, 16, 8, -0.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `bold ${Math.round(H * 0.40)}px Georgia, serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('WHOLE FOODS', ax + ar + 22, ay);
+    },
+    'BREAKING NEWS': (ctx, W, H) => {
+      // Red TV-news lower-third.
+      ctx.fillStyle = '#001199';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#CC0000';
+      ctx.fillRect(0, H * 0.20, W, H * 0.55);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 italic ${Math.round(H * 0.34)}px 'Arial Black', sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('BREAKING NEWS', W / 2, H * 0.475);
+      ctx.fillStyle = '#FFE680';
+      ctx.font = `bold ${Math.round(H * 0.16)}px Arial`;
+      ctx.fillText('NYC LIVE  ▮  24/7', W / 2, H * 0.88);
+    },
+    'TKTS': (ctx, W, H) => {
+      // Iconic red staircase TKTS sign — tall block letters on red.
+      ctx.fillStyle = '#CC0000';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `900 ${Math.round(H * 0.78)}px 'Arial Black', Impact, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('TKTS', W / 2, H * 0.50);
+    },
+    'DISNEY+': (ctx, W, H) => {
+      // Disney script + plus sign.
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = `italic bold ${Math.round(H * 0.55)}px Georgia, serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('Disney', W * 0.18, H / 2);
+      // Plus sign
+      ctx.fillStyle = '#88AAFF';
+      ctx.font = `900 ${Math.round(H * 0.55)}px 'Arial Black', sans-serif`;
+      ctx.fillText('+', W * 0.74, H / 2);
+    },
     'DISNEY': (ctx, W, H) => {
       const base = H * 0.72;
       ctx.fillStyle = '#FFD700';
@@ -8649,118 +8965,83 @@ function buildTimesSquare(scene, solidObjects) {
     scene.add(torus);
   }
 
-  // ── TKTS red steps — solid ────────────────────────────────────────────────────
-  for (let step = 0; step <= 5; step++) {
-    const sw = 12 - step * 0.5;
-    const sh = 0.35;
-    const sd = 0.9;
-    const sy = step * sh + sh / 2;
-    const sz = 12 - step * 0.7;
-    bx(0xCC2200, 0, sy, sz, sw, sh, sd);
-    registerSolid(solidObjects, ox, oz + sz, sw / 2 + 0.05, sd / 2 + 0.05);
-  }
-  // TKTS back wall
-  bx(0xAA1100, 0, 1.2, 8.5, 12, 2.4, 0.4);
-  registerSolid(solidObjects, ox, oz + 8.5, 6.2, 0.4);
-  // TKTS booth top canopy + sign
-  emissive(0xCC2200, 0xFF2200, 0, 2.6, 12, 12, 0.2, 0.9);
-  label('TKTS', 0, 3.5, 11.4, 4, 1.2);
+  // TKTS booth removed entirely — its red staircase + back wall ran across
+  // the south approach into the plaza and blocked players walking up from
+  // that side. The TKTS brand still appears on the corner-tower sign packs
+  // above so the iconic name stays.
 
-  // ── DENSE SIGN PACK on tower inner faces ──────────────────────────────────
-  // Every sign here is mounted flush on a real tower wall (no floating
-  // panels), faces TOWARD the plaza center (no outward signs that the
-  // tower would occlude from inside the square), and varies in size to
-  // feel like real Times Square (mega billboards, wide horizontals,
-  // squares, tickers stacked vertically). All four corner towers get
-  // packs on BOTH inner faces; OTS gets extras on its east + west.
+  // ── SIGN PACKS on tower inner faces ───────────────────────────────────────
+  // Each pack: 4 stacked signs PLUS the existing cornerBillboard mega.
+  // All signs sit in non-overlapping y bands so nothing visually conflicts.
+  // Brands chosen to favor graphic-rendered ones (BRAND_GRAPHICS map) over
+  // plain text — every sign in here either draws a logo or has a styled
+  // bg/text combo, so no sign is "just words on a colored block".
   //
-  // Tower dims recap (from the towers loop above):
-  //   NW(-14,-14, 8w×58h×8d)    NE(14,-14, 8w×62h×8d)
-  //   SW(-14, 14, 8w×50h×8d)    SE(14, 14, 8w×54h×8d)
-  // Each face is 8u wide × tower_h tall. Inner faces:
-  //   NW: south(local z=-10, +z dir)  +  east(local x=-10, +x dir)
-  //   NE: south(local z=-10, +z dir)  +  west(local x= 10, -x dir)
-  //   SW: north(local z= 10, -z dir)  +  east(local x=-10, +x dir)
-  //   SE: north(local z= 10, -z dir)  +  west(local x= 10, -x dir)
-  // Sign offset 0.05u outside its mounting face. rotY: 0=+z, π=-z,
-  // π/2=+x, -π/2=-x.
+  // Tower dims:  NW(-14,-14, 8w×58h)   NE(14,-14, 8w×62h)
+  //              SW(-14, 14, 8w×50h)   SE(14, 14, 8w×54h)
+  // Sign offset 0.05u outside its mounting face. rotY:
+  //   0 = +z (south face inner), π = -z (north face inner)
+  //   π/2 = +x (east face inner), -π/2 = -x (west face inner)
+  // y bands per face: ~33 (3h),  ~24 (4h),  ~14 (3h),  ~5 (3h)
 
-  // NW tower SOUTH face (cornerBillboard "AMERICAN EAGLE" already at y=44)
-  flatSign('NASDAQ',          -14, 30, -9.95, 6.5, 2.5, 0);
-  flatSign('BREAKING NEWS',   -15, 22, -9.95, 4.5, 4.5, 0);
-  flatSign('COCA-COLA',       -11.5, 22, -9.95, 3, 4.5, 0);
-  flatSign('SPOTIFY',         -14, 14, -9.95, 6, 3, 0);
-  flatSign('PEPSI',           -14, 8, -9.95, 6, 3, 0);
-  flatSign('STARBUCKS',       -14, 3, -9.95, 7, 2.2, 0);
-  // NW tower EAST face (rotY=π/2 → face direction +x)
-  flatSign('SAMSUNG',         -9.95, 44, -14, 7, 14, Math.PI / 2);
-  flatSign('DISNEY',          -9.95, 30, -14, 6, 3, Math.PI / 2);
-  flatSign('MTV',             -9.95, 22, -12.5, 4, 4, Math.PI / 2);
-  flatSign('STREAM NOW',      -9.95, 22, -16, 3, 4, Math.PI / 2);
-  flatSign('AMERICAN EAGLE',  -9.95, 14, -14, 6, 3, Math.PI / 2);
-  flatSign('HARD ROCK CAFE',  -9.95, 8, -14, 6.5, 2.2, Math.PI / 2);
-  flatSign('ESPN ZONE',       -9.95, 3, -14, 7, 2.2, Math.PI / 2);
+  // NW tower SOUTH face — mega AMERICAN EAGLE at y=44
+  flatSign('NASDAQ',         -14, 33, -9.95, 7, 3, 0);
+  flatSign('BREAKING NEWS',  -14, 24, -9.95, 7, 4, 0);
+  flatSign('COCA-COLA',      -14, 14, -9.95, 7, 3, 0);
+  flatSign('STARBUCKS',      -14,  5, -9.95, 7, 3, 0);
+  // NW tower EAST face — mega SAMSUNG at top
+  flatSign('SAMSUNG',        -9.95, 44, -14, 7, 14, Math.PI / 2);
+  flatSign('SPOTIFY',        -9.95, 33, -14, 7, 3, Math.PI / 2);
+  flatSign('MTV',            -9.95, 24, -14, 7, 4, Math.PI / 2);
+  flatSign('PEPSI',          -9.95, 14, -14, 7, 3, Math.PI / 2);
+  flatSign('ESPN ZONE',      -9.95,  5, -14, 7, 3, Math.PI / 2);
 
-  // NE tower SOUTH face (cornerBillboard "NIKE" already at y=44)
-  flatSign("M&M'S",            14, 30, -9.95, 6.5, 3, 0);
-  flatSign('PEPSI',            14, 22, -9.95, 4.5, 4.5, 0);
-  flatSign('PREMIUM',         11.5, 22, -9.95, 3, 4.5, 0);
-  flatSign('NASDAQ',           14, 14, -9.95, 6, 3, 0);
-  flatSign('TKTS',             14, 8, -9.95, 6, 3, 0);
-  flatSign('MCDONALDS',        14, 3, -9.95, 7, 2.2, 0);
-  // NE tower WEST face (rotY=-π/2 → face direction -x)
+  // NE tower SOUTH face — mega NIKE at y=44
+  flatSign('NASDAQ',          14, 33, -9.95, 7, 3, 0);
+  flatSign("M&M'S",           14, 24, -9.95, 7, 4, 0);
+  flatSign('SAMSUNG',         14, 14, -9.95, 7, 3, 0);
+  flatSign('MCDONALDS',       14,  5, -9.95, 7, 3, 0);
+  // NE tower WEST face — mega DISNEY+ at top
   flatSign('DISNEY+',          9.95, 46, -14, 7, 14, -Math.PI / 2);
-  flatSign('HAMILTON',         9.95, 32, -14, 6, 3, -Math.PI / 2);
-  flatSign('TONIGHT 8PM',      9.95, 28, -14, 6, 2.5, -Math.PI / 2);
-  flatSign('MARRIOTT',         9.95, 22, -12.5, 4, 4, -Math.PI / 2);
-  flatSign('SEPHORA',          9.95, 22, -16, 3, 4, -Math.PI / 2);
-  flatSign('SPOTIFY',          9.95, 14, -14, 6, 3, -Math.PI / 2);
-  flatSign('BREAKING NEWS',    9.95, 8, -14, 6.5, 2.2, -Math.PI / 2);
-  flatSign('BANK OF AMERICA',  9.95, 3, -14, 7, 2.2, -Math.PI / 2);
+  flatSign('HAMILTON',         9.95, 33, -14, 7, 3, -Math.PI / 2);
+  flatSign('PHANTOM',          9.95, 24, -14, 7, 4, -Math.PI / 2);
+  flatSign('SPOTIFY',          9.95, 14, -14, 7, 3, -Math.PI / 2);
+  flatSign('HARD ROCK CAFE',   9.95,  5, -14, 7, 3, -Math.PI / 2);
 
-  // SW tower NORTH face (cornerBillboard "SEPHORA" already at y=32)
-  flatSign('PHANTOM',         -14, 22, 9.95, 4.5, 4.5, Math.PI);
-  flatSign('OF THE OPERA',    -11.5, 22, 9.95, 3, 4.5, Math.PI);
-  flatSign('MOULIN ROUGE',    -14, 14, 9.95, 6, 3, Math.PI);
-  flatSign('BROADWAY',        -14, 9, 9.95, 6.5, 2.5, Math.PI);
-  flatSign('WHOLE FOODS',     -14, 3, 9.95, 7, 2.2, Math.PI);
-  // SW tower EAST face (rotY=π/2)
+  // SW tower NORTH face — mega SEPHORA at y=32 (tower only 50u)
+  flatSign('WHOLE FOODS',     -14, 18, 9.95, 7, 4, Math.PI);
+  flatSign('BROADWAY',        -14, 10, 9.95, 7, 3, Math.PI);
+  flatSign('PEPSI',           -14,  4, 9.95, 7, 3, Math.PI);
+  // SW tower EAST face — mega NIKE at top
   flatSign('NIKE',            -9.95, 38, 14, 7, 14, Math.PI / 2);
-  flatSign('SAMSUNG',         -9.95, 24, 14, 6, 3, Math.PI / 2);
-  flatSign('NYC  LIVE',       -9.95, 18, 12.5, 4, 4, Math.PI / 2);
-  flatSign('MARKET',          -9.95, 18, 16, 3, 4, Math.PI / 2);
-  flatSign('PEPSI',           -9.95, 11, 14, 6, 3, Math.PI / 2);
-  flatSign('WALGREENS',       -9.95, 4, 14, 7, 2.5, Math.PI / 2);
+  flatSign('SPOTIFY',         -9.95, 27, 14, 7, 3, Math.PI / 2);
+  flatSign("M&M'S",           -9.95, 18, 14, 7, 4, Math.PI / 2);
+  flatSign('SAMSUNG',         -9.95, 10, 14, 7, 3, Math.PI / 2);
+  flatSign('STARBUCKS',       -9.95,  4, 14, 7, 3, Math.PI / 2);
 
-  // SE tower NORTH face (cornerBillboard "DISNEY" already at y=32)
-  flatSign("M&M'S",            14, 22, 9.95, 4.5, 4.5, Math.PI);
-  flatSign('PREMIUM',         11.5, 22, 9.95, 3, 4.5, Math.PI);
-  flatSign('NASDAQ  +2.4%  DJIA  34,521', 14, 14, 9.95, 7, 1.8, Math.PI);
-  flatSign('AMERICAN EAGLE',   14, 9, 9.95, 6.5, 2.8, Math.PI);
-  flatSign('STARBUCKS',        14, 3, 9.95, 7, 2.2, Math.PI);
-  // SE tower WEST face (rotY=-π/2)
+  // SE tower NORTH face — mega DISNEY at y=32 (tower 54u)
+  flatSign('HAMILTON',         14, 18, 9.95, 7, 4, Math.PI);
+  flatSign("M&M'S",            14, 10, 9.95, 7, 3, Math.PI);
+  flatSign('BREAKING NEWS',    14,  4, 9.95, 7, 3, Math.PI);
+  // SE tower WEST face — mega COCA-COLA at top
   flatSign('COCA-COLA',        9.95, 40, 14, 7, 14, -Math.PI / 2);
-  flatSign('DISNEY+',          9.95, 26, 14, 6, 3, -Math.PI / 2);
-  flatSign('STREAM NOW',       9.95, 22, 14, 6, 2, -Math.PI / 2);
-  flatSign('MTV',              9.95, 16, 12.5, 4, 4, -Math.PI / 2);
-  flatSign('SPOTIFY',          9.95, 16, 16, 3, 4, -Math.PI / 2);
-  flatSign('HARD ROCK CAFE',   9.95, 9, 14, 6.5, 2.5, -Math.PI / 2);
-  flatSign('ESPN ZONE',        9.95, 3, 14, 7, 2.2, -Math.PI / 2);
+  flatSign('MOULIN ROUGE',     9.95, 29, 14, 7, 4, -Math.PI / 2);
+  flatSign('HARD ROCK CAFE',   9.95, 20, 14, 7, 4, -Math.PI / 2);
+  flatSign('NASDAQ',           9.95, 12, 14, 7, 3, -Math.PI / 2);
+  flatSign('ESPN ZONE',        9.95,  4, 14, 7, 3, -Math.PI / 2);
 
-  // OTS — extra signs on east + west faces (visible from inside plaza).
-  // South face already covered above with COCA-COLA / ONE TIMES SQ /
-  // TIMES SQUARE labels + the red south LED panel.
-  flatSign('NASDAQ', -2.6, 36, OTS_Z, 5.5, 4, -Math.PI / 2);   // OTS west face
+  // OTS — three extra signs each on east + west faces.
+  flatSign('NASDAQ', -2.6, 36, OTS_Z, 5.5, 4, -Math.PI / 2);
   flatSign('PEPSI',  -2.6, 26, OTS_Z, 5.5, 4, -Math.PI / 2);
   flatSign('NIKE',   -2.6, 12, OTS_Z, 5.5, 4, -Math.PI / 2);
-  flatSign('TKTS',    2.6, 36, OTS_Z, 5.5, 4,  Math.PI / 2);   // OTS east face
+  flatSign('TKTS',    2.6, 36, OTS_Z, 5.5, 4,  Math.PI / 2);
   flatSign("M&M'S",   2.6, 26, OTS_Z, 5.5, 4,  Math.PI / 2);
   flatSign('SAMSUNG', 2.6, 12, OTS_Z, 5.5, 4,  Math.PI / 2);
 
   // Removed: taxis, pedestrian barriers, newsstands, pretzel carts, police
   // booth, Broadway marquee arch, theater marquee panels, news ticker
-  // bands, and the 8 floating wall signs that previously hung mid-air
-  // between corner towers. Plaza is now wide-open from every approach.
+  // bands, the floating mid-air wall signs, and the TKTS staircase that
+  // blocked the south approach. Plaza is wide-open from every side.
 
   // ── Point lights for ambiance — kept tight + dim so they accent
   // Times Square without flooding adjacent blocks.
@@ -11551,9 +11832,10 @@ function _mortonGreeting() {
 
 // Next-tool hint shown in the HUD top-right. Logic:
 //   1. If the player can already AFFORD any unowned tool, point at the
-//      MOST EXPENSIVE one they can afford (so big saves are rewarded
-//      with a meaningful target, not a 20g sprint feet that's already
-//      cheap change).
+//      MOST EXPENSIVE tier they can afford. If multiple tools share
+//      that highest-affordable price, list them all ("Lightsaber and
+//      Armor"). This way the player sees the full set of options at
+//      that price tier instead of arbitrarily one of them.
 //   2. Otherwise fall back to the cheapest unowned tool and show how
 //      much more gold the player needs.
 function _nextBoosterTarget() {
@@ -11562,9 +11844,14 @@ function _nextBoosterTarget() {
   const gold = feetdex.gold;
   const affordable = unowned.filter(b => b.price <= gold);
   if (affordable.length > 0) {
-    affordable.sort((a, b) => b.price - a.price);  // most expensive first
-    const top = affordable[0];
-    return { name: top.name, diff: 0 };
+    const topPrice = Math.max(...affordable.map(b => b.price));
+    const topTier  = affordable.filter(b => b.price === topPrice);
+    const names = topTier.map(b => b.name);
+    let label;
+    if      (names.length === 1) label = names[0];
+    else if (names.length === 2) label = `${names[0]} and ${names[1]}`;
+    else                         label = names.slice(0, -1).join(', ') + `, and ${names[names.length - 1]}`;
+    return { name: label, diff: 0 };
   }
   // Nothing affordable yet — point at the cheapest unowned with the
   // diff so the player knows how much further to save.
@@ -11922,7 +12209,7 @@ const BOOSTER_TIPS = {
   armor:          { title: 'ARMOR',
     body: 'HP doubles and mythics and legendaries hit 30% softer.' },
   lightsaber:     { title: 'LIGHTSABER',
-    body: 'Strikes do <b>2×</b> damage at <b>1.5×</b> speed — bonus jumps to <b>4×</b> damage and <b>3×</b> speed against mythics and legendaries.' },
+    body: 'Cuts deep against bosses: <b>4× damage</b> and <b>3× attack speed</b> vs. <b>mythics</b> and <b>legendaries</b>. Standard punches against anyone else.' },
   metrocard:      { title: 'METROCARD',
     body: 'Press <b>[E]</b> at any subway, then click a <b style="color:#0066ff">blue dot</b> on the map to ride.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
@@ -12239,20 +12526,13 @@ const ANCIENT_ARENA = { x: 1500, z: 1500 };
 let _ancientPreBattle = null;   // { player.pos, player.yaw, npc.pos, currentInteriorId }
 
 function _enterAncientArena(npc) {
-  // Snapshot pre-battle state so we can restore on loss / fully reset on win.
+  // The fight stays in place (per "battles preserve position/camera"
+  // rule); we only snapshot the NPC's position so we can return him to
+  // the alley on loss, and turn ON the holy radiance + arrival sound
+  // for the dramatic Ancient One mood.
   _ancientPreBattle = {
-    px: player.position.x, py: player.position.y, pz: player.position.z,
-    pyaw: player.yaw, ppitch: player.pitch,
     nx: npc.group.position.x, nz: npc.group.position.z,
-    interior: currentInteriorId,
   };
-  currentInteriorId = null;     // pull out of any interior — fight is on the arena.
-  // Drop player onto the arena facing the NPC, who waits at the center.
-  player.position.set(ANCIENT_ARENA.x, 0, ANCIENT_ARENA.z + 6);
-  player.velocity.set(0, 0, 0);
-  player.yaw   = Math.PI;       // face -Z (toward arena center)
-  player.pitch = 0;
-  npc.group.position.set(ANCIENT_ARENA.x, npc.group.position.y, ANCIENT_ARENA.z);
   _ancientHolyOn();
   try { Audio.holyArrival?.(); } catch (_) {}
 }
@@ -12280,6 +12560,25 @@ function _exitAncientArena({ npc, won, respawnPlayer = true }) {
 
 function _runCountdownAndFight(npc) {
   state = 'pre-combat';
+
+  // Space the NPC a few units BACK from the player (along the player→
+  // NPC vector) so the fight has room to breathe. The player's own
+  // position and camera angle are preserved exactly.
+  if (npc?.group?.position) {
+    const px = player.position.x, pz = player.position.z;
+    const nx = npc.group.position.x, nz = npc.group.position.z;
+    let dx = nx - px, dz = nz - pz;
+    const len = Math.hypot(dx, dz);
+    if (len > 0.01) {
+      const want = 4.5;        // metres of separation we want to enforce
+      if (len < want) {
+        const need = want - len;
+        npc.group.position.x += (dx / len) * need;
+        npc.group.position.z += (dz / len) * need;
+      }
+    }
+  }
+
   // If the player owns the lightsaber, ignite the blade NOW (at the
   // start of the countdown) — the unsheathe animation fills the 3-2-1
   // window so the player sees the blade come to life right before the
@@ -13255,43 +13554,52 @@ function _findNearestBoss(from) {
   return best;
 }
 
-// 3D arrow mesh built once at module init and parented to the scene. We
-// position+orient it each frame; visibility is gated by hold-C + ownership
-// + a live target. Single forward pointer ONLY — no rear fletch, so the
-// "which end is which" ambiguity that confused players is gone.
+// 3D compass — a single bright glowing arrow-tip that floats in front
+// of the player, pointing at the nearest mythic/legendary. The dim
+// shaft was dropped so the glow IS the pointer; the cone tip itself is
+// emissive, and a soft halo wraps it for the "magic-orb" look.
 const _compassArrow = (() => {
   const g = new THREE.Group();
-  // Shaft (lays along local -Z so lookAt() at the target points the
-  // tip TOWARD the target, not away from it).
-  const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.045, 0.045, 0.55, 10),
-    new THREE.MeshStandardMaterial({
-      color: 0xffd866, emissive: 0xffaa33, emissiveIntensity: 1.4,
-    }),
-  );
-  shaft.rotation.x = Math.PI / 2;
-  shaft.position.z = -0.05;
-  g.add(shaft);
-  // Conical tip (points at -Z = where lookAt sends "forward").
+  // Bright glowing arrow tip (points at -Z = where lookAt sends "forward")
   const tip = new THREE.Mesh(
-    new THREE.ConeGeometry(0.13, 0.28, 14),
+    new THREE.ConeGeometry(0.18, 0.45, 16),
     new THREE.MeshStandardMaterial({
-      color: 0xfff2a8, emissive: 0xffc24d, emissiveIntensity: 1.8,
+      color: 0xfff8d0, emissive: 0xffc24d, emissiveIntensity: 2.4,
     }),
   );
   tip.rotation.x = -Math.PI / 2;
-  tip.position.z = -0.45;
+  tip.position.z = -0.32;
   g.add(tip);
-  // Soft halo behind the tip — gives the front end an obvious "front"
-  // glow so players know which way to walk.
-  const halo = new THREE.Mesh(
-    new THREE.SphereGeometry(0.16, 14, 10),
+  // Inner core glow — additive so it reads as a light source
+  const core = new THREE.Mesh(
+    new THREE.SphereGeometry(0.10, 14, 10),
     new THREE.MeshBasicMaterial({
-      color: 0xfff2c8, transparent: true, opacity: 0.22, depthWrite: false,
+      color: 0xffffe0, transparent: true, opacity: 0.85,
+      depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
-  halo.position.z = -0.42;
+  core.position.z = -0.32;
+  g.add(core);
+  // Soft halo around the whole thing
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.32, 16, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff2c8, transparent: true, opacity: 0.32,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }),
+  );
+  halo.position.z = -0.30;
   g.add(halo);
+  // Outermost shimmer
+  const shim = new THREE.Mesh(
+    new THREE.SphereGeometry(0.50, 14, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0xffe6a0, transparent: true, opacity: 0.12,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }),
+  );
+  shim.position.z = -0.28;
+  g.add(shim);
 
   g.visible = false;
   scene.add(g);
@@ -13308,32 +13616,18 @@ function _updateCompassPointer(dt) {
   const owned = feetdex.hasBooster('compass');
   const held  = input.isDown('KeyC');
   const stateOK = (state === 'playing' || state === 'interior');
-
-  // Drop a stale lock — the locked target was collected, removed, or
-  // (in the case of legendaries) finished its 3-defeat arc.
-  if (_compassTarget) {
-    const stillValid =
-      _compassTarget._removedFromScene !== true &&
-      !_compassTarget.feetCollected &&
-      (_compassTarget.rarity === 'mythic' || _compassTarget.rarity === 'legendary');
-    if (!stillValid) _compassTarget = null;
-  }
-
   if (!owned || !held || !stateOK) {
     _compassArrow.visible = false;
     return;
   }
-
-  // Lock onto a target the FIRST frame the key is held (or whenever the
-  // previous lock expired). Don't re-pick a target every frame — that
-  // was making the arrow ping-pong between bosses near each other.
-  if (!_compassTarget) {
-    const from = currentInteriorId
-      ? (world.interiors[currentInteriorId]?.cityReturnPos ?? player.position)
-      : player.position;
-    _compassTarget = _findNearestBoss(from);
-    if (!_compassTarget) { _compassArrow.visible = false; return; }
-  }
+  // Always re-pick the nearest live mythic/legendary every frame — if
+  // the player walks past one, the arrow swings to whoever's closer
+  // next, no lock.
+  const from = currentInteriorId
+    ? (world.interiors[currentInteriorId]?.cityReturnPos ?? player.position)
+    : player.position;
+  const target = _findNearestBoss(from);
+  if (!target) { _compassArrow.visible = false; return; }
 
   // Position the arrow in world space ~2 m in front of the camera, just
   // below center so it sits under the crosshair without blocking view.
@@ -13345,11 +13639,11 @@ function _updateCompassPointer(dt) {
     camera.position.y + fwd.y * offset - 0.30,
     camera.position.z + fwd.z * offset,
   );
-  // Orient: the arrow's tip (its -Z) points at the locked target.
+  // Orient: the arrow's tip (its -Z) points at the target.
   _compassArrow.lookAt(
-    _compassTarget.group.position.x,
+    target.group.position.x,
     camera.position.y - 0.30,
-    _compassTarget.group.position.z,
+    target.group.position.z,
   );
   // Gentle bob so it reads as "alive" rather than glued in space.
   _compassPulse += (dt ?? 0.016) * 4;
@@ -13519,11 +13813,12 @@ function gameLoop() {
   if (input.justPressed('KeyC'))   _handleC();
   if (input.justPressed('Escape')) _handleESC();
 
-  // Show the lightsaber any time the lightsaber booster is owned and the
-  // player is in actively-played states (not paused, etc.)
+  // Show the lightsaber any time the lightsaber booster is owned and
+  // the player is in actively-played states. 'pre-combat' is included
+  // so the unsheathe animation is visible during the 3-2-1 countdown.
   player.setLightsaberVisible?.(
     feetdex.hasBooster('lightsaber') &&
-    (state === 'playing' || state === 'interior' || state === 'combat'),
+    (state === 'playing' || state === 'interior' || state === 'combat' || state === 'pre-combat'),
   );
 
   _updateHint();
