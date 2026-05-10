@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T160313';
+  var BAKED = '20260510T160525';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -12759,7 +12759,18 @@ function handleMinigameResult(npc, won) {
     if (npc.rarity === 'legendary') {
       const count = feetdex.incrementLegendary(npc.name);   // 1, 2, or 3 after this win
       if (count >= 3) {
-        // Final fight — claim their feet
+        // Final fight — claim their feet AND keep the legendary
+        // standing where they fell. The KO pose is wiped so the player
+        // sees them upright in the world afterward; their feetCollected
+        // flag prevents re-engagement.
+        npc._kod = false;
+        npc.feetCollected = true;
+        npc.group.rotation.x = 0;
+        npc.group.rotation.z = 0;
+        const s = npc._bodyScale ?? 1;
+        npc.group.scale.set(s, s, s);
+        if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
+        if (npc._leftArmPivot)  npc._leftArmPivot.rotation.x  = 0;
         const entry = feetdex.getEntry(npc.feetId);
         if (entry && !feetdex.has(entry.id)) {
           ui.showDiscovery(entry, npc);
@@ -12784,9 +12795,18 @@ function handleMinigameResult(npc, won) {
       }
     } else {
       // Mythic / RPS-class: single victory = discovery. Flash a quick
-      // named-defeat banner before the discovery overlay so the player
-      // sees who they just took down.
+      // named-defeat banner, restore the NPC to a standing pose so
+      // they remain visible in the world afterward (no permanent
+      // ragdoll), then show the discovery overlay.
       showHUDMessage(`${npc.name.toUpperCase()} defeated!`, 1800);
+      npc._kod = false;
+      npc.feetCollected = true;
+      npc.group.rotation.x = 0;
+      npc.group.rotation.z = 0;
+      const ms = npc._bodyScale ?? 1;
+      npc.group.scale.set(ms, ms, ms);
+      if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
+      if (npc._leftArmPivot)  npc._leftArmPivot.rotation.x  = 0;
       const entry = feetdex.getEntry(npc.feetId);
       if (entry && !feetdex.has(entry.id)) {
         ui.showDiscovery(entry, npc);
