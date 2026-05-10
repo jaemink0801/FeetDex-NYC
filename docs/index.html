@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T010957';
+  var BAKED = '20260510T011312';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1669,7 +1669,7 @@ const BOOSTER_DEFS = [
   { id:'radar',          name:'Radar',          price:50,
     desc:'Common, rare, and epic characters show on minimap and map.' },
   { id:'compass',        name:'Compass',        price:80,
-    desc:'Press [C] for a needle that twitches toward mythics & legendaries.' },
+    desc:'Hold [C] for a 3D arrow that points to the nearest mythic or legendary.' },
   { id:'armor',          name:'Armor',          price:100,
     desc:'Doubles HP and reduces damage taken in combat.' },
   { id:'metrocard',      name:'MetroCard',      price:100,
@@ -11680,7 +11680,7 @@ const BOOSTER_TIPS = {
   radar:          { title: 'RADAR',
     body: 'Common, rare, and epic characters now show as colored dots on the map and minimap.' },
   compass:        { title: 'COMPASS',
-    body: 'A top-left needle now twitches toward the nearest <b>mythic</b> or <b>legendary</b>.' },
+    body: 'Hold <b>[C]</b> and a glowing arrow appears in front of you, pointing at the nearest <b>mythic</b> or <b>legendary</b>.' },
   armor:          { title: 'ARMOR',
     body: 'HP doubles and mythics and legendaries hit 30% softer.' },
   lightsaber:     { title: 'LIGHTSABER',
@@ -12982,10 +12982,11 @@ function _drawMinimap(elapsed) {
 }
 
 // ── Compass booster ──────────────────────────────────────────────────────────
-// Compass auto-points at the nearest live mythic or legendary NPC the
-// moment it's owned — no toggle, no special key. "Vague" because it shows
-// direction only (no distance, no name).
-function _handleC() { /* compass needs no manual key */ }
+// Compass spawns a glowing 3D arrow that floats in front of the player and
+// points at the nearest live mythic/legendary while the player HOLDS [C].
+// Releasing the key (or owning no compass) hides the arrow. The HUD-corner
+// compass needle is suppressed in favor of the 3D pointer.
+function _handleC() { /* compass uses isDown, not a one-shot tap */ }
 
 function _findNearestBoss(from) {
   const npcs = window.ALL_NPCS || [];
@@ -13003,22 +13004,99 @@ function _findNearestBoss(from) {
   return best;
 }
 
-function _updateCompassPointer() {
-  if (!feetdex.hasBooster('compass')) {
-    ui.updateCompassPointer(false);
+// 3D arrow mesh built once at module init and parented to the scene. We
+// position+orient it each frame; visibility is gated by hold-C + ownership
+// + a live target.
+const _compassArrow = (() => {
+  const g = new THREE.Group();
+  // Shaft (lays along local -Z so lookAt() at the target points the
+  // tip TOWARD the target, not away from it).
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, 0.55, 10),
+    new THREE.MeshStandardMaterial({
+      color: 0xffd866, emissive: 0xffaa33, emissiveIntensity: 1.4,
+    }),
+  );
+  shaft.rotation.x = Math.PI / 2;
+  shaft.position.z = -0.05;
+  g.add(shaft);
+  // Conical tip (points at -Z = where lookAt sends "forward").
+  const tip = new THREE.Mesh(
+    new THREE.ConeGeometry(0.13, 0.28, 14),
+    new THREE.MeshStandardMaterial({
+      color: 0xfff2a8, emissive: 0xffc24d, emissiveIntensity: 1.8,
+    }),
+  );
+  tip.rotation.x = -Math.PI / 2;
+  tip.position.z = -0.45;
+  g.add(tip);
+  // Soft halo behind the tip
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 14, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff2c8, transparent: true, opacity: 0.22, depthWrite: false,
+    }),
+  );
+  halo.position.z = -0.42;
+  g.add(halo);
+  // Tail flair — small cone pointing backwards (visual fletch)
+  const tail = new THREE.Mesh(
+    new THREE.ConeGeometry(0.07, 0.14, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0xffaa33, emissive: 0xff8a1a, emissiveIntensity: 1.0,
+    }),
+  );
+  tail.rotation.x = Math.PI / 2;
+  tail.position.z = +0.30;
+  g.add(tail);
+
+  g.visible = false;
+  scene.add(g);
+  return g;
+})();
+let _compassPulse = 0;        // accumulator for the gentle bobbing animation
+
+function _updateCompassPointer(dt) {
+  // Always make sure the legacy HUD compass needle is hidden — the 3D
+  // arrow is the only compass UI now.
+  ui.updateCompassPointer(false);
+
+  const owned = feetdex.hasBooster('compass');
+  const held  = input.isDown('KeyC');
+  // Only show in active gameplay states. (Hide during dialogue, combat
+  // would be fine but the arrow visually clutters the fight; we keep it
+  // gated to playing/interior so it's a navigation tool.)
+  const stateOK = (state === 'playing' || state === 'interior');
+  if (!owned || !held || !stateOK) {
+    _compassArrow.visible = false;
     return;
   }
   const from = currentInteriorId
     ? (world.interiors[currentInteriorId]?.cityReturnPos ?? player.position)
     : player.position;
   const target = _findNearestBoss(from);
-  if (!target) { ui.updateCompassPointer(false); return; }
-  const dx = target.group.position.x - from.x;
-  const dz = target.group.position.z - from.z;
-  const targetAngle = Math.atan2(dx, -dz);
-  const dirDeg = (targetAngle - player.yaw) * 180 / Math.PI;
-  // Pass null distance so the UI shows "??" instead of metres — vague intent.
-  ui.updateCompassPointer(true, '???', null, dirDeg);
+  if (!target) { _compassArrow.visible = false; return; }
+
+  // Position the arrow in world space ~2 m in front of the camera, just
+  // below center so it sits under the crosshair without blocking the view.
+  const fwd = new THREE.Vector3();
+  camera.getWorldDirection(fwd);
+  const offset = 2.0;
+  _compassArrow.position.set(
+    camera.position.x + fwd.x * offset,
+    camera.position.y + fwd.y * offset - 0.30,
+    camera.position.z + fwd.z * offset,
+  );
+  // Orient: the arrow's tip (its -Z) points at the target.
+  _compassArrow.lookAt(
+    target.group.position.x,
+    camera.position.y - 0.30,         // keep it horizontal — only yaw to target
+    target.group.position.z,
+  );
+  // Gentle bob so it reads as "alive" rather than glued in space.
+  _compassPulse += (dt ?? 0.016) * 4;
+  _compassArrow.position.y += Math.sin(_compassPulse) * 0.04;
+  _compassArrow.visible = true;
 }
 
 // ── Ancient Tracker compass ──────────────────────────────────────────────────
@@ -13118,7 +13196,7 @@ function gameLoop() {
 
   _updateHint();
   _updateTrackerCompass();
-  _updateCompassPointer();
+  _updateCompassPointer(dt);
   _updateTutorial();
   _drawMinimap(elapsed);
   if (_mapOpen) _drawDynamicMap();
