@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T003833';
+  var BAKED = '20260510T004120';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -10311,7 +10311,7 @@ document.addEventListener('pointerlockchange', () => {
         _afterTipCallback = () => {
           if (!tutorial.active) return;
           ui.openFeetGodDialogue(
-            "Start with the <b>Empire State Building</b> right ahead."
+            "Welcome to the <b>Feet World</b>, mortal. Begin at the <b>Empire State Building</b>, right ahead."
           );
         };
       }, 250);
@@ -10710,7 +10710,7 @@ function _handleE() {
           ui.openFeetGodDialogue(
             "Feet pay you <b>gold</b> whenever you discover new feet. " +
             "Your next tool available for purchase is marked in the <b>top right</b> so you know what to save toward — " +
-            "open the <b>[M]</b> map to find <b>Morton's Shop</b>."
+            "open the <b>[M]</b> map and head to <b>Morton's Shop</b>."
           );
         }, 600);
       }
@@ -11231,7 +11231,7 @@ function _onBuyBooster(id) {
         _showBoosterTip('sprint_feet');
         _afterTipCallback = () => {
           ui.openFeetGodDialogue(
-            "Optional <b>missions</b> will pop up in the corner for extra gold — take the ones you want, skip the rest."
+            "Optional <b>missions</b> will appear in the corner — extra gold if you want it, skip if you don't."
           );
           _afterTipCallback = () => {
             _revealMissions();
@@ -11241,9 +11241,9 @@ function _onBuyBooster(id) {
             // the bootstrap visit-fleetfeet mission now sitting in their
             // mission slate.
             ui.openFeetGodDialogue(
-              "Last thing — look down at your feet. You're walking around <b>barefoot</b> right now, " +
-              "and <b>Fleet Feet</b> sells skins of any foot you've collected so you can actually wear them. " +
-              "It's the dessert after dinner: only worth it once your tools are covered."
+              "Look down at your feet, mortal — you walk <b>barefoot</b>. " +
+              "<b>Fleet Feet</b> turns every foot you've collected into a skin you can wear. " +
+              "Dessert after dinner, though — only worth it once your tools are covered."
             );
             _afterTipCallback = () => {
               // NOW the tutorial is done. Celebrate.
@@ -11396,8 +11396,8 @@ function _enterLandmark(id, name) {
       tutorial.advance('enter-esb');
       setTimeout(() => {
         ui.openFeetGodDialogue(
-          "<b style=\"color:#ffd700\">Yellow</b> dots on the map and yellow doors up close mean you can enter — " +
-          "find the character inside and press <b>[E]</b> to talk."
+          "<b style=\"color:#ffd700\">Yellow</b> doors and yellow dots on the map open for you. " +
+          "Find the character inside, walk up, press <b>[E]</b>."
         );
       }, 450);
     }
