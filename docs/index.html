@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T010430';
+  var BAKED = '20260510T010850';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2009,57 +2009,204 @@ const SHOE_STYLES = {
     { type:'sphere', r:0.04, color:0xffffff, pos:[-0.04, 0.08, 0.04] },
     { type:'sphere', r:0.04, color:0xffffff, pos:[ 0.00, 0.08, 0.10] },
   ] },
-  // Epic
+  // ── Epic ────────────────────────────────────────────────────────────────
+  // LeBron — purple-and-gold high-top basketball sneaker. Ankle collar,
+  // thick midsole + black rubber outsole, three slash stripes and a gold
+  // "23" emblem on the OUTER side, gold tongue patch up front, and a
+  // visible white air-cushion bubble at the heel. Negative spec.x lands
+  // the side branding on the outer side after the foot's π rotation.
   epic_lebron:     { color: 0x552583, extras: [
-    // Purple high-tops — tall ankle wrap + gold "23". The "23" decal
-    // belongs on the OUTER side of each high-top; spec.x is negative
-    // here because the foot group is rotated 180° around Y, which flips
-    // the X-axis (see common_gymrat above).
-    { type:'box', s:[0.16, 0.10, 0.10], color:0x552583, pos:[0, 0.05, -0.02] },
-    { type:'box', s:[0.04, 0.025, 0.005], color:0xffd700, pos:[-0.06, 0.05, 0.04] },
+    // Tall purple high-top upper covering the ankle
+    { type:'box', s:[0.18, 0.13, 0.16], color:0x552583, pos:[0, 0.06, -0.01] },
+    { type:'box', s:[0.16, 0.06, 0.14], color:0x4a1f70, pos:[0, 0.13, -0.02] },
+    // Thick cream midsole + black rubber outsole
+    { type:'box', s:[0.20, 0.04, 0.24], color:0xfff8e8, pos:[0, -0.07, 0.02] },
+    { type:'box', s:[0.20, 0.02, 0.24], color:0x1a1a1a, pos:[0, -0.10, 0.02] },
+    // Visible white air-cushion bubble at the heel
+    { type:'sphere', r:0.045, color:0xffffff, pos:[0, -0.04, -0.08] },
+    // Three diagonal slash stripes on the OUTER side
+    { type:'box', s:[0.005, 0.02, 0.10], color:0xffd700, pos:[-0.085, 0.06, 0.02], rot:[0,0,Math.PI/8] },
+    { type:'box', s:[0.005, 0.02, 0.05], color:0xffd700, pos:[-0.085, 0.02, 0.07], rot:[0,0,Math.PI/8] },
+    { type:'box', s:[0.005, 0.02, 0.05], color:0xffd700, pos:[-0.085, 0.10, 0.07], rot:[0,0,Math.PI/8] },
+    // Gold "23" jersey-number panel on the OUTER side
+    { type:'box', s:[0.005, 0.05, 0.05], color:0xffd700, pos:[-0.087, 0.06, -0.08] },
+    // Gold tongue patch up front
+    { type:'box', s:[0.07, 0.03, 0.04], color:0xffd700, pos:[0, 0.10, 0.10] },
+    // Black laces (three rungs)
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.13, 0.04] },
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.13, 0.07] },
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.13, 0.10] },
   ] },
+  // Sonion — sleek black formal shoe wreathed in mystical purple energy.
+  // Cyan-purple seam glows run the length of both sides; a gold "contract
+  // seal" with a glowing purple gem sits on the toe, and a few floating
+  // mist-spheres hover above the foot to sell the "walking EULA" vibe.
   epic_sonion:     { color: 0x000000, extras: [
-    // Deep purple glow strip along the toe
-    { type:'box', s:[0.14, 0.01, 0.04], color:0x9D4EDD, pos:[0, 0.005, 0.13] },
-    { type:'sphere', r:0.025, color:0x4b0082, pos:[0, 0.01, -0.04] },
+    // Sleek black dress-shoe upper
+    { type:'box', s:[0.16, 0.05, 0.20], color:0x080808, pos:[0, 0.010, 0.04] },
+    // Glowing purple energy seam down the center
+    { type:'box', s:[0.005, 0.012, 0.18], color:0x9D4EDD, pos:[0, 0.040, 0.04] },
+    // Glowing purple side-strips (inner + outer)
+    { type:'box', s:[0.005, 0.018, 0.16], color:0x9D4EDD, pos:[ 0.080, 0.010, 0.04] },
+    { type:'box', s:[0.005, 0.018, 0.16], color:0x9D4EDD, pos:[-0.080, 0.010, 0.04] },
+    // Forward toe glow strip
+    { type:'box', s:[0.13, 0.01, 0.04], color:0x9D4EDD, pos:[0, 0.030, 0.14] },
+    // Gold contract-seal disc on the toe
+    { type:'cylinder', r:0.022, h:0.006, color:0xffd700, pos:[0, 0.040, 0.16], rot:[Math.PI/2,0,0] },
+    // Glowing purple gem at the seal's center
+    { type:'sphere', r:0.013, color:0x9D4EDD, pos:[0, 0.046, 0.16] },
+    // Floating purple mist orbs above the foot
+    { type:'sphere', r:0.014, color:0x4b0082, pos:[ 0.04, 0.08, 0.02] },
+    { type:'sphere', r:0.011, color:0x4b0082, pos:[-0.03, 0.09, 0.06] },
+    { type:'sphere', r:0.009, color:0x4b0082, pos:[ 0.02, 0.10, -0.04] },
   ] },
+  // Sydney — red leather action-stunt boot. Pointed steel toe-cap (for
+  // those high-fall stunts), gold buckle-strap with metal frame on the
+  // outer side, dark lace-rungs over the instep, and a stiletto heel
+  // plate at the back so it stays unmistakably HER and not just a boot.
   epic_sydney:     { color: 0xd62828, extras: [
-    // Red high heels — tall back stiletto + bright red strap
-    { type:'cylinder', r:0.018, h:0.18, color:0x8a1a1a, pos:[0, -0.10, -0.06] },
-    { type:'box', s:[0.12, 0.02, 0.04], color:0xd62828, pos:[0, 0.04, 0.04] },
+    // Red leather upper covering the foot
+    { type:'box', s:[0.17, 0.07, 0.22], color:0xc71010, pos:[0, 0.025, 0.04] },
+    // Darker red collar strip
+    { type:'box', s:[0.16, 0.015, 0.20], color:0x8a1a1a, pos:[0, 0.060, 0.04] },
+    // Pointed steel toe-cap up front
+    { type:'box', s:[0.10, 0.030, 0.06], color:0x666666, pos:[0, -0.005, 0.16] },
+    // Gold buckle strap on the OUTER side
+    { type:'box', s:[0.005, 0.040, 0.05], color:0xffd700, pos:[-0.087, 0.020, 0.02] },
+    { type:'box', s:[0.012, 0.025, 0.025], color:0x222222, pos:[-0.092, 0.025, 0.02] },
+    // Lace rungs across the instep
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.060, 0.10] },
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.060, 0.06] },
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.060, 0.02] },
+    // Stiletto heel + base plate
+    { type:'cylinder', r:0.022, h:0.10, color:0x8a1a1a, pos:[0, -0.06, -0.06] },
+    { type:'cylinder', r:0.030, h:0.005, color:0x6a0a0a, pos:[0, -0.115, -0.06] },
   ] },
-  // Mythic
+  // ── Mythic ──────────────────────────────────────────────────────────────
+  // Clav — the foot IS the hair. Dense chestnut fur tufts in varied
+  // shades cover every centimetre of the upper, with a black headband
+  // crossing the instep and two tiny gold "frame-data" sparks sitting
+  // up top to nod at the framemog meme. No conventional sneaker here.
   mythic_clav:     { color: 0x0d0d0d, extras: [
-    // Sleek black + chestnut hair tufts to match Clav's iconic locks
-    { type:'sphere', r:0.045, color:0x6B4423, pos:[ 0.04, 0.05, 0.02] },
-    { type:'sphere', r:0.040, color:0x6B4423, pos:[-0.04, 0.05, 0.02] },
-    { type:'sphere', r:0.035, color:0x6B4423, pos:[ 0.00, 0.06, 0.06] },
+    // Slim black sole (everything else is hair)
+    { type:'box', s:[0.16, 0.02, 0.22], color:0x0d0d0d, pos:[0, -0.005, 0.04] },
+    // Densely-packed chestnut tufts of varied size and tone
+    { type:'sphere', r:0.058, color:0x6B4423, pos:[ 0.05, 0.05, -0.02] },
+    { type:'sphere', r:0.052, color:0x5a3a1f, pos:[-0.05, 0.05, -0.02] },
+    { type:'sphere', r:0.050, color:0x6B4423, pos:[ 0.00, 0.06, 0.04] },
+    { type:'sphere', r:0.046, color:0x7a5530, pos:[ 0.06, 0.06, 0.10] },
+    { type:'sphere', r:0.046, color:0x6B4423, pos:[-0.06, 0.06, 0.10] },
+    { type:'sphere', r:0.040, color:0x5a3a1f, pos:[ 0.03, 0.07, 0.16] },
+    { type:'sphere', r:0.036, color:0x4d3015, pos:[-0.03, 0.07, 0.16] },
+    // Black headband crossing the instep
+    { type:'box', s:[0.20, 0.014, 0.025], color:0x222222, pos:[0, 0.045, 0.06] },
+    // Tiny gold "frame-data" sparks up top
+    { type:'sphere', r:0.008, color:0xffd700, pos:[ 0.03, 0.105, -0.02] },
+    { type:'sphere', r:0.008, color:0xffd700, pos:[-0.03, 0.105, -0.02] },
   ] },
+  // Patapim — Italian-brainrot kid energy. Pink/yellow stacked chunks,
+  // a chunky purple velcro strap, a smiley face stamped on the toe,
+  // and yellow side-stars studding both flanks. Maximum sugar.
   mythic_patapim:  { color: 0xffeb3b, extras: [
-    // Pink + yellow alternating boots — bright kid energy
-    { type:'box', s:[0.16, 0.06, 0.06], color:0xff6b9d, pos:[0, 0.04, -0.02] },
-    { type:'box', s:[0.04, 0.04, 0.04], color:0xff69b4, pos:[0, 0.005, 0.15] },
+    // Pink chunky heel block
+    { type:'box', s:[0.18, 0.09, 0.10], color:0xff6b9d, pos:[0, 0.045, -0.04] },
+    // Yellow midfoot block
+    { type:'box', s:[0.18, 0.07, 0.10], color:0xffeb3b, pos:[0, 0.035, 0.06] },
+    // Hot-pink toe cap
+    { type:'box', s:[0.12, 0.06, 0.06], color:0xff1493, pos:[0, 0.010, 0.16] },
+    // Chunky purple velcro strap across the instep
+    { type:'box', s:[0.19, 0.022, 0.04], color:0x9933cc, pos:[0, 0.080, 0.04] },
+    // Smiley face on the toe — eyes
+    { type:'sphere', r:0.013, color:0x000000, pos:[ 0.03, 0.050, 0.18] },
+    { type:'sphere', r:0.013, color:0x000000, pos:[-0.03, 0.050, 0.18] },
+    // Smiley mouth (small horizontal black bar)
+    { type:'box', s:[0.05, 0.005, 0.005], color:0x000000, pos:[0, 0.020, 0.19] },
+    // Yellow side-stars on both flanks
+    { type:'sphere', r:0.012, color:0xffeb3b, pos:[ 0.090, 0.030, 0.04] },
+    { type:'sphere', r:0.012, color:0xffeb3b, pos:[ 0.090, 0.030, 0.10] },
+    { type:'sphere', r:0.012, color:0xffeb3b, pos:[-0.090, 0.030, 0.04] },
+    { type:'sphere', r:0.012, color:0xffeb3b, pos:[-0.090, 0.030, 0.10] },
+    // White rubber sole
+    { type:'box', s:[0.20, 0.025, 0.24], color:0xffffff, pos:[0, -0.040, 0.04] },
   ] },
+  // Messi — full Adidas-style football boot. White upper with Argentina
+  // sky-blue chest stripe + gold collar trim, three gold Adidas stripes
+  // on the outer flank, a row of gold studs underneath, and a tiny gold
+  // "10" stamped on the outer heel.
   mythic_messi:    { color: 0x75aadb, extras: [
-    // White-blue cleats — gold studs on the underside
-    { type:'box', s:[0.16, 0.02, 0.18], color:0xffffff, pos:[0, -0.04, 0.04] },
-    { type:'sphere', r:0.012, color:0xffd700, pos:[ 0.05, -0.06, 0.10] },
-    { type:'sphere', r:0.012, color:0xffd700, pos:[-0.05, -0.06, 0.10] },
-    { type:'sphere', r:0.012, color:0xffd700, pos:[ 0.00, -0.06, 0.16] },
+    // White upper
+    { type:'box', s:[0.17, 0.06, 0.22], color:0xffffff, pos:[0, 0.025, 0.04] },
+    // Argentina sky-blue chest stripe across the top
+    { type:'box', s:[0.10, 0.008, 0.18], color:0x75aadb, pos:[0, 0.060, 0.04] },
+    // Gold collar trim
+    { type:'box', s:[0.16, 0.006, 0.20], color:0xffd700, pos:[0, 0.062, 0.04] },
+    // Three gold Adidas stripes on the OUTER side
+    { type:'box', s:[0.005, 0.025, 0.10], color:0xffd700, pos:[-0.087, 0.025, 0.06], rot:[0,0,-Math.PI/12] },
+    { type:'box', s:[0.005, 0.025, 0.06], color:0xffd700, pos:[-0.087, 0.000, 0.10], rot:[0,0,-Math.PI/12] },
+    { type:'box', s:[0.005, 0.025, 0.06], color:0xffd700, pos:[-0.087, 0.050, 0.10], rot:[0,0,-Math.PI/12] },
+    // Row of gold studs underneath
+    { type:'sphere', r:0.013, color:0xffd700, pos:[ 0.05, -0.06, 0.10] },
+    { type:'sphere', r:0.013, color:0xffd700, pos:[-0.05, -0.06, 0.10] },
+    { type:'sphere', r:0.013, color:0xffd700, pos:[ 0.00, -0.06, 0.16] },
+    { type:'sphere', r:0.013, color:0xffd700, pos:[ 0.05, -0.06, -0.04] },
+    { type:'sphere', r:0.013, color:0xffd700, pos:[-0.05, -0.06, -0.04] },
+    // Tiny gold "10" — two vertical bars on the outer heel
+    { type:'box', s:[0.005, 0.020, 0.008], color:0xffd700, pos:[-0.090, 0.020, -0.06] },
+    { type:'box', s:[0.005, 0.020, 0.018], color:0xffd700, pos:[-0.090, 0.020, -0.08] },
   ] },
-  // Legendary
+  // ── Legendary ───────────────────────────────────────────────────────────
+  // Margot (Barbie) — full Barbie-pink platform stiletto. Tiered pink
+  // layers, a hot-pink toe cap, a 5-piece fabric bow on the instep,
+  // a pearl bead at the toe, and tiny white sparkle dots scattered on
+  // top. Tall stiletto with a pink base plate at the heel.
   legendary_margot:{ color: 0xff69b4, extras: [
-    // Tall pink platinum heels — like Barbie premiere
+    // Pink platform sole
+    { type:'box', s:[0.16, 0.04, 0.22], color:0xff69b4, pos:[0, -0.05, 0.04] },
+    // Glittery upper
+    { type:'box', s:[0.13, 0.04, 0.18], color:0xff8fc0, pos:[0, 0.005, 0.04] },
+    // Hot-pink toe cap
+    { type:'box', s:[0.10, 0.04, 0.06], color:0xff1493, pos:[0, 0.005, 0.16] },
+    // Tall stiletto heel
     { type:'cylinder', r:0.020, h:0.20, color:0xc4458b, pos:[0, -0.11, -0.06] },
-    { type:'box', s:[0.13, 0.02, 0.20], color:0xff69b4, pos:[0, 0.005, 0.04] },
-    { type:'sphere', r:0.025, color:0xfaf0e6, pos:[0, 0.04, 0.10] },
+    { type:'cylinder', r:0.030, h:0.005, color:0xc4458b, pos:[0, -0.21, -0.06] },
+    // Bow on the instep — center plus four loop/ribbon spheres
+    { type:'sphere', r:0.025, color:0xff1493, pos:[0,    0.040, 0.06] },
+    { type:'sphere', r:0.020, color:0xff69b4, pos:[ 0.025, 0.045, 0.05] },
+    { type:'sphere', r:0.020, color:0xff69b4, pos:[-0.025, 0.045, 0.05] },
+    { type:'sphere', r:0.014, color:0xff8fc0, pos:[ 0.040, 0.040, 0.04] },
+    { type:'sphere', r:0.014, color:0xff8fc0, pos:[-0.040, 0.040, 0.04] },
+    // Pearl bead on the toe
+    { type:'sphere', r:0.020, color:0xfaf0e6, pos:[0, 0.040, 0.16] },
+    // Sparkle dots
+    { type:'sphere', r:0.005, color:0xffffff, pos:[ 0.06, 0.020, 0.02] },
+    { type:'sphere', r:0.005, color:0xffffff, pos:[-0.06, 0.020, 0.02] },
+    { type:'sphere', r:0.005, color:0xffffff, pos:[ 0.04, 0.050, -0.04] },
+    { type:'sphere', r:0.005, color:0xffffff, pos:[-0.04, 0.050, -0.04] },
   ] },
+  // Bigfoot — massive bare hairy foot. Wider/larger base than other
+  // skins, dense fur tufts of varied size and tone covering the top,
+  // four big yellowed claws sticking forward off the toe, and mud
+  // splatters on the underside.
   legendary_bigfoot:{ color: 0x5c3d11, extras: [
-    // Hairy big-foot — dense fur tufts on top + extra wide
-    { type:'box', s:[0.22, 0.06, 0.24], color:0x3d2008, pos:[0, -0.02, 0.04] },
-    { type:'sphere', r:0.05, color:0x3d2008, pos:[ 0.05, 0.05, 0.02] },
-    { type:'sphere', r:0.05, color:0x3d2008, pos:[-0.05, 0.05, 0.02] },
-    { type:'sphere', r:0.05, color:0x3d2008, pos:[ 0.00, 0.06, 0.08] },
+    // Wide oversized foot base + dirt layer underneath
+    { type:'box', s:[0.24, 0.06, 0.28], color:0x3d2008, pos:[0, -0.02, 0.04] },
+    { type:'box', s:[0.22, 0.02, 0.26], color:0x2a1604, pos:[0, -0.06, 0.04] },
+    // Dense fur tufts of varying size and tone
+    { type:'sphere', r:0.060, color:0x3d2008, pos:[ 0.07, 0.06, -0.02] },
+    { type:'sphere', r:0.055, color:0x4a2f10, pos:[-0.07, 0.06, -0.02] },
+    { type:'sphere', r:0.050, color:0x3d2008, pos:[ 0.00, 0.07, 0.04] },
+    { type:'sphere', r:0.045, color:0x4a2f10, pos:[ 0.07, 0.06, 0.10] },
+    { type:'sphere', r:0.045, color:0x3d2008, pos:[-0.07, 0.06, 0.10] },
+    { type:'sphere', r:0.040, color:0x2a1604, pos:[ 0.04, 0.08, 0.14] },
+    { type:'sphere', r:0.040, color:0x2a1604, pos:[-0.04, 0.08, 0.14] },
+    // Big yellowed claws sticking forward off the toes
+    { type:'cylinder', r:0.012, h:0.04, color:0xc8b876, pos:[ 0.07, -0.020, 0.20], rot:[Math.PI/3, 0, 0] },
+    { type:'cylinder', r:0.012, h:0.04, color:0xc8b876, pos:[ 0.02, -0.020, 0.22], rot:[Math.PI/3, 0, 0] },
+    { type:'cylinder', r:0.012, h:0.04, color:0xc8b876, pos:[-0.02, -0.020, 0.22], rot:[Math.PI/3, 0, 0] },
+    { type:'cylinder', r:0.012, h:0.04, color:0xc8b876, pos:[-0.07, -0.020, 0.20], rot:[Math.PI/3, 0, 0] },
+    // Mud splatter
+    { type:'sphere', r:0.015, color:0x4a3010, pos:[ 0.07, -0.04, 0.10] },
+    { type:'sphere', r:0.012, color:0x4a3010, pos:[-0.06, -0.05, 0.06] },
   ] },
   // Secret
   secret_rexey:    { color: 0x8B6914, extras: [
