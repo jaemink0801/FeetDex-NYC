@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T162156';
+  var BAKED = '20260510T162620';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2680,11 +2680,16 @@ class Player {
 
     this._saber.visible = false;
     this._saberSwingT  = 0;       // 0..1 progress of current swing
-    // Resting transform (used as the target by the idle drift-back).
-    this._saberRest = { rx: -0.30, ry: 0.15, rz: 0.05, py: -0.30, pz: -0.55 };
+    // Two distinct poses: a tip-UP "sheathed" carry (not in battle) and
+    // the original lower-right "battle" stance used during combat. The
+    // ignition animation eases the saber from sheathed → battle pose
+    // while the blade extends, so the unsheathe reads as a real motion.
+    this._saberSheathPose = { rx: -1.05, ry: 0.05, rz: 0.05, py: -0.18, pz: -0.40 };
+    this._saberBattlePose = { rx: -0.30, ry: 0.15, rz: 0.05, py: -0.30, pz: -0.55 };
 
-    // Sheath state. When sheathed (default), the blade + halo + trail
-    // collapse to length 0 so only the hilt stick is visible. The
+    // Sheath state. When sheathed (default), blade + halo + trail are
+    // hidden entirely (visible=false) — the cylinder geometry's end caps
+    // would otherwise render as glowing disks even at scale.z≈0. The
     // ignition animation grows them back out. _saberSheathed flags
     // sheathed; _saberIgniteT 0..1 is the unsheathe progress.
     this._saberBlade = blade;
@@ -2692,7 +2697,10 @@ class Player {
     this._saberTrail = trail;
     this._saberSheathed = true;
     this._saberIgniteT  = 0;
-    this._setSaberLength(0);     // start fully collapsed
+    this._setSaberLength(0);     // start fully collapsed (and hidden)
+    // Apply sheathed pose to the saber group on construction.
+    this._saber.position.set(0.32, this._saberSheathPose.py, this._saberSheathPose.pz);
+    this._saber.rotation.set(this._saberSheathPose.rx, this._saberSheathPose.ry, this._saberSheathPose.rz);
 
     window.addEventListener('keydown', e => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this._sprint = true;
@@ -2752,18 +2760,24 @@ class Player {
   // the hilt visible) and 1 = full length. The blade & halo geometries
   // are oriented with their length along Z after rotation.x=π/2; we
   // scale.z and shift their position so the base stays at the hilt tip.
+  // When length is 0 we hide them entirely — the cylinder's end caps
+  // otherwise render as a glowing emissive disk at the hilt tip.
   _setSaberLength(t) {
     const k = Math.max(0, Math.min(1, t));
+    const visible = k > 0.001;
     if (this._saberBlade) {
-      this._saberBlade.scale.z = k > 0 ? k : 0.0001;
+      this._saberBlade.visible = visible;
+      this._saberBlade.scale.z = visible ? k : 0.0001;
       this._saberBlade.position.z = -0.09 - 0.60 * k;     // base at hilt tip
     }
     if (this._saberHalo) {
-      this._saberHalo.scale.z = k > 0 ? k : 0.0001;
+      this._saberHalo.visible = visible;
+      this._saberHalo.scale.z = visible ? k : 0.0001;
       this._saberHalo.position.z = -0.09 - 0.60 * k;
     }
     if (this._saberTrail) {
-      this._saberTrail.scale.z = k > 0 ? k : 0.0001;
+      this._saberTrail.visible = visible;
+      this._saberTrail.scale.z = visible ? k : 0.0001;
       this._saberTrail.position.z = -0.09 - 0.625 * k;
     }
   }
@@ -2784,7 +2798,21 @@ class Player {
 
   _animateLightsaber(dt) {
     if (!this._saber || !this._saber.visible) return;
-    const rest = this._saberRest;
+    // Pose target — sheathed pose when carrying the hilt around the city,
+    // battle pose during the unsheathe + fight. The ignition animation
+    // smoothly interpolates rest pose alongside blade extension so the
+    // saber visually shifts from "tip up, held close" to "ready stance"
+    // as the blade ignites.
+    const sP = this._saberSheathPose, bP = this._saberBattlePose;
+    const ip = this._saberSheathed ? 0 : this._saberIgniteT;
+    const lerp = (a, b) => a + (b - a) * ip;
+    const rest = {
+      rx: lerp(sP.rx, bP.rx),
+      ry: lerp(sP.ry, bP.ry),
+      rz: lerp(sP.rz, bP.rz),
+      py: lerp(sP.py, bP.py),
+      pz: lerp(sP.pz, bP.pz),
+    };
     if (this._saberSwingT > 0) {
       // Slightly slower decay than before (was 4.5) so the diagonal arc
       // is actually visible — players couldn't catch the previous swing.
@@ -2827,12 +2855,21 @@ class Player {
     }
 
     // Ignition / sheathe animation. When _saberSheathed is false and
-    // _saberIgniteT < 1, grow the blade from 0 to 1 over ~0.55s. When
-    // _saberSheathed flips back to true the blade is collapsed instantly
-    // by sheathLightsaber().
+    // _saberIgniteT < 1, grow the blade from 0 to 1 over ~2.0s — slow
+    // enough that the player can clearly watch the blade extend during
+    // the 3-2-1 countdown (the sequence runs ~2.75s total). The blade
+    // material also brightens as it fully extends, giving a satisfying
+    // bloom right as "FIGHT!" appears.
     if (!this._saberSheathed && this._saberIgniteT < 1) {
-      this._saberIgniteT = Math.min(1, this._saberIgniteT + dt / 0.55);
+      this._saberIgniteT = Math.min(1, this._saberIgniteT + dt / 2.0);
       this._setSaberLength(this._saberIgniteT);
+      // Brief ignition flash that builds with the blade's growth
+      if (this._saberBladeMat) {
+        this._saberBladeMat.emissiveIntensity = 0.6 + this._saberIgniteT * 1.4;
+      }
+      if (this._saberHaloMat) {
+        this._saberHaloMat.opacity = 0.10 + this._saberIgniteT * 0.20;
+      }
     }
   }
 
