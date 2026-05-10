@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260509T234913';
+  var BAKED = '20260510T002943';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1515,6 +1515,15 @@ const COSMETIC_SHOE_COLORS = {
 // a fixed dialogue script in ui.js (MISSION_NPC_SCRIPTS).
 const MISSIONS_ACTIVE_MAX = 3;
 const MISSION_POOL = [
+  // ── BOOTSTRAP (always the very first mission) ──────────────────────────
+  // Sends the player to meet Vance at Fleet Feet. He runs a short
+  // budgeting tutorial (mirrors Morton's) so skins are introduced with
+  // their financial framing — cosmetic, opportunity-cost, save-for-the-
+  // one-you-want — and the mission resolves after the dialogue ends.
+  { id: 'visit_fleetfeet',    type: 'talk', target: 'shopkeeper_fleetfeet',
+    label: 'Visit Fleet Feet — Vance has something to teach you.',
+    reward: 20 },
+
   // ── FIND-CHARACTER (target = feetId; reveal omits the name) ────────────
   { id: 'find_grand_central', type: 'find', target: 'common_samurai',
     label: 'A wandering figure waits inside Grand Central Terminal.',
@@ -1644,9 +1653,18 @@ class FeetDex {
   }
 
   _drawNextMission() {
-    const taken     = new Set([...this.completedMissions, ...this.activeMissions.map(m => m.id)]);
+    const taken = new Set([...this.completedMissions, ...this.activeMissions.map(m => m.id)]);
+    // Bootstrap rule: the very first mission the player ever sees is
+    // always 'visit_fleetfeet' — meet Vance, hear the budgeting basics
+    // for cosmetic spend. After it's been drawn (active or completed)
+    // the rest of the pool draws normally.
+    if (!taken.has('visit_fleetfeet')) {
+      const m = MISSION_POOL.find(x => x.id === 'visit_fleetfeet');
+      if (m) return m;
+    }
     const available = MISSION_POOL.filter(m => {
       if (taken.has(m.id)) return false;
+      if (m.id === 'visit_fleetfeet') return false;       // bootstrap-only
       if (m.type === 'find' && this.has(m.target)) return false;
       return true;
     });
@@ -11012,7 +11030,7 @@ function _vanceOnBuy(price) {
   const trophyT = trophy ? tierVal[trophy.rarity] : 0;
 
   if (skins === 1) {
-    return `Clean — and that's your first fit, which is its own little milestone. The lesson behind it: essentials before luxuries, every time. You did it in the right order.`;
+    return `Clean — that's your first fit. <b>Look down at your feet</b> right now and you'll see them on you. Lesson behind it: essentials before luxuries, every time. You did the order right.`;
   }
   // If they bought a low-tier skin while a higher-rarity pair waits in
   // their dex, coach them to save up for the trophy and route the in-
@@ -11039,9 +11057,53 @@ function _vanceOnBuy(price) {
 function _openFleet() {
   document.exitPointerLock();
   state = 'fleet';
-  ui.openFleetFeetShop(feetdex, FEET_CATALOG, COSMETIC_PRICES,
-    _onBuyCosmetic, _onEquipCosmetic, _onUnequipCosmetic,
-    _vanceGreeting());
+  // First-ever visit runs Vance's mini-tutorial (mirrors Morton's three-
+  // line teach), then resolves the bootstrap visit-fleetfeet mission and
+  // opens the shop. Subsequent visits skip straight to the shop.
+  if (_vanceVisits === 0) {
+    _runVanceTutorial();
+  } else {
+    ui.openFleetFeetShop(feetdex, FEET_CATALOG, COSMETIC_PRICES,
+      _onBuyCosmetic, _onEquipCosmetic, _onUnequipCosmetic,
+      _vanceGreeting());
+  }
+}
+
+function _runVanceTutorial() {
+  // Mark Vance as visited up-front so when _vanceGreeting fires after the
+  // tutorial it picks a context-aware return greeting instead of
+  // re-running VANCE_FIRST_LINE.
+  _vanceVisits = 1;
+  const lines = [
+    {
+      title: 'VANCE',
+      body: "Yo, welcome to <b>FLEET FEET</b>. Name's Vance — every foot you bring me, I'll cut you the matching <b>skin</b> so you can actually wear 'em. Pure cosmetic, no boost, all flex."
+    },
+    {
+      title: 'VANCE',
+      body: "House rule though: skins are <i>luxuries</i>, not essentials. The same gold spent on a fit can't buy a tool over at Morton's, and that's <b>opportunity cost</b> — every coin makes a choice for you whether you notice or not. Cover the tools that earn gold back first; drip second."
+    },
+    {
+      title: 'VANCE',
+      body: "Smartest play is to save up for the <b>one</b> pair you actually want, and let the in-between gold do work at Morton's. Look down — you're rocking nothing right now. Cop a skin and you'll see it on your feet immediately."
+    },
+  ];
+  let i = 0;
+  const showNext = () => {
+    if (i >= lines.length) {
+      // Bootstrap mission resolves once the dialogue is fully heard.
+      const result = feetdex.resolveMission('talk', 'shopkeeper_fleetfeet');
+      if (result) _celebrateMission(result);
+      ui.openFleetFeetShop(feetdex, FEET_CATALOG, COSMETIC_PRICES,
+        _onBuyCosmetic, _onEquipCosmetic, _onUnequipCosmetic,
+        "Rack's right there — take a look around.");
+      return;
+    }
+    const line = lines[i++];
+    ui.showTip(line.title, line.body);
+    _afterTipCallback = showNext;
+  };
+  showNext();
 }
 function _closeFleet() {
   ui.closeFleetFeetShop();
@@ -11152,10 +11214,15 @@ function _onBuyBooster(id) {
           );
           _afterTipCallback = () => {
             _revealMissions();
-            // Fleet Feet intro — last lesson before the celebration.
+            // Fleet Feet intro — last lesson before the celebration. The
+            // "look down, you're barefoot" hint plants the visual hook so
+            // the player WANTS to visit Fleet Feet, which dovetails with
+            // the bootstrap visit-fleetfeet mission now sitting in their
+            // mission slate.
             ui.openFeetGodDialogue(
-              "Last thing — once your tools are covered, <b>Fleet Feet</b> sells skins of any foot you've collected. " +
-              "It's the dessert after dinner: only worth it once the essentials are handled."
+              "Last thing — look down at your feet. You're walking around <b>barefoot</b> right now, " +
+              "and <b>Fleet Feet</b> sells skins of any foot you've collected so you can actually wear them. " +
+              "It's the dessert after dinner: only worth it once your tools are covered."
             );
             _afterTipCallback = () => {
               // NOW the tutorial is done. Celebrate.
