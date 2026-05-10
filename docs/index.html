@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T012013';
+  var BAKED = '20260510T153745';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -705,8 +705,30 @@
       background-color .25s; }
     .mission-row.complete { border-color:#9bdc9b; background:rgba(40,80,40,.85);
       animation:mission-pop .55s ease-out; }
+    .mission-row.complete .m-box { color:#9bdc9b;
+      animation:mission-check .35s cubic-bezier(.2,1.5,.4,1) both; }
+    /* Slide-out + fade when a completed mission is leaving the slot */
+    .mission-row.mission-leaving { transform:translateX(40px) scale(0.94);
+      opacity:0; transition:transform .45s ease-in, opacity .45s ease-in; }
     .mission-row.entering { transform:translateX(-30px); opacity:0; }
     .mission-row.entering.in { transform:translateX(0); opacity:1; }
+    /* Bootstrap "visit Fleet Feet" mission — gold-bordered + glowing
+       so it stands apart from the random pool. */
+    .mission-row.mission-special { border-color:#FFD700;
+      background:linear-gradient(90deg, rgba(80,60,10,.92), rgba(40,30,8,.86));
+      box-shadow:0 0 14px rgba(255,215,0,.40);
+      animation:mission-special-glow 2.4s ease-in-out infinite; }
+    .mission-row.mission-special .m-text { color:#FFE680; }
+    .mission-row.mission-special .m-reward { color:#FFEC60; text-shadow:0 0 6px rgba(255,220,80,.6); }
+    @keyframes mission-special-glow {
+      0%,100% { box-shadow:0 0 10px rgba(255,215,0,.30); }
+      50%     { box-shadow:0 0 20px rgba(255,215,0,.55); }
+    }
+    @keyframes mission-check {
+      0%   { transform:scale(0.4); }
+      60%  { transform:scale(1.35); }
+      100% { transform:scale(1.0); }
+    }
     .mission-row .m-box { flex-shrink:0; font-size:14px; line-height:1; }
     .mission-row .m-text { flex:1; line-height:1.3; }
     .mission-row .m-reward { flex-shrink:0; color:#FFD700; font-weight:bold; }
@@ -1384,6 +1406,42 @@ const Audio = {
     });
   },
 
+  // Lightsaber ignition — the iconic SHWFFFF "vwoom-up" of the blade
+  // extending. A pitched-up whoosh swelling in over ~0.55s, paired with
+  // a low harmonic so it has body. Used during the 3-2-1 countdown.
+  lightsaberIgnite() {
+    const c = getCtx();
+    const t = c.currentTime;
+    const dur = 0.55;
+    // Pitched whoosh — sawtooth swelling 200→1100 Hz through bandpass.
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(200, t);
+    o.frequency.exponentialRampToValueAtTime(1100, t + dur);
+    const bp = c.createBiquadFilter(); bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(700, t);
+    bp.frequency.exponentialRampToValueAtTime(2200, t + dur);
+    bp.Q.value = 4;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(0.30, t + 0.10);
+    g.gain.linearRampToValueAtTime(0.18, t + dur);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.20);
+    o.connect(bp); bp.connect(g); g.connect(masterGain);
+    o.start(t); o.stop(t + dur + 0.22);
+    // Low body — sub-bass sine swelling
+    const sub = c.createOscillator(); sub.type = 'sine';
+    sub.frequency.setValueAtTime(70, t);
+    sub.frequency.linearRampToValueAtTime(110, t + dur);
+    const sg = c.createGain();
+    sg.gain.setValueAtTime(0.0001, t);
+    sg.gain.linearRampToValueAtTime(0.28, t + 0.20);
+    sg.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.20);
+    sub.connect(sg); sg.connect(masterGain);
+    sub.start(t); sub.stop(t + dur + 0.22);
+    // Bright spark on tip emergence
+    tone(2400, 0.10, 'triangle', 0.16, 0.05);
+  },
+
   // Continuous low choir-pad hum, started when the player equips the
   // Ancient One's feet skin and stopped when they unequip / swap. Three
   // detuned saw-wave layers through a lowpass — soft, sustained, holy.
@@ -1588,10 +1646,12 @@ const Audio = {
     this._battleTimer = null;
   },
 
-  // Countdown tick (3, 2, 1) — sharp pip
+  // Countdown tick (3, 2, 1) — sharp pip. Volume halved so the
+  // lightsaber ignition that fires alongside the countdown gets to
+  // be the dominant element of the moment.
   countdownTick() {
-    tone(660, 0.08, 'square', 0.18);
-    tone(990, 0.06, 'sine',   0.10, 0.01);
+    tone(660, 0.08, 'square', 0.09);
+    tone(990, 0.06, 'sine',   0.05, 0.01);
   },
   // Final "FIGHT!" stinger — bigger, brighter
   countdownGo() {
@@ -1674,7 +1734,7 @@ const MISSION_POOL = [
   // one-you-want — and the mission resolves after the dialogue ends.
   { id: 'visit_fleetfeet',    type: 'talk', target: 'shopkeeper_fleetfeet',
     label: 'Visit Fleet Feet — Vance has something to teach you.',
-    reward: 20 },
+    reward: 30, special: true },
 
   // ── FIND-CHARACTER (target = feetId; reveal omits the name) ────────────
   { id: 'find_grand_central', type: 'find', target: 'common_samurai',
@@ -1726,7 +1786,7 @@ const BOOSTER_DEFS = [
   { id:'metrocard',      name:'MetroCard',      price:100,
     desc:'Walk to a subway station and press [E] to ride.' },
   { id:'lightsaber',     name:'Lightsaber',     price:100,
-    desc:'Doubles damage, knockback, and attack speed. Quadruples them against mythics and legendaries.' },
+    desc:'2× damage and 1.5× attack speed. 4× damage and 3× attack speed against mythics and legendaries.' },
   { id:'ancient_tracker',name:'Ancient Tracker',price:500,
     desc:'A guiding star points to The Ancient One.' },
 ];
@@ -2500,6 +2560,17 @@ class Player {
     // Resting transform (used as the target by the idle drift-back).
     this._saberRest = { rx: -0.30, ry: 0.15, rz: 0.05, py: -0.30, pz: -0.55 };
 
+    // Sheath state. When sheathed (default), the blade + halo + trail
+    // collapse to length 0 so only the hilt stick is visible. The
+    // ignition animation grows them back out. _saberSheathed flags
+    // sheathed; _saberIgniteT 0..1 is the unsheathe progress.
+    this._saberBlade = blade;
+    this._saberHalo  = halo;
+    this._saberTrail = trail;
+    this._saberSheathed = true;
+    this._saberIgniteT  = 0;
+    this._setSaberLength(0);     // start fully collapsed
+
     window.addEventListener('keydown', e => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this._sprint = true;
     });
@@ -2553,6 +2624,40 @@ class Player {
     this._saberSwingT = 1.0;        // animation timer counts down to 0
   }
 
+  // Scale blade/halo/trail along their long axis so 0 = collapsed (just
+  // the hilt visible) and 1 = full length. The blade & halo geometries
+  // are oriented with their length along Z after rotation.x=π/2; we
+  // scale.z and shift their position so the base stays at the hilt tip.
+  _setSaberLength(t) {
+    const k = Math.max(0, Math.min(1, t));
+    if (this._saberBlade) {
+      this._saberBlade.scale.z = k > 0 ? k : 0.0001;
+      this._saberBlade.position.z = -0.09 - 0.60 * k;     // base at hilt tip
+    }
+    if (this._saberHalo) {
+      this._saberHalo.scale.z = k > 0 ? k : 0.0001;
+      this._saberHalo.position.z = -0.09 - 0.60 * k;
+    }
+    if (this._saberTrail) {
+      this._saberTrail.scale.z = k > 0 ? k : 0.0001;
+      this._saberTrail.position.z = -0.09 - 0.625 * k;
+    }
+  }
+
+  // Sheath/unsheathe — main.js calls this at the start of the 3-2-1
+  // countdown to ignite the blade, and after combat to collapse it back.
+  igniteLightsaber() {
+    if (!this._saber) return;
+    this._saberSheathed = false;
+    this._saberIgniteT  = 0;       // animation runs in _animateLightsaber
+  }
+  sheathLightsaber() {
+    if (!this._saber) return;
+    this._saberSheathed = true;
+    this._saberIgniteT  = 0;       // collapse instantly via _animateLightsaber
+    this._setSaberLength(0);
+  }
+
   _animateLightsaber(dt) {
     if (!this._saber || !this._saber.visible) return;
     const rest = this._saberRest;
@@ -2564,19 +2669,15 @@ class Player {
       const arc   = Math.sin(phase * Math.PI);    // 0 → 1 → 0  (peaks mid-swing)
       const chop  = -Math.cos(phase * Math.PI);   // -1 → +1   (windup → follow-through)
 
-      // DIAGONAL DOWNWARD SLASH from upper-right to lower-left:
-      //   - rotation.x sweeps from windup (tip raised back, x more negative)
-      //     through chop forward (x positive = blade tip forward + down).
-      //   - rotation.z leans the blade across the body — positive at windup
-      //     (right-shoulder side) to negative at follow-through (left hip).
-      //   - rotation.y keeps a small forward presentation.
-      //   - position dips during the chop so the blade visibly rises then
-      //     descends through the camera frame, NOT a side-to-side wipe.
-      this._saber.rotation.x = rest.rx + chop * 1.10;          // up→down chop
-      this._saber.rotation.z = rest.rz + chop * -0.65;         // diagonal lean
-      this._saber.rotation.y = rest.ry + arc * 0.10;           // tiny present
+      // VERTICAL UP→DOWN CHOP — pure rotation.x. Windup tilts the blade
+      // back/up; strike snaps it forward and down through the camera.
+      // A subtle wrist-twist via rotation.z adds character without
+      // turning the motion into a horizontal wipe.
+      this._saber.rotation.x = rest.rx + chop * 1.30;          // big up→down chop
+      this._saber.rotation.z = rest.rz + arc * 0.18;           // small wrist twist
+      this._saber.rotation.y = rest.ry;                         // no horizontal sweep
       this._saber.position.z = rest.pz - arc * 0.28;           // forward thrust
-      this._saber.position.y = rest.py + chop * -0.18;         // up then down
+      this._saber.position.y = rest.py + chop * -0.22;         // up then down
 
       // FLASH — emissive intensity peaks at mid-swing and the wide trail
       // mesh briefly blooms, leaving an obvious cyan slash arc.
@@ -2599,6 +2700,15 @@ class Player {
       if (this._saberBladeMat) this._saberBladeMat.emissiveIntensity = 1.2;
       if (this._saberHaloMat)  this._saberHaloMat.opacity = 0.25;
       if (this._saberTrailMat) this._saberTrailMat.opacity = 0;
+    }
+
+    // Ignition / sheathe animation. When _saberSheathed is false and
+    // _saberIgniteT < 1, grow the blade from 0 to 1 over ~0.55s. When
+    // _saberSheathed flips back to true the blade is collapsed instantly
+    // by sheathLightsaber().
+    if (!this._saberSheathed && this._saberIgniteT < 1) {
+      this._saberIgniteT = Math.min(1, this._saberIgniteT + dt / 0.55);
+      this._setSaberLength(this._saberIgniteT);
     }
   }
 
@@ -4427,12 +4537,11 @@ function showHUDMessage(text, durationMs = 2500) {
 
 // ── Combat encounter ──────────────────────────────────────────────────────────
 
-// HP and damage scale linearly through the boss tiers:
-//   mythic  → legendary  → secret (Ancient One)
-//   100      200          300       (HP, +100 each step)
-//    25       37           50       (dmg, ~+12 each step)
-const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 200, secret: 300 };
-const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 37,  secret: 50  };
+// HP and damage scale through the boss tiers. Legendaries got a +25%
+// bump (HP 200→250, DMG 37→46) per the difficulty pass; secret was
+// already higher and stays as-is.
+const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 250, secret: 300 };
+const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 46,  secret: 50  };
 const PLAYER_DMG  = 10;
 const PLAYER_MAX  = 100;
 const HIT_CD      = 500;   // ms between player attacks
@@ -4465,10 +4574,12 @@ class CombatEncounter {
     this._npcHP      = _NPC_HP[npc.rarity] ?? PLAYER_MAX;
     this._npcMaxHP   = this._npcHP;
 
-    // Per-rarity attack-speed multiplier. Each tier is 1.25× the previous:
-    //   mythic 1.65× → legendary 2.06× → secret 2.58×.
+    // Per-rarity attack-speed multiplier. Legendaries got a 1.25× bump
+    // on top of their previous 2.06× (now 2.58×) per the difficulty
+    // pass. Secret stays at its previous 2.58× (which is now equal to
+    // legendary speed, but secret HP is still highest).
     const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 1.25
-                     : npc.rarity === 'legendary' ? 1.65 * 1.25
+                     : npc.rarity === 'legendary' ? 1.65 * 1.25 * 1.25
                      : npc.rarity === 'mythic'    ? 1.65
                      : 1;
     this._atkCd  = NPC_ATK_CD / speedMult;
@@ -4480,9 +4591,10 @@ class CombatEncounter {
     this._nextSwing     = Date.now() + 1200;
     this._koTime        = 0;        // when NPC HP hit 0
     this._active        = true;
-    // Chase speed scales with tier: mythic 8.1 → legendary 12.15 → ancient 16.2.
+    // Chase speed scales with tier. Legendary got a 1.25× bump on top
+    // of its prior 1.5× (now 1.875×, ≈15.2 m/s).
     this._chaseSpeed    = npc.rarity === 'secret'    ? 8.1 * 2.0
-                        : npc.rarity === 'legendary' ? 8.1 * 1.5
+                        : npc.rarity === 'legendary' ? 8.1 * 1.5 * 1.25
                         : 8.1;
     this._origGroupY    = npc.group.position.y;
     this._origGroupRotX = npc.group.rotation.x;
@@ -4664,9 +4776,10 @@ class CombatEncounter {
   playerAttack() {
     if (!this._active || this._koTime > 0) return;
     const now = Date.now();
-    // Lightsaber halves the swing cooldown (2× attack speed); against
-    // mythics/legendaries the bonus doubles AGAIN (4× attack speed).
-    const lsSpeedMult = this._hasLightsaber ? (this._isElite ? 4 : 2) : 1;
+    // Lightsaber attack-speed multiplier: 1.5× normal, 3× vs elites
+    // (was 2× / 4× — 25% reduction across the board to keep the
+    // weapon strong but not trivializing endgame fights).
+    const lsSpeedMult = this._hasLightsaber ? (this._isElite ? 3 : 1.5) : 1;
     const cooldown = HIT_CD / lsSpeedMult;
     if (now - this._lastHit < cooldown) return;
     this._lastHit = now;
@@ -5456,8 +5569,9 @@ class UI {
     if (!missions || missions.length === 0) { wrap.classList.remove('active'); return; }
     wrap.classList.add('active');
     rows.innerHTML = missions.map(m => {
-      const reward = (m.reward === 'mystery') ? '?' : `${m.reward}⛂`;
-      return `<div class="mission-row" data-mid="${m.id}">` +
+      const reward  = (m.reward === 'mystery') ? '?' : `${m.reward}⛂`;
+      const cls     = 'mission-row' + (m.special ? ' mission-special' : '');
+      return `<div class="${cls}" data-mid="${m.id}">` +
              `  <span class="m-box">☐</span>` +
              `  <span class="m-text">${m.label}</span>` +
              `  <span class="m-reward">${reward}</span>` +
@@ -5465,17 +5579,23 @@ class UI {
     }).join('');
   }
 
-  // Briefly mark a mission row as complete (green check, scale pulse), then
-  // re-render so the next mission can take its slot. Returns a Promise that
-  // resolves once the celebration timing is done.
+  // Mission completion: tick the box, run a quick check + slide-out
+  // animation, then re-render so the replacement mission slides in
+  // smoothly underneath.
   markMissionComplete(missionId, onAfter) {
     const row = document.querySelector(`#mission-rows [data-mid="${missionId}"]`);
     if (!row) { onAfter?.(); return; }
-    row.classList.add('complete');
     const box = row.querySelector('.m-box');
+    // Phase 1 — instant check (with a quick scale-pulse via CSS class).
+    row.classList.add('complete');
     if (box) box.textContent = '☑';
     this.spawnFeetRain(15);
-    setTimeout(() => onAfter?.(), 900);
+    // Phase 2 — slide-out fade after 700ms so the player sees the check.
+    setTimeout(() => {
+      row.classList.add('mission-leaving');
+    }, 700);
+    // Phase 3 — fire callback (replacement render) after slide-out.
+    setTimeout(() => onAfter?.(), 1200);
   }
 
   // Floating "+N gold" or "-N gold" toast — drifts up and fades.
@@ -7850,14 +7970,12 @@ function buildBrooklynBridge(scene, solidObjects) {
   uLine.position.set(-60, 0.06, -80);
   scene.add(uLine);
 
-  // ── Ramp guardrails (prevent player walking off ramp sides) ──────────────
-  // Y-bounded to the ramp's vertical span so the player can also walk
-  // UNDER the ramps along the road below without being clipped by the
-  // rails on either side.
-  registerSolid(solidObjects, -63.25, -38, 0.25, 8, 0.05, 0, BRIDGE_DECK_Y + 1);
-  registerSolid(solidObjects, -56.75, -38, 0.25, 8, 0.05, 0, BRIDGE_DECK_Y + 1);
-  registerSolid(solidObjects, -63.25,-120, 0.25, 6, 0.05, 0, BRIDGE_DECK_Y + 1);
-  registerSolid(solidObjects, -56.75,-120, 0.25, 6, 0.05, 0, BRIDGE_DECK_Y + 1);
+  // Ramp guardrails removed entirely — they were blocking players from
+  // walking up to the ramp from the side. Now the player can approach
+  // any ramp section laterally; if their feet are at-or-near the ramp
+  // height the existing getFloorY snap-up takes them onto the ramp
+  // smoothly, and at the bottom (where the ramp is flush with ground)
+  // they can simply walk on without any boundary in the way.
 
   // ── NPC spawn-exclusion colliders ─────────────────────────────────────────
   const colliders = [];
@@ -8400,12 +8518,16 @@ function buildTimesSquare(scene, solidObjects) {
   // panels narrower to fit the new 5-wide tower.
   emissive(0xDD0000, 0xFF0000,  -2.55, 18, OTS_Z, 0.10, 28, 6.6, 0);
   emissive(0xDD0000, 0xFF0000,   2.55, 18, OTS_Z, 0.10, 28, 6.6, 0);
-  emissive(0x111111, 0xFF0000,   0,   18, OTS_Z - 3.55, 4.4, 28, 0.10, 0);
+  // South-facing LED panel (toward plaza center). Removed the matching
+  // north panel because its face pointed away from the plaza interior
+  // and the OTS body itself occluded it from anyone standing in the
+  // square — see "all signs face inward" rule.
   emissive(0x111111, 0xFF4400,   0,   18, OTS_Z + 3.55, 4.4, 28, 0.10, 0);
-  // Brand labels (sized for the narrower face)
-  label('COCA-COLA',    0, 22, OTS_Z - 3.65, 3.5, 1.0);
-  label('ONE TIMES SQ', 0, 12, OTS_Z - 3.65, 3.5, 0.85);
-  label('TIMES SQUARE', 0, 22, OTS_Z + 3.65, 3.5, 1.0);
+  // Brand labels — all moved to the SOUTH face (toward plaza center)
+  // for the same reason. North labels removed.
+  label('COCA-COLA',    0, 28, OTS_Z + 3.65, 3.5, 1.0);
+  label('ONE TIMES SQ', 0, 18, OTS_Z + 3.65, 3.5, 0.85);
+  label('TIMES SQUARE', 0,  9, OTS_Z + 3.65, 3.5, 0.85);
   // New Year's Eve ball platform (small dark band at top)
   bx(0x222222, 0, 65.5, OTS_Z, 2, 0.4, 2);
   const ballMat = new THREE.MeshStandardMaterial({ color: 0xCCDDFF, emissive: 0x8899FF, emissiveIntensity: 0.8 });
@@ -8520,169 +8642,101 @@ function buildTimesSquare(scene, solidObjects) {
   emissive(0xCC2200, 0xFF2200, 0, 2.6, 12, 12, 0.2, 0.9);
   label('TKTS', 0, 3.5, 11.4, 4, 1.2);
 
-  // ── Newsstands (solid) ────────────────────────────────────────────────────────
-  for (const [nx, nz] of [[-10,-11],[-6,-11],[6,-11],[10,-11],[-10,9],[10,9]]) {
-    bx(0x444444, nx, 1.0, nz, 1.4, 2.0, 0.9);
-    bx(0x333333, nx, 2.2, nz, 1.5, 0.35, 1.0);
-    // Magazine front panel
-    emissive(0xFFCC00, 0xFFDD44, nx, 1.3, nz - 0.46, 1.2, 1.6, 0.05);
-    registerSolid(solidObjects, ox + nx, oz + nz, 0.75, 0.55);
-  }
+  // ── DENSE SIGN PACK on tower inner faces ──────────────────────────────────
+  // Every sign here is mounted flush on a real tower wall (no floating
+  // panels), faces TOWARD the plaza center (no outward signs that the
+  // tower would occlude from inside the square), and varies in size to
+  // feel like real Times Square (mega billboards, wide horizontals,
+  // squares, tickers stacked vertically). All four corner towers get
+  // packs on BOTH inner faces; OTS gets extras on its east + west.
+  //
+  // Tower dims recap (from the towers loop above):
+  //   NW(-14,-14, 8w×58h×8d)    NE(14,-14, 8w×62h×8d)
+  //   SW(-14, 14, 8w×50h×8d)    SE(14, 14, 8w×54h×8d)
+  // Each face is 8u wide × tower_h tall. Inner faces:
+  //   NW: south(local z=-10, +z dir)  +  east(local x=-10, +x dir)
+  //   NE: south(local z=-10, +z dir)  +  west(local x= 10, -x dir)
+  //   SW: north(local z= 10, -z dir)  +  east(local x=-10, +x dir)
+  //   SE: north(local z= 10, -z dir)  +  west(local x= 10, -x dir)
+  // Sign offset 0.05u outside its mounting face. rotY: 0=+z, π=-z,
+  // π/2=+x, -π/2=-x.
 
-  // ── Pretzel carts (solid) ─────────────────────────────────────────────────────
-  for (const [cx, cz] of [[-11.5,3],[11.5,3],[-11.5,-8],[11.5,-8]]) {
-    bx(0x886633, cx, 0.5, cz, 1.2, 0.9, 0.8);
-    bx(0x553300, cx, 0.95, cz, 1.3, 0.12, 0.9);
-    registerSolid(solidObjects, ox + cx, oz + cz, 0.7, 0.55);
-    const cartPole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 6),
-      new THREE.MeshLambertMaterial({ color: 0x777777 }));
-    cartPole.position.set(ox + cx, 1.8, oz + cz);
-    scene.add(cartPole);
-    const canopy = new THREE.Mesh(new THREE.ConeGeometry(1.1, 0.55, 8),
-      new THREE.MeshLambertMaterial({ color: 0xDD3333 }));
-    canopy.position.set(ox + cx, 3.2, oz + cz);
-    scene.add(canopy);
-    // Striped canopy ring
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(1.1, 0.06, 6, 10),
-      new THREE.MeshLambertMaterial({ color: 0xFFFFFF }));
-    ring.rotation.x = Math.PI / 2;
-    ring.position.set(ox + cx, 3.0, oz + cz);
-    scene.add(ring);
-  }
+  // NW tower SOUTH face (cornerBillboard "AMERICAN EAGLE" already at y=44)
+  flatSign('NASDAQ',          -14, 30, -9.95, 6.5, 2.5, 0);
+  flatSign('BREAKING NEWS',   -15, 22, -9.95, 4.5, 4.5, 0);
+  flatSign('COCA-COLA',       -11.5, 22, -9.95, 3, 4.5, 0);
+  flatSign('SPOTIFY',         -14, 14, -9.95, 6, 3, 0);
+  flatSign('PEPSI',           -14, 8, -9.95, 6, 3, 0);
+  flatSign('STARBUCKS',       -14, 3, -9.95, 7, 2.2, 0);
+  // NW tower EAST face (rotY=π/2 → face direction +x)
+  flatSign('SAMSUNG',         -9.95, 44, -14, 7, 14, Math.PI / 2);
+  flatSign('DISNEY',          -9.95, 30, -14, 6, 3, Math.PI / 2);
+  flatSign('MTV',             -9.95, 22, -12.5, 4, 4, Math.PI / 2);
+  flatSign('STREAM NOW',      -9.95, 22, -16, 3, 4, Math.PI / 2);
+  flatSign('AMERICAN EAGLE',  -9.95, 14, -14, 6, 3, Math.PI / 2);
+  flatSign('HARD ROCK CAFE',  -9.95, 8, -14, 6.5, 2.2, Math.PI / 2);
+  flatSign('ESPN ZONE',       -9.95, 3, -14, 7, 2.2, Math.PI / 2);
 
-  // ── Police booth (solid) ──────────────────────────────────────────────────────
-  bx(0x1C3A6B, -13, 1.5, 11, 1.6, 3.0, 1.6);
-  bx(0xEEEEEE, -13, 3.2,  11, 1.7, 0.35, 1.7);
-  bx(0x2255AA, -13, 1.5,  11, 1.5, 2.6, 0.05); // front window
-  emissive(0x0044FF, 0x2266FF, -13, 3.55, 11, 0.8, 0.3, 1.65); // light bar
-  registerSolid(solidObjects, ox - 13, oz + 11, 0.9, 0.9);
+  // NE tower SOUTH face (cornerBillboard "NIKE" already at y=44)
+  flatSign("M&M'S",            14, 30, -9.95, 6.5, 3, 0);
+  flatSign('PEPSI',            14, 22, -9.95, 4.5, 4.5, 0);
+  flatSign('PREMIUM',         11.5, 22, -9.95, 3, 4.5, 0);
+  flatSign('NASDAQ',           14, 14, -9.95, 6, 3, 0);
+  flatSign('TKTS',             14, 8, -9.95, 6, 3, 0);
+  flatSign('MCDONALDS',        14, 3, -9.95, 7, 2.2, 0);
+  // NE tower WEST face (rotY=-π/2 → face direction -x)
+  flatSign('DISNEY+',          9.95, 46, -14, 7, 14, -Math.PI / 2);
+  flatSign('HAMILTON',         9.95, 32, -14, 6, 3, -Math.PI / 2);
+  flatSign('TONIGHT 8PM',      9.95, 28, -14, 6, 2.5, -Math.PI / 2);
+  flatSign('MARRIOTT',         9.95, 22, -12.5, 4, 4, -Math.PI / 2);
+  flatSign('SEPHORA',          9.95, 22, -16, 3, 4, -Math.PI / 2);
+  flatSign('SPOTIFY',          9.95, 14, -14, 6, 3, -Math.PI / 2);
+  flatSign('BREAKING NEWS',    9.95, 8, -14, 6.5, 2.2, -Math.PI / 2);
+  flatSign('BANK OF AMERICA',  9.95, 3, -14, 7, 2.2, -Math.PI / 2);
 
-  // ── Pedestrian barriers (solid metal rails) ───────────────────────────────────
-  for (const [bx_, bz_] of [[-5, -13],[5,-13],[-5,13],[5,13],[-5,0],[5,0]]) {
-    bx(0x555555, bx_, 0.5, bz_, 3.0, 1.0, 0.12);
-    registerSolid(solidObjects, ox + bx_, oz + bz_, 1.55, 0.15);
-  }
-  // Barrier posts
-  for (const [bx_, bz_] of [[-5,-13],[5,-13],[-5,13],[5,13],[-5,0],[5,0]]) {
-    for (const px of [-1.3, 0, 1.3]) {
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.1, 6),
-        new THREE.MeshLambertMaterial({ color: 0x666666 }));
-      post.position.set(ox + bx_ + px, 0.55, oz + bz_);
-      scene.add(post);
-    }
-  }
+  // SW tower NORTH face (cornerBillboard "SEPHORA" already at y=32)
+  flatSign('PHANTOM',         -14, 22, 9.95, 4.5, 4.5, Math.PI);
+  flatSign('OF THE OPERA',    -11.5, 22, 9.95, 3, 4.5, Math.PI);
+  flatSign('MOULIN ROUGE',    -14, 14, 9.95, 6, 3, Math.PI);
+  flatSign('BROADWAY',        -14, 9, 9.95, 6.5, 2.5, Math.PI);
+  flatSign('WHOLE FOODS',     -14, 3, 9.95, 7, 2.2, Math.PI);
+  // SW tower EAST face (rotY=π/2)
+  flatSign('NIKE',            -9.95, 38, 14, 7, 14, Math.PI / 2);
+  flatSign('SAMSUNG',         -9.95, 24, 14, 6, 3, Math.PI / 2);
+  flatSign('NYC  LIVE',       -9.95, 18, 12.5, 4, 4, Math.PI / 2);
+  flatSign('MARKET',          -9.95, 18, 16, 3, 4, Math.PI / 2);
+  flatSign('PEPSI',           -9.95, 11, 14, 6, 3, Math.PI / 2);
+  flatSign('WALGREENS',       -9.95, 4, 14, 7, 2.5, Math.PI / 2);
 
-  // ── Taxi cabs (solid) ─────────────────────────────────────────────────────────
-  const taxiPositions = [
-    [-10.5, 13.5], [-6.5, 13.5], [-2.5, 13.5], [1.5, 13.5],
-    [-10.5,-13.5], [-6.5,-13.5], [-2.5,-13.5], [1.5,-13.5],
-  ];
-  for (const [tx, tz_] of taxiPositions) {
-    // Body
-    bx(0xF5C518, tx, 0.55, tz_, 3.6, 1.1, 1.8);
-    // Roof
-    bx(0xE8B800, tx, 1.2, tz_, 2.4, 0.6, 1.6);
-    // Taxi light on roof
-    emissive(0xFFFF99, 0xFFFFAA, tx, 1.65, tz_, 0.9, 0.3, 0.5);
-    // Wheels (visual only)
-    for (const [wx, wz_] of [[-1.3, 0.7],[1.3, 0.7],[-1.3,-0.7],[1.3,-0.7]]) {
-      const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.2, 8),
-        new THREE.MeshLambertMaterial({ color: 0x111111 }));
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(ox + tx + wx, 0.28, oz + tz_ + wz_);
-      scene.add(wheel);
-    }
-    registerSolid(solidObjects, ox + tx, oz + tz_, 1.95, 1.0);
-  }
+  // SE tower NORTH face (cornerBillboard "DISNEY" already at y=32)
+  flatSign("M&M'S",            14, 22, 9.95, 4.5, 4.5, Math.PI);
+  flatSign('PREMIUM',         11.5, 22, 9.95, 3, 4.5, Math.PI);
+  flatSign('NASDAQ  +2.4%  DJIA  34,521', 14, 14, 9.95, 7, 1.8, Math.PI);
+  flatSign('AMERICAN EAGLE',   14, 9, 9.95, 6.5, 2.8, Math.PI);
+  flatSign('STARBUCKS',        14, 3, 9.95, 7, 2.2, Math.PI);
+  // SE tower WEST face (rotY=-π/2)
+  flatSign('COCA-COLA',        9.95, 40, 14, 7, 14, -Math.PI / 2);
+  flatSign('DISNEY+',          9.95, 26, 14, 6, 3, -Math.PI / 2);
+  flatSign('STREAM NOW',       9.95, 22, 14, 6, 2, -Math.PI / 2);
+  flatSign('MTV',              9.95, 16, 12.5, 4, 4, -Math.PI / 2);
+  flatSign('SPOTIFY',          9.95, 16, 16, 3, 4, -Math.PI / 2);
+  flatSign('HARD ROCK CAFE',   9.95, 9, 14, 6.5, 2.5, -Math.PI / 2);
+  flatSign('ESPN ZONE',        9.95, 3, 14, 7, 2.2, -Math.PI / 2);
 
-  // ── Broadway marquee arch at z=-15 (solid posts) ─────────────────────────────
-  bx(0x222222, -8, 6, -15, 1.2, 12, 1.2);
-  bx(0x222222,  8, 6, -15, 1.2, 12, 1.2);
-  bx(0x111111,  0, 12, -15, 18.4, 1.8, 1.2);
-  registerSolid(solidObjects, ox - 8, oz - 15, 0.7, 0.7);
-  registerSolid(solidObjects, ox + 8, oz - 15, 0.7, 0.7);
-  // Marquee fascia
-  emissive(0xFFEE00, 0xFFFF44, 0, 12, -15, 17.6, 1.4, 1.0);
-  label('BROADWAY  TIMES SQUARE', 0, 12, -15.7, 8, 1.0);
-  // Bulbs
-  const bulbMat = new THREE.MeshStandardMaterial({ color: 0xFFFFF0, emissive: 0xFFFFCC, emissiveIntensity: 1.0 });
-  for (let bi = 0; bi < 12; bi++) {
-    const bpx = -8.5 + bi * (17 / 11);
-    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 6), bulbMat);
-    bulb.position.set(ox + bpx, 11.1, oz - 15);
-    scene.add(bulb);
-  }
-  for (const by of [2, 4, 6, 8, 10, 12]) {
-    for (const bpx of [-8.7, 8.7]) {
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.2, 6, 6), bulbMat);
-      bulb.position.set(ox + bpx, by, oz - 15);
-      scene.add(bulb);
-    }
-  }
-  // Theater name boards on posts
-  emissive(0x111111, 0xFF2200, -8, 3, -15.7, 1.0, 3.0, 0.15);
-  emissive(0x111111, 0x2200FF,  8, 3, -15.7, 1.0, 3.0, 0.15);
+  // OTS — extra signs on east + west faces (visible from inside plaza).
+  // South face already covered above with COCA-COLA / ONE TIMES SQ /
+  // TIMES SQUARE labels + the red south LED panel.
+  flatSign('NASDAQ', -2.6, 36, OTS_Z, 5.5, 4, -Math.PI / 2);   // OTS west face
+  flatSign('PEPSI',  -2.6, 26, OTS_Z, 5.5, 4, -Math.PI / 2);
+  flatSign('NIKE',   -2.6, 12, OTS_Z, 5.5, 4, -Math.PI / 2);
+  flatSign('TKTS',    2.6, 36, OTS_Z, 5.5, 4,  Math.PI / 2);   // OTS east face
+  flatSign("M&M'S",   2.6, 26, OTS_Z, 5.5, 4,  Math.PI / 2);
+  flatSign('SAMSUNG', 2.6, 12, OTS_Z, 5.5, 4,  Math.PI / 2);
 
-  // ── High-quality Broadway arch canvas sign ────────────────────────────────
-  {
-    const bwC = document.createElement('canvas');
-    bwC.width = 2048; bwC.height = 512;
-    const bwCtx = bwC.getContext('2d');
-    bwCtx.fillStyle = '#000000'; bwCtx.fillRect(0, 0, 2048, 512);
-    bwCtx.fillStyle = '#CC0000';
-    bwCtx.fillRect(0, 0, 2048, 40); bwCtx.fillRect(0, 472, 2048, 40);
-    bwCtx.fillRect(0, 0, 40, 512);  bwCtx.fillRect(2008, 0, 40, 512);
-    bwCtx.fillStyle = '#FFD700';
-    bwCtx.font = 'bold 60px Arial';
-    for (let si = 0; si < 8; si++) bwCtx.fillText('★', 60 + si * 270, 100);
-    bwCtx.font = '900 220px "Arial Black", Impact, sans-serif';
-    bwCtx.textAlign = 'center'; bwCtx.textBaseline = 'middle'; bwCtx.lineJoin = 'round';
-    bwCtx.strokeStyle = '#FFD700'; bwCtx.lineWidth = 12; bwCtx.strokeText('BROADWAY', 1024, 310);
-    bwCtx.fillStyle = '#FFFFFF'; bwCtx.fillText('BROADWAY', 1024, 310);
-    bwCtx.font = 'bold 56px Arial'; bwCtx.fillStyle = '#FFD700';
-    bwCtx.fillText('★  THE GREAT WHITE WAY  ★', 1024, 445);
-    const bwTex = new THREE.CanvasTexture(bwC);
-    bwTex.minFilter = THREE.LinearFilter; bwTex.needsUpdate = true;
-    const bwSign = new THREE.Mesh(
-      new THREE.BoxGeometry(14, 3.2, 0.10),
-      [new THREE.MeshLambertMaterial({ color: 0x000000 }),
-       new THREE.MeshLambertMaterial({ color: 0x000000 }),
-       new THREE.MeshLambertMaterial({ color: 0x000000 }),
-       new THREE.MeshLambertMaterial({ color: 0x000000 }),
-       new THREE.MeshBasicMaterial({ map: bwTex }),
-       new THREE.MeshBasicMaterial({ map: bwTex }),
-      ],
-    );
-    bwSign.position.set(ox, 6.5, oz - 15.1);
-    scene.add(bwSign);
-  }
-
-  // ── Street-level wall signs (flat, no poles) ─────────────────────────────────
-  // Mounted flush on tower faces at street level. rotY chosen so face 4 faces plaza center.
-  flatSign('BROADWAY',  -15.05, 6, -4, 4.5, 2.0, Math.PI / 2);   // west tower, east face
-  flatSign('COCA-COLA', -15.05, 6,  4, 4.5, 2.0, Math.PI / 2);   // west tower, east face lower
-  flatSign('MTV',        15.05, 6, -4, 4.5, 2.0,-Math.PI / 2);   // east tower, west face
-  flatSign('NIKE',       15.05, 6,  4, 4.5, 2.0,-Math.PI / 2);   // east tower, west face lower
-  flatSign('PEPSI',      -5, 6,-15.05, 5.0, 2.0, 0);              // north face, facing south
-  flatSign('SEPHORA',     5, 6,-15.05, 5.0, 2.0, 0);              // north face east, facing south
-
-  // ── Theater marquees on tower ground floors ───────────────────────────────────
-  // West tower marquee
-  emissive(0x220022, 0xFF00FF, -15.2, 4, -6, 0.10, 5, 6, Math.PI / 2);
-  label('PHANTOM', -16, 5.5, -6, 4, 1.0);
-  label('OF THE OPERA', -16, 4, -6, 3.5, 0.8);
-  // East tower marquee
-  emissive(0x001122, 0x0088FF, 15.2, 4, -6, 0.10, 5, 6, -Math.PI / 2);
-  label('HAMILTON', 16, 5.5, -6, 4, 1.0);
-  label('TONIGHT 8PM', 16, 4, -6, 3.5, 0.8);
-  // North tower marquee (facing south)
-  emissive(0x001100, 0x00FF88, 0, 4, -15.2, 9, 4, 0.10, 0);
-  label('MOULIN ROUGE', 0, 5, -15.6, 5, 1.0);
-
-  // ── News ticker crawl band (low-level, on north faces) ─────────────────────────
-  emissive(0x000011, 0x0033FF, -14.1, 3.5, -5, 0.12, 1.0, 7.6, Math.PI / 2);
-  emissive(0x000011, 0x0033FF,  14.1, 3.5, -5, 0.12, 1.0, 7.6, -Math.PI / 2);
-  emissive(0x000011, 0x0033FF,  0, 3.5, -15.1, 9.6, 1.0, 0.12, 0);
+  // Removed: taxis, pedestrian barriers, newsstands, pretzel carts, police
+  // booth, Broadway marquee arch, theater marquee panels, news ticker
+  // bands, and the 8 floating wall signs that previously hung mid-air
+  // between corner towers. Plaza is now wide-open from every approach.
 
   // ── Point lights for ambiance — kept tight + dim so they accent
   // Times Square without flooding adjacent blocks.
@@ -8696,20 +8750,10 @@ function buildTimesSquare(scene, solidObjects) {
   glow3.position.set(ox + 10, 6, oz + 10);
   scene.add(glow3);
 
-  // ── Ground-floor storefronts on outer tower bases ──────────────────────────
-  // Tower grid: NW[-14,-14,w=8,d=8] NE[14,-14,w=8,d=8] SW[-14,14] SE[14,14]
-  //             W[-15,0,w=6,d=10]   E[15,0,w=6,d=10]
-  // Face offset = half-depth + 0.1 clearance
-  flatSign('STARBUCKS',      -14, 2.8, -18.1, 7.6, 2.8, Math.PI);      // NW outer south
-  flatSign('MCDONALDS',       14, 2.8, -18.1, 7.6, 2.8, Math.PI);      // NE outer south
-  flatSign('WALGREENS',      -14, 2.8,  18.1, 7.6, 2.8, 0);            // SW outer north
-  flatSign('BANK OF AMERICA', 14, 2.8,  18.1, 7.6, 2.8, 0);            // SE outer north
-  // Originally these two signs hung on the middle-west / middle-east towers,
-  // but those towers were removed when we widened the avenues into the
-  // square. Re-pin them to the OUTER faces of the corner towers (which still
-  // exist) so they hang flush against a real wall instead of mid-air.
-  flatSign('HARD ROCK CAFE', -18.1, 2.8, -14, 7, 2.8, Math.PI / 2);   // NW tower west face
-  flatSign('ESPN ZONE',       18.1, 2.8, -14, 7, 2.8, -Math.PI / 2);  // NE tower east face
+  // Outer-face storefront signs removed — they pointed AWAY from the
+  // plaza interior so players inside Times Square could never see them
+  // (the tower body itself occluded the face). The plaza is now signed
+  // entirely from the inner-facing dense pack above.
 }
 
 // ── Generic interior rooms ────────────────────────────────────────────────────
@@ -11481,15 +11525,28 @@ function _mortonGreeting() {
   return MORTON_LINES[(_mortonVisits - 2) % MORTON_LINES.length];
 }
 
-// Next-cheapest unowned booster + how much more gold the player needs.
-// Returns { name, diff } or null if everything's owned.
+// Next-tool hint shown in the HUD top-right. Logic:
+//   1. If the player can already AFFORD any unowned tool, point at the
+//      MOST EXPENSIVE one they can afford (so big saves are rewarded
+//      with a meaningful target, not a 20g sprint feet that's already
+//      cheap change).
+//   2. Otherwise fall back to the cheapest unowned tool and show how
+//      much more gold the player needs.
 function _nextBoosterTarget() {
   const unowned = BOOSTER_DEFS.filter(b => !feetdex.hasBooster(b.id));
   if (unowned.length === 0) return null;
+  const gold = feetdex.gold;
+  const affordable = unowned.filter(b => b.price <= gold);
+  if (affordable.length > 0) {
+    affordable.sort((a, b) => b.price - a.price);  // most expensive first
+    const top = affordable[0];
+    return { name: top.name, diff: 0 };
+  }
+  // Nothing affordable yet — point at the cheapest unowned with the
+  // diff so the player knows how much further to save.
   unowned.sort((a, b) => a.price - b.price);
-  // Show the cheapest one not yet owned
   const next = unowned[0];
-  return { name: next.name, diff: Math.max(0, next.price - feetdex.gold) };
+  return { name: next.name, diff: Math.max(0, next.price - gold) };
 }
 function _mortonOnPurchase(boosterId) {
   const lines = {
@@ -11841,7 +11898,7 @@ const BOOSTER_TIPS = {
   armor:          { title: 'ARMOR',
     body: 'HP doubles and mythics and legendaries hit 30% softer.' },
   lightsaber:     { title: 'LIGHTSABER',
-    body: 'Strikes do <b>2×</b> damage at <b>2×</b> speed — and <b>4×</b> of both against mythics and legendaries.' },
+    body: 'Strikes do <b>2×</b> damage at <b>1.5×</b> speed — bonus jumps to <b>4×</b> damage and <b>3×</b> speed against mythics and legendaries.' },
   metrocard:      { title: 'METROCARD',
     body: 'Press <b>[E]</b> at any subway, then click a <b style="color:#0066ff">blue dot</b> on the map to ride.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
@@ -12103,7 +12160,7 @@ const FIGHT_TUTORIAL = {
   legendary: {
     title: 'LEGENDARY FIGHT',
     theme: 'legendary',
-    body : 'Legendaries hit harder — beat this one <b>three times</b> to claim their feet.',
+    body : 'Legendaries hit harder — you have to <b>find them again</b> and defeat them <b>three times</b> total before they\'ll hand over their feet.',
   },
   secret: {
     title: 'THE ANCIENT ONE',
@@ -12196,7 +12253,14 @@ function _exitAncientArena({ npc, won, respawnPlayer = true }) {
 
 function _runCountdownAndFight(npc) {
   state = 'pre-combat';
-  // Pointer lock stays — see comment in _startBattle.
+  // If the player owns the lightsaber, ignite the blade NOW (at the
+  // start of the countdown) — the unsheathe animation fills the 3-2-1
+  // window so the player sees the blade come to life right before the
+  // fight starts, exactly like the films.
+  if (feetdex.hasBooster('lightsaber')) {
+    try { Audio.lightsaberIgnite?.(); } catch (_) {}
+    player.igniteLightsaber?.();
+  }
   const SEQ = ['3', '2', '1', 'FIGHT!'];
   let step = 0;
   const advance = () => {
@@ -12220,8 +12284,8 @@ function _openCombat(npc) {
   Audio.startBattleMusic();
   const combat = new CombatEncounter(
     npc, player, camera,
-    () => { interaction.clearCombat(); Audio.stopBattleMusic(); handleMinigameResult(npc, true);  },
-    () => { interaction.clearCombat(); Audio.stopBattleMusic(); handleMinigameResult(npc, false); }
+    () => { interaction.clearCombat(); Audio.stopBattleMusic(); player.sheathLightsaber?.(); handleMinigameResult(npc, true);  },
+    () => { interaction.clearCombat(); Audio.stopBattleMusic(); player.sheathLightsaber?.(); handleMinigameResult(npc, false); }
   );
   interaction.setCombat(combat);
 }
@@ -12286,8 +12350,11 @@ function handleMinigameResult(npc, won) {
           return;
         }
       } else {
-        // Rounds 1 and 2 — name the legendary explicitly and tell the
-        // player how many more wins they need before claiming the feet.
+        // Rounds 1 and 2 — small celebration so each win feels good even
+        // when the player still has more rounds to go. Chime + a brief
+        // foot-rain on top of the HUD message.
+        try { Audio.feetfettiChime?.(); } catch (_) {}
+        ui.spawnFeetRain?.(10);
         _relocateLegendary(npc);
         const remaining = 3 - count;
         const plural    = remaining === 1 ? 'time' : 'times';
@@ -13163,7 +13230,8 @@ function _findNearestBoss(from) {
 
 // 3D arrow mesh built once at module init and parented to the scene. We
 // position+orient it each frame; visibility is gated by hold-C + ownership
-// + a live target.
+// + a live target. Single forward pointer ONLY — no rear fletch, so the
+// "which end is which" ambiguity that confused players is gone.
 const _compassArrow = (() => {
   const g = new THREE.Group();
   // Shaft (lays along local -Z so lookAt() at the target points the
@@ -13187,7 +13255,8 @@ const _compassArrow = (() => {
   tip.rotation.x = -Math.PI / 2;
   tip.position.z = -0.45;
   g.add(tip);
-  // Soft halo behind the tip
+  // Soft halo behind the tip — gives the front end an obvious "front"
+  // glow so players know which way to walk.
   const halo = new THREE.Mesh(
     new THREE.SphereGeometry(0.16, 14, 10),
     new THREE.MeshBasicMaterial({
@@ -13196,22 +13265,13 @@ const _compassArrow = (() => {
   );
   halo.position.z = -0.42;
   g.add(halo);
-  // Tail flair — small cone pointing backwards (visual fletch)
-  const tail = new THREE.Mesh(
-    new THREE.ConeGeometry(0.07, 0.14, 8),
-    new THREE.MeshStandardMaterial({
-      color: 0xffaa33, emissive: 0xff8a1a, emissiveIntensity: 1.0,
-    }),
-  );
-  tail.rotation.x = Math.PI / 2;
-  tail.position.z = +0.30;
-  g.add(tail);
 
   g.visible = false;
   scene.add(g);
   return g;
 })();
-let _compassPulse = 0;        // accumulator for the gentle bobbing animation
+let _compassPulse  = 0;        // bob-animation accumulator
+let _compassTarget = null;     // locked target NPC (sticky until cleared)
 
 function _updateCompassPointer(dt) {
   // Always make sure the legacy HUD compass needle is hidden — the 3D
@@ -13220,22 +13280,36 @@ function _updateCompassPointer(dt) {
 
   const owned = feetdex.hasBooster('compass');
   const held  = input.isDown('KeyC');
-  // Only show in active gameplay states. (Hide during dialogue, combat
-  // would be fine but the arrow visually clutters the fight; we keep it
-  // gated to playing/interior so it's a navigation tool.)
   const stateOK = (state === 'playing' || state === 'interior');
+
+  // Drop a stale lock — the locked target was collected, removed, or
+  // (in the case of legendaries) finished its 3-defeat arc.
+  if (_compassTarget) {
+    const stillValid =
+      _compassTarget._removedFromScene !== true &&
+      !_compassTarget.feetCollected &&
+      (_compassTarget.rarity === 'mythic' || _compassTarget.rarity === 'legendary');
+    if (!stillValid) _compassTarget = null;
+  }
+
   if (!owned || !held || !stateOK) {
     _compassArrow.visible = false;
     return;
   }
-  const from = currentInteriorId
-    ? (world.interiors[currentInteriorId]?.cityReturnPos ?? player.position)
-    : player.position;
-  const target = _findNearestBoss(from);
-  if (!target) { _compassArrow.visible = false; return; }
+
+  // Lock onto a target the FIRST frame the key is held (or whenever the
+  // previous lock expired). Don't re-pick a target every frame — that
+  // was making the arrow ping-pong between bosses near each other.
+  if (!_compassTarget) {
+    const from = currentInteriorId
+      ? (world.interiors[currentInteriorId]?.cityReturnPos ?? player.position)
+      : player.position;
+    _compassTarget = _findNearestBoss(from);
+    if (!_compassTarget) { _compassArrow.visible = false; return; }
+  }
 
   // Position the arrow in world space ~2 m in front of the camera, just
-  // below center so it sits under the crosshair without blocking the view.
+  // below center so it sits under the crosshair without blocking view.
   const fwd = new THREE.Vector3();
   camera.getWorldDirection(fwd);
   const offset = 2.0;
@@ -13244,11 +13318,11 @@ function _updateCompassPointer(dt) {
     camera.position.y + fwd.y * offset - 0.30,
     camera.position.z + fwd.z * offset,
   );
-  // Orient: the arrow's tip (its -Z) points at the target.
+  // Orient: the arrow's tip (its -Z) points at the locked target.
   _compassArrow.lookAt(
-    target.group.position.x,
-    camera.position.y - 0.30,         // keep it horizontal — only yaw to target
-    target.group.position.z,
+    _compassTarget.group.position.x,
+    camera.position.y - 0.30,
+    _compassTarget.group.position.z,
   );
   // Gentle bob so it reads as "alive" rather than glued in space.
   _compassPulse += (dt ?? 0.016) * 4;
@@ -13260,8 +13334,82 @@ function _updateCompassPointer(dt) {
 // World position of The Ancient One's hiding spot (matches the SPECIAL_DEFS
 // entry in npc.js and the maze layout in buildSecretAlley).
 const _ANCIENT_POS = { x: -115.5, z: -234 };
+
+// 3D guiding star — a big glowing 5-point star that hovers ~80 m above
+// the alley. Built once at module init, hidden by default; revealed
+// when the player owns the Ancient Tracker booster and the secret has
+// not been collected. The mesh slowly spins so it twinkles, and a
+// PointLight rides along to push warm light onto the scene.
+const _ancientStar = (() => {
+  const g = new THREE.Group();
+  // 5-point star using two crossed flat shapes — cheap and reads
+  // perfectly at distance. Front face uses MeshBasic with full
+  // emissive-feeling brightness so it reads against the sky.
+  const star2D = (rotZ) => {
+    const sh = new THREE.Shape();
+    const N = 5;
+    const ro = 4.5, ri = 1.8;
+    for (let i = 0; i < N * 2; i++) {
+      const r = (i % 2 === 0) ? ro : ri;
+      const a = (i / (N * 2)) * Math.PI * 2 - Math.PI / 2;
+      const x = Math.cos(a) * r, y = Math.sin(a) * r;
+      if (i === 0) sh.moveTo(x, y); else sh.lineTo(x, y);
+    }
+    sh.closePath();
+    const m = new THREE.Mesh(
+      new THREE.ShapeGeometry(sh),
+      new THREE.MeshBasicMaterial({
+        color: 0xfff2a8, side: THREE.DoubleSide,
+        transparent: true, opacity: 0.96,
+      }),
+    );
+    m.rotation.z = rotZ;
+    return m;
+  };
+  g.add(star2D(0));
+  g.add(star2D(Math.PI / 2));    // crossed plane for 3D feel
+  // Halo glow
+  const halo = new THREE.Mesh(
+    new THREE.SphereGeometry(7.5, 18, 14),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd866, transparent: true, opacity: 0.18,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }),
+  );
+  g.add(halo);
+  // Outer shimmer
+  const shim = new THREE.Mesh(
+    new THREE.SphereGeometry(11, 16, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff2c8, transparent: true, opacity: 0.08,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    }),
+  );
+  g.add(shim);
+  // Warm point light spilling from the star
+  const lt = new THREE.PointLight(0xffe6a0, 0.9, 60, 1.2);
+  g.add(lt);
+
+  g.position.set(_ANCIENT_POS.x, 80, _ANCIENT_POS.z);
+  g.visible = false;
+  scene.add(g);
+  return g;
+})();
+let _ancientStarSpin = 0;
 function _updateTrackerCompass() {
-  if (!feetdex.hasBooster('ancient_tracker') || feetdex.has('secret_rexey')) {
+  const showTracker = feetdex.hasBooster('ancient_tracker') && !feetdex.has('secret_rexey');
+  // 3D sky star — visible from anywhere in the city when the booster is
+  // owned and the secret isn't collected yet. Slowly rotates so it
+  // twinkles and faces the camera approximately.
+  if (_ancientStar) {
+    _ancientStar.visible = !!showTracker;
+    if (showTracker) {
+      _ancientStarSpin += 0.01;
+      _ancientStar.rotation.y = _ancientStarSpin;
+      _ancientStar.position.y = 80 + Math.sin(_ancientStarSpin * 1.7) * 1.6;
+    }
+  }
+  if (!showTracker) {
     ui.updateTrackerCompass(false);
     return;
   }
