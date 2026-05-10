@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T003254';
+  var BAKED = '20260510T003517';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -10552,54 +10552,74 @@ function _handleE() {
 
     case 'playing':
     case 'interior': {
-      // Cursor-aim interaction: E fires the target the player is actually
-      // LOOKING at. EVERY in-range NPC, entry door, and subway is eligible
-      // — not just the nearest — so aiming at a slightly-farther NPC while
-      // a closer one stands beside you still picks the one under your
-      // cursor. Eligibility = within proximity range AND within a 60°
-      // cone of the camera's forward axis. Among multiple eligible
-      // targets, the one most directly under the cursor (highest aim
-      // dot) wins. Targets within 0.5 m bypass the cone — when you're
-      // standing on something, direction is meaningless.
+      // Cursor-aim interaction. Two passes, in priority order:
+      //
+      //  PASS 1 — aimed: every in-range NPC / entry door / subway whose
+      //    direction from the player is within a 60° cone of the
+      //    camera's forward axis. Among these, the one most directly
+      //    under the cursor (highest aim dot) wins. THIS PASS ALWAYS
+      //    BEATS PASS 2 — a clearly-aimed farther target wins over a
+      //    much closer un-aimed one (the previous code forced close
+      //    targets to dot=1 and broke this).
+      //
+      //  PASS 2 — overlap fallback: only triggers if NOTHING was in the
+      //    cursor cone. Picks the closest target within 0.6 m (you're
+      //    essentially standing on it; cursor direction is meaningless).
+      //
+      // Exit doors are exempt and always succeed (you should always be
+      // able to leave a building no matter which way you face).
       const fwd = new THREE.Vector3();
       camera.getWorldDirection(fwd);
-      const AIM_COS = 0.5;          // cos(60°)
-      const _aimDot = (tx, tz) => {
+      const AIM_COS  = 0.5;          // cos(60°)
+      const NEAR_FB  = 0.6;          // metres — Pass 2 fallback radius
+      const _measure = (tx, tz) => {
         const dx = tx - player.position.x, dz = tz - player.position.z;
         const len = Math.hypot(dx, dz);
-        if (len < 0.5) return 1;
-        return (dx / len) * fwd.x + (dz / len) * fwd.z;
+        // dist for Pass-2 ranking; dot=undefined when the target is
+        // essentially overlapping the player (direction has no meaning)
+        // so it can never win the aimed pass on bogus normalized math.
+        if (len < 0.05) return { dot: -1, dist: len };
+        return { dot: (dx / len) * fwd.x + (dz / len) * fwd.z, dist: len };
       };
 
-      // Exit door is exempt from cursor-aim — you should always be able
-      // to leave a building, regardless of which way you're facing.
       const proxDoor = world.checkDoorProximity(player.position);
       if (proxDoor && proxDoor.action === 'near-exit') {
         _exitLandmark();
         return;
       }
 
-      // Build candidate list of cursor-aimed interactions.
-      const candidates = [];
-      // ALL in-range NPCs — not just the nearest. The cursor decides
-      // which one E targets when multiple are reachable.
       const inRangeNpcs = npcMgr.inRange ?? (_nearestNPC ? [_nearestNPC] : []);
+      const aimed   = [];
+      const overlap = [];
+      const _consider = (cand, m) => {
+        if (m.dot >= AIM_COS) aimed.push({ ...cand, dot: m.dot });
+        else if (m.dist < NEAR_FB) overlap.push({ ...cand, dist: m.dist });
+      };
       for (const npc of inRangeNpcs) {
-        const d = _aimDot(npc.group.position.x, npc.group.position.z);
-        if (d >= AIM_COS) candidates.push({ kind: 'npc', npc, dot: d });
+        _consider({ kind: 'npc', npc },
+                  _measure(npc.group.position.x, npc.group.position.z));
       }
       if (proxDoor && proxDoor.action === 'near-entry') {
-        const d = _aimDot(proxDoor.pos.x, proxDoor.pos.z);
-        if (d >= AIM_COS) candidates.push({ kind: 'door', door: proxDoor, dot: d });
+        _consider({ kind: 'door', door: proxDoor },
+                  _measure(proxDoor.pos.x, proxDoor.pos.z));
       }
       const station = _nearestSubway();
       if (station) {
-        const d = _aimDot(station.x, station.z);
-        if (d >= AIM_COS) candidates.push({ kind: 'subway', station, dot: d });
+        _consider({ kind: 'subway', station },
+                  _measure(station.x, station.z));
       }
-      if (candidates.length === 0) break;     // nothing aimed at — no-op
-      candidates.sort((a, b) => b.dot - a.dot);
-      const top = candidates[0];
+
+      let top = null;
+      if (aimed.length > 0) {
+        // Cursor-aimed wins, regardless of how close any other target is.
+        aimed.sort((a, b) => b.dot - a.dot);
+        top = aimed[0];
+      } else if (overlap.length > 0) {
+        // Nothing in the cone — fall back to the closest overlapping target.
+        overlap.sort((a, b) => a.dist - b.dist);
+        top = overlap[0];
+      }
+      if (!top) break;
 
       if (top.kind === 'npc') {
         const targetNpc = top.npc;
