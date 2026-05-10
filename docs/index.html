@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T160916';
+  var BAKED = '20260510T162156';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2229,11 +2229,8 @@ const SHOE_STYLES = {
     { type:'box', s:[0.06, 0.02, 0.02], color:0xc81818, pos:[0,  0.02,  0.07] },
   ] },
   rare_cheerleader:{ color: 0xf5f5f5, extras: [
-    // POM POMS — fluffy blue+white spheres on top of each foot
-    { type:'sphere', r:0.07, color:0x1a3c8a, pos:[0,  0.06, 0.06] },
-    { type:'sphere', r:0.04, color:0xffffff, pos:[ 0.04, 0.08, 0.04] },
-    { type:'sphere', r:0.04, color:0xffffff, pos:[-0.04, 0.08, 0.04] },
-    { type:'sphere', r:0.04, color:0xffffff, pos:[ 0.00, 0.08, 0.10] },
+    // No static extras — pom-pom particles are spawned procedurally in
+    // _buildCheerleaderPoms() so they can flutter as the player moves.
   ] },
   // ── Epic ────────────────────────────────────────────────────────────────
   // LeBron — purple-and-gold high-top basketball sneaker. Ankle collar,
@@ -2242,26 +2239,37 @@ const SHOE_STYLES = {
   // visible white air-cushion bubble at the heel. Negative spec.x lands
   // the side branding on the outer side after the foot's π rotation.
   epic_lebron:     { color: 0x552583, extras: [
-    // Tall purple high-top upper covering the ankle
-    { type:'box', s:[0.18, 0.13, 0.16], color:0x552583, pos:[0, 0.06, -0.01] },
-    { type:'box', s:[0.16, 0.06, 0.14], color:0x4a1f70, pos:[0, 0.13, -0.02] },
-    // Thick cream midsole + black rubber outsole
-    { type:'box', s:[0.20, 0.04, 0.24], color:0xfff8e8, pos:[0, -0.07, 0.02] },
-    { type:'box', s:[0.20, 0.02, 0.24], color:0x1a1a1a, pos:[0, -0.10, 0.02] },
-    // Visible white air-cushion bubble at the heel
-    { type:'sphere', r:0.045, color:0xffffff, pos:[0, -0.04, -0.08] },
+    // Tall purple high-top upper — wraps the entire foot top to ankle so
+    // no base anatomy peeks through underneath.
+    { type:'box', s:[0.19, 0.13, 0.22], color:0x552583, pos:[0, 0.045, 0.04] },
+    // Padded ankle collar
+    { type:'box', s:[0.16, 0.06, 0.14], color:0x4a1f70, pos:[0, 0.135, -0.02] },
+    // Slim white midsole hugging the foot (no longer a wide protruding
+    // cream slab — sized to the foot's actual length and width).
+    { type:'box', s:[0.20, 0.025, 0.22], color:0xffffff, pos:[0, -0.060, 0.04] },
+    // White toe bumper rand wrapping the front edge
+    { type:'box', s:[0.19, 0.040, 0.05], color:0xffffff, pos:[0, -0.030, 0.135] },
+    // Chunky black rubber outsole, slightly wider than midsole
+    { type:'box', s:[0.21, 0.025, 0.23], color:0x111111, pos:[0, -0.085, 0.04] },
+    // Herringbone-style outsole grooves running across the sole
+    { type:'box', s:[0.21, 0.006, 0.018], color:0x000000, pos:[0, -0.072, 0.11] },
+    { type:'box', s:[0.21, 0.006, 0.018], color:0x000000, pos:[0, -0.072, 0.05] },
+    { type:'box', s:[0.21, 0.006, 0.018], color:0x000000, pos:[0, -0.072, -0.01] },
+    { type:'box', s:[0.21, 0.006, 0.018], color:0x000000, pos:[0, -0.072, -0.07] },
+    // Visible Nike Air-style cushion bubble at the heel
+    { type:'sphere', r:0.038, color:0xffffff, pos:[0, -0.060, -0.08] },
     // Three diagonal slash stripes on the OUTER side
-    { type:'box', s:[0.005, 0.02, 0.10], color:0xffd700, pos:[-0.085, 0.06, 0.02], rot:[0,0,Math.PI/8] },
-    { type:'box', s:[0.005, 0.02, 0.05], color:0xffd700, pos:[-0.085, 0.02, 0.07], rot:[0,0,Math.PI/8] },
-    { type:'box', s:[0.005, 0.02, 0.05], color:0xffd700, pos:[-0.085, 0.10, 0.07], rot:[0,0,Math.PI/8] },
+    { type:'box', s:[0.005, 0.02, 0.10], color:0xffd700, pos:[-0.097, 0.05, 0.02], rot:[0,0,Math.PI/8] },
+    { type:'box', s:[0.005, 0.02, 0.05], color:0xffd700, pos:[-0.097, 0.01, 0.07], rot:[0,0,Math.PI/8] },
+    { type:'box', s:[0.005, 0.02, 0.05], color:0xffd700, pos:[-0.097, 0.09, 0.07], rot:[0,0,Math.PI/8] },
     // Gold "23" jersey-number panel on the OUTER side
-    { type:'box', s:[0.005, 0.05, 0.05], color:0xffd700, pos:[-0.087, 0.06, -0.08] },
+    { type:'box', s:[0.005, 0.05, 0.05], color:0xffd700, pos:[-0.099, 0.05, -0.08] },
     // Gold tongue patch up front
-    { type:'box', s:[0.07, 0.03, 0.04], color:0xffd700, pos:[0, 0.10, 0.10] },
+    { type:'box', s:[0.07, 0.03, 0.04], color:0xffd700, pos:[0, 0.090, 0.10] },
     // Black laces (three rungs)
-    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.13, 0.04] },
-    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.13, 0.07] },
-    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.13, 0.10] },
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.120, 0.04] },
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.120, 0.07] },
+    { type:'box', s:[0.06, 0.005, 0.005], color:0x111111, pos:[0, 0.120, 0.10] },
   ] },
   // Sonion — sleek black formal shoe wreathed in mystical purple energy.
   // Cyan-purple seam glows run the length of both sides; a gold "contract
@@ -2704,6 +2712,7 @@ class Player {
     this._animateLegs(dt);
     this._animateLightsaber(dt);
     this._animateAncient(dt);
+    this._animateCheerleader(dt);
   }
 
   // Swing the leg pivots based on horizontal velocity. Faster gait when
@@ -2854,6 +2863,8 @@ class Player {
     }
     // Clear ancient aura too — re-spawned below if the new skin is secret.
     this._clearAncientAura();
+    // Clear cheerleader pom flutter list — re-spawned below if applicable.
+    this._clearCheerleaderPoms();
     if (!feetId) {
       this.setShoeColor(null);  // bare again
       return;
@@ -2877,6 +2888,10 @@ class Player {
     }
     // Ancient One — the only secret skin. Build the radiant aura.
     if (feetId === 'secret_rexey') this._buildAncientAura();
+    // Cheerleader — bushy pom-poms made of many small particles that
+    // flutter as the player moves. Built procedurally so each strand
+    // can wobble independently.
+    if (feetId === 'rare_cheerleader') this._buildCheerleaderPoms();
   }
 
   // Build per-foot golden aura: a translucent halo sphere + 6 orbiting
@@ -2930,6 +2945,74 @@ class Player {
   _clearAncientAura() {
     this._ancientOrbits = null;
     this._ancientAuraTime = 0;
+  }
+
+  // Build bushy pom-poms — each foot gets ~22 small spheres of varied
+  // blue/white shades clustered on top of the foot. Every particle has
+  // a base offset, a phase, and a wobble axis stored in userData so
+  // _animateCheerleader can flutter them independently each frame.
+  _buildCheerleaderPoms() {
+    if (!this._feet || this._feet.length === 0) return;
+    this._cheerPoms = [];
+    const POM_COLORS = [0x1a3c8a, 0x2350b0, 0x3060c0, 0xffffff, 0xf0f4ff, 0xeef2ff];
+    const COUNT = 22;
+    for (const foot of this._feet) {
+      const cx = 0, cy = 0.08, cz = 0.05;     // pom-pom cluster center on top of foot
+      for (let i = 0; i < COUNT; i++) {
+        // Distribute particles in a rough sphere using golden-spiral phi sampling
+        const u = (i + 0.5) / COUNT;
+        const phi   = Math.acos(1 - 2 * u);
+        const theta = i * 2.3998;
+        const r = 0.05 + Math.random() * 0.025;
+        const ox = Math.sin(phi) * Math.cos(theta) * r;
+        const oy = Math.cos(phi) * r * 0.8;
+        const oz = Math.sin(phi) * Math.sin(theta) * r;
+        const color = POM_COLORS[Math.floor(Math.random() * POM_COLORS.length)];
+        const sphereR = 0.014 + Math.random() * 0.012;
+        const mesh = new THREE.Mesh(
+          new THREE.SphereGeometry(sphereR, 6, 5),
+          new THREE.MeshLambertMaterial({ color }),
+        );
+        const baseX = cx + ox;
+        const baseY = cy + oy;
+        const baseZ = cz + oz;
+        mesh.position.set(baseX, baseY, baseZ);
+        mesh.userData.pom = {
+          baseX, baseY, baseZ,
+          phase: Math.random() * Math.PI * 2,
+          freq: 6 + Math.random() * 4,
+          amp:  0.012 + Math.random() * 0.010,
+        };
+        foot.add(mesh);
+        this._shoeAccessories.push(mesh);
+        this._cheerPoms.push(mesh);
+      }
+    }
+    this._cheerTime = 0;
+  }
+
+  _clearCheerleaderPoms() {
+    this._cheerPoms = null;
+    this._cheerTime = 0;
+  }
+
+  _animateCheerleader(dt) {
+    if (!this._cheerPoms || this._cheerPoms.length === 0) return;
+    this._cheerTime = (this._cheerTime || 0) + dt;
+    const t = this._cheerTime;
+    // Faster, larger flutter while moving — the gait shake sells the
+    // pom-pom motion. Stationary still gets a gentle idle wobble.
+    const speed = Math.hypot(this.velocity.x, this.velocity.z);
+    const moveBoost = Math.min(1, speed / 4);
+    for (const p of this._cheerPoms) {
+      const u = p.userData.pom;
+      const a = u.amp * (0.5 + moveBoost * 1.8);
+      p.position.set(
+        u.baseX + Math.sin(t * u.freq + u.phase)        * a,
+        u.baseY + Math.sin(t * u.freq + u.phase + 1.7)  * a * 0.9,
+        u.baseZ + Math.cos(t * u.freq + u.phase + 0.8)  * a,
+      );
+    }
   }
 
   _animateAncient(dt) {
@@ -4652,11 +4735,12 @@ function showHUDMessage(text, durationMs = 2500) {
 
 // ── Combat encounter ──────────────────────────────────────────────────────────
 
-// HP and damage scale through the boss tiers. Legendaries got a +25%
-// bump (HP 200→250, DMG 37→46) per the difficulty pass; secret was
-// already higher and stays as-is.
+// HP and damage scale through the boss tiers. Legendary HP keeps the
+// +25% bump (HP 200→250) so they feel tanky, but DMG, attack speed,
+// and chase speed reverted to their pre-bump values — bosses now lean
+// on durability rather than oppressive offense.
 const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 250, secret: 300 };
-const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 46,  secret: 50  };
+const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 37,  secret: 50  };
 const PLAYER_DMG  = 10;
 const PLAYER_MAX  = 100;
 const HIT_CD      = 500;   // ms between player attacks
@@ -4696,13 +4780,13 @@ class CombatEncounter {
     this._npcHP      = Math.round((_NPC_HP[npc.rarity] ?? PLAYER_MAX) * bodyMult);
     this._npcMaxHP   = this._npcHP;
 
-    // Per-rarity attack-speed multiplier. Legendaries got a 1.25× bump
-    // on top of their previous 2.06× (now 2.58×). Ancient One was at
-    // 2.58× but reduced 35% per the difficulty pass — final 1.68× —
+    // Per-rarity attack-speed multiplier. Legendary attack speed
+    // reverted from 2.58× back to 2.06× (the +25% bump removed).
+    // Ancient One reduced 35% from that baseline — final 1.34× —
     // so the heavy kicks land less often, giving the player breathing
     // room to dodge.
-    const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 1.25 * 0.65
-                     : npc.rarity === 'legendary' ? 1.65 * 1.25 * 1.25
+    const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 0.65
+                     : npc.rarity === 'legendary' ? 1.65 * 1.25
                      : npc.rarity === 'mythic'    ? 1.65
                      : 1;
     this._atkCd  = NPC_ATK_CD / speedMult;
@@ -4714,10 +4798,10 @@ class CombatEncounter {
     this._nextSwing     = Date.now() + 1200;
     this._koTime        = 0;        // when NPC HP hit 0
     this._active        = true;
-    // Chase speed scales with tier. Legendary got a 1.25× bump on top
-    // of its prior 1.5× (now 1.875×, ≈15.2 m/s).
+    // Chase speed scales with tier. Legendary reverted from 1.875×
+    // back to its prior 1.5× (≈12.15 m/s) — the +25% bump removed.
     this._chaseSpeed    = npc.rarity === 'secret'    ? 8.1 * 2.0
-                        : npc.rarity === 'legendary' ? 8.1 * 1.5 * 1.25
+                        : npc.rarity === 'legendary' ? 8.1 * 1.5
                         : 8.1;
     this._origGroupY    = npc.group.position.y;
     this._origGroupRotX = npc.group.rotation.x;
@@ -11107,7 +11191,7 @@ class World {
     makeMidtownBanner(scene,  28,  11,   2, 'METLIFE BUILDING',      { bg: '#0A1A30', fg: '#FFFFFF' });
     makeMidtownBanner(scene,  -8,  11,  22, 'RADIO CITY MUSIC HALL', { bg: '#2A1A00', fg: '#FFD700' });
     makeMidtownBanner(scene, -55,  11, -62, 'CITY HALL',             { bg: '#1A2040', fg: '#E8E8FF' });
-    makeMidtownBanner(scene,  84,  0, -30, 'GRAND CENTRAL STATION', { bg: '#2A1800', fg: '#FFD700' });
+    makeMidtownBanner(scene,  82,  0, -22, 'GRAND CENTRAL STATION', { bg: '#2A1800', fg: '#FFD700' });
 
     if (esbBox)      this.colliders.push(esbBox);
     if (chryslerBox) this.colliders.push(chryslerBox);
@@ -12264,11 +12348,11 @@ const BOOSTER_TIPS = {
   armor:          { title: 'ARMOR',
     body: 'HP doubles and mythics and legendaries hit 30% softer.' },
   lightsaber:     { title: 'LIGHTSABER',
-    body: 'Cuts deep against bosses: <b>4× damage</b> and <b>3× attack speed</b> vs. <b>mythics</b> and <b>legendaries</b>. Standard punches against anyone else.' },
+    body: '<b>LEFT CLICK</b> to swing. Cuts deep against bosses: <b>4× damage</b> and <b>3× attack speed</b> vs. <b>mythics</b> and <b>legendaries</b>. Standard punches against anyone else.' },
   metrocard:      { title: 'METROCARD',
-    body: 'Press <b>[E]</b> at any subway, then click a <b style="color:#0066ff">blue dot</b> on the map to ride.' },
+    body: 'Walk up to any <b>subway entrance</b> and press <b>[E]</b>, then click a <b style="color:#0066ff">blue dot</b> on the map to ride.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
-    body: 'A gold <b>★</b> now marks The Ancient One — just follow it.' },
+    body: 'A gold <b>★</b> now marks The Ancient One in the sky — just walk toward it to find him.' },
 };
 let _shownTips = new Set();
 let _afterTipCallback = null;     // run after the tip is dismissed (countdown chains here)
@@ -12521,21 +12605,21 @@ const FIGHT_TUTORIAL = {
   mythic: {
     title: 'MYTHIC FIGHT',
     theme: 'mythic',
-    body : '<b>WASD</b> to move, <b>LEFT CLICK</b> to punch — step away to dodge.',
+    body : '<b>WASD</b> to move, <b>LEFT CLICK</b> to punch. Step away to dodge their swing.',
   },
   legendary: {
     title: 'LEGENDARY FIGHT',
     theme: 'legendary',
-    body : 'Legendaries hit harder — you have to <b>find them again</b> and defeat them <b>three times</b> total before they\'ll hand over their feet.',
+    body : '<b>WASD</b> to move, <b>LEFT CLICK</b> to swing. Legendaries hit harder — you must <b>find them again and defeat them 3 times total</b> before they hand over their feet.',
   },
   secret: {
     title: '⚔ THE ANCIENT ONE ⚔',
     theme: 'ancient',
     body :
-      'The final test, mortal. The ground rises to meet you. ' +
+      'The final test, mortal. <b>WASD</b> to circle, <b>LEFT CLICK</b> to strike. ' +
       'THE <b>ANCIENT ONE</b>\'s <b>KICKS</b> strike with the weight of centuries — harder than any legendary you have faced — ' +
       'and every blow <b>HURLS YOU BACK</b> a full step. ' +
-      'Strike fast. Circle wide. <b>DODGE when the leg lifts</b> — that is your only window.',
+      'Strike fast. Circle wide. <b>STEP AWAY when the leg lifts</b> — that is your only window.',
   },
 };
 let _firstMythicFought    = false;
