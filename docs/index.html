@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T155925';
+  var BAKED = '20260510T160211';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -4692,10 +4692,11 @@ class CombatEncounter {
     this._npcMaxHP   = this._npcHP;
 
     // Per-rarity attack-speed multiplier. Legendaries got a 1.25× bump
-    // on top of their previous 2.06× (now 2.58×) per the difficulty
-    // pass. Secret stays at its previous 2.58× (which is now equal to
-    // legendary speed, but secret HP is still highest).
-    const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 1.25
+    // on top of their previous 2.06× (now 2.58×). Ancient One was at
+    // 2.58× but reduced 35% per the difficulty pass — final 1.68× —
+    // so the heavy kicks land less often, giving the player breathing
+    // room to dodge.
+    const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 1.25 * 0.65
                      : npc.rarity === 'legendary' ? 1.65 * 1.25 * 1.25
                      : npc.rarity === 'mythic'    ? 1.65
                      : 1;
@@ -10217,11 +10218,14 @@ function buildSecretAlley(scene, solidObjects) {
 }
 
 // ── Ancient One battle arena ──────────────────────────────────────────────
-// A holy circular arena far from the city. Player and Ancient One are
-// teleported here for the final fight; geometry is built once at world
-// init. No solid colliders so the player can move freely.
+// A holy circular arena floating in the sky at y=60, far from the
+// city. Player and Ancient One RISE up to it for the final fight;
+// geometry built once at world init. No solid colliders so the player
+// can move freely on the platform. The arena's y is exposed via
+// world.ancientArena.y so getFloorY can hold the player on it during
+// the fight.
 function buildAncientArena(scene) {
-  const ox = 1500, oz = 1500;
+  const ox = 1500, oy = 60, oz = 1500;
 
   // Floor — pale-gold marble disk, slightly emissive so it glows softly
   // against the high ambient. 30u radius gives plenty of arena room.
@@ -10233,7 +10237,7 @@ function buildAncientArena(scene) {
     }),
   );
   floor.rotation.x = -Math.PI / 2;
-  floor.position.set(ox, 0.02, oz);
+  floor.position.set(ox, oy + 0.02, oz);
   scene.add(floor);
 
   // Concentric gold ring inlay (decorative).
@@ -10244,7 +10248,7 @@ function buildAncientArena(scene) {
     }),
   );
   ring.rotation.x = -Math.PI / 2;
-  ring.position.set(ox, 0.04, oz);
+  ring.position.set(ox, oy + 0.04, oz);
   scene.add(ring);
 
   // Eight glowing white pillars around the perimeter.
@@ -10258,7 +10262,7 @@ function buildAncientArena(scene) {
     const pillar = new THREE.Mesh(
       new THREE.CylinderGeometry(0.7, 0.9, 14, 16), pillarMat,
     );
-    pillar.position.set(px, 7, pz);
+    pillar.position.set(px, oy + 7, pz);
     scene.add(pillar);
     // Capital cap
     const cap = new THREE.Mesh(
@@ -10267,13 +10271,13 @@ function buildAncientArena(scene) {
         color: 0xffd866, emissive: 0xffb84d, emissiveIntensity: 0.6,
       }),
     );
-    cap.position.set(px, 14.3, pz);
+    cap.position.set(px, oy + 14.3, pz);
     scene.add(cap);
   }
 
   // Central pillar of light — a tall translucent cone over the arena
-  // center, from ground up to ~30u, giving the "pillar of holy light"
-  // visual the player walks INTO when teleported.
+  // center, from arena floor up ~30u, giving the "pillar of holy light"
+  // visual the player rises INTO when entering the fight.
   const beam = new THREE.Mesh(
     new THREE.CylinderGeometry(2.5, 6.0, 30, 24, 1, true),
     new THREE.MeshBasicMaterial({
@@ -10281,13 +10285,12 @@ function buildAncientArena(scene) {
       depthWrite: false,
     }),
   );
-  beam.position.set(ox, 15, oz);
+  beam.position.set(ox, oy + 15, oz);
   scene.add(beam);
 
-  // Bright point light at the top of the beam — spills warm gold over
-  // the arena floor and the combatants.
+  // Bright point light at the top of the beam.
   const light = new THREE.PointLight(0xffe0a0, 1.6, 80, 1.2);
-  light.position.set(ox, 24, oz);
+  light.position.set(ox, oy + 24, oz);
   scene.add(light);
 }
 
@@ -11144,6 +11147,15 @@ class World {
 
   // ── Terrain elevation for ramps and bridge deck ──────────────────────────
   getFloorY(x, z, currentY = 0) {
+    // Ancient One floating arena at (1500, 60, 1500), 30u radius.
+    // Returns y=60 for anyone standing on/near the platform so the
+    // player and the Ancient One don't fall off during combat. The
+    // currentY check (≥58) gates this so flyovers from below don't
+    // get yanked up onto the platform.
+    {
+      const ax = x - 1500, az = z - 1500;
+      if (ax * ax + az * az < 30 * 30 && currentY >= 58) return 60;
+    }
     // North ramp: linear slope from z=-32 (y=0) to z=-46 (y=BRIDGE_DECK_Y).
     // Mirrors the bridge-deck underpass logic: if the player's currentY is
     // well below the ramp surface (>1.5m gap) treat the ramp as overhead
@@ -12538,13 +12550,13 @@ function _startBattle(npc) {
     (tutorialKey === 'legendary' && !_firstLegendaryFought) ||
     (tutorialKey === 'secret');                              // always shown
 
-  // Ancient One battle gets a special teleport-to-holy-arena entrance
-  // before the countdown. Save the player's current position so we can
-  // return them to spawn on win/loss, and translate the NPC into the
-  // arena so the fight happens in a clean dedicated space.
+  // Ancient One battle gets a special rise-up arena entrance — the
+  // rise animation must complete BEFORE the 3-2-1 countdown plays, so
+  // _enterAncientArena handles its own countdown trigger internally.
+  // Other rarities go straight into the countdown.
   const proceed = () => {
     if (npc.rarity === 'secret') _enterAncientArena(npc);
-    _runCountdownAndFight(npc);
+    else _runCountdownAndFight(npc);
   };
 
   if (showTutorial && tutorialKey) {
@@ -12560,20 +12572,60 @@ function _startBattle(npc) {
 }
 
 // ── Ancient One arena ────────────────────────────────────────────────────────
-// Coordinates of the arena (must match buildAncientArena in world.js).
-const ANCIENT_ARENA = { x: 1500, z: 1500 };
-let _ancientPreBattle = null;   // { player.pos, player.yaw, npc.pos, currentInteriorId }
+// Floating arena at (1500, 60, 1500) — must match buildAncientArena's oy=60.
+const ANCIENT_ARENA = { x: 1500, y: 60, z: 1500 };
+let _ancientPreBattle = null;   // { npc.pos } — snapshot for restore on loss
 
+// Rise-up entrance: snap player + NPC over to the arena's xz, then
+// animate both UP from y=0 to y=60 over RISE_MS. Holy radiance fades in
+// during the rise. After the rise lands, _runCountdownAndFight starts
+// the 3-2-1 + lightsaber ignition sequence — so the player sees the
+// rise FIRST, then the countdown, then the fight.
 function _enterAncientArena(npc) {
-  // The fight stays in place (per "battles preserve position/camera"
-  // rule); we only snapshot the NPC's position so we can return him to
-  // the alley on loss, and turn ON the holy radiance + arrival sound
-  // for the dramatic Ancient One mood.
+  // Save the NPC's pre-battle position (the alley) so a loss restores
+  // him there. Player position is restored via player.respawn() on
+  // win/loss elsewhere.
   _ancientPreBattle = {
     nx: npc.group.position.x, nz: npc.group.position.z,
   };
+  currentInteriorId = null;
+
+  const RISE_MS = 2300;
+  const startY  = player.position.y;
+  const startT  = performance.now();
+  const targetY = ANCIENT_ARENA.y;
+  // Snap player + NPC over to the arena xz immediately. y stays at
+  // startY for now — the animation lifts them up.
+  player.position.set(ANCIENT_ARENA.x, startY, ANCIENT_ARENA.z + 6);
+  player.velocity.set(0, 0, 0);
+  player.yaw   = Math.PI;       // face -Z (arena center is in front)
+  player.pitch = 0;
+  npc.group.position.set(ANCIENT_ARENA.x, startY - 0.5, ANCIENT_ARENA.z);
+  // Holy effects spool up at the start of the rise so the audio + visual
+  // match the camera lifting.
   _ancientHolyOn();
   try { Audio.holyArrival?.(); } catch (_) {}
+
+  const tick = () => {
+    const t = (performance.now() - startT) / RISE_MS;
+    if (t >= 1) {
+      player.position.y = targetY;
+      npc.group.position.y = targetY;
+      // Force camera + body sync since player.update doesn't run in
+      // pre-combat and we've been writing position.y directly.
+      player._updateCamera?.();
+      // Now run the countdown + lightsaber ignition + fight start.
+      _runCountdownAndFight(npc);
+      return;
+    }
+    // ease-out-quad: starts fast, settles into the platform softly.
+    const k = 1 - (1 - t) * (1 - t);
+    player.position.y    = startY + (targetY - startY) * k;
+    npc.group.position.y = startY - 0.5 + (targetY - (startY - 0.5)) * k;
+    player._updateCamera?.();
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
 }
 
 // Activate / deactivate the screen-level holy radiance overlay.
