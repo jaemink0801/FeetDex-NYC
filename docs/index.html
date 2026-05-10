@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T155547';
+  var BAKED = '20260510T155925';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -476,28 +476,67 @@
       box-shadow:0 0 40px rgba(255,215,0,.35); }
     #generic-tip.theme-legendary h3 { color:#ffd700;
       text-shadow:0 0 10px rgba(255,215,0,.6); }
-    /* Ancient One theme — deep gold + holy radiance, larger title,
-       slow pulsing aura. Reserved for the final boss popup. */
+    /* Ancient One theme — full holy-boss-fight treatment: thick gold
+       border, layered glowing radial gradient, vignetted backdrop,
+       slow aura pulse, and a title that breathes its own glow. */
     #generic-tip.theme-ancient {
-      border:3px solid rgba(255,215,0,.85);
-      background:radial-gradient(ellipse at 50% 0%, rgba(80,55,15,.96) 0%, rgba(8,8,16,.96) 70%);
-      box-shadow:0 0 80px rgba(255,200,80,.55), inset 0 0 30px rgba(255,200,80,.18);
-      padding:34px 44px; max-width:560px;
-      animation:tip-ancient-pulse 2.4s ease-in-out infinite; }
-    #generic-tip.theme-ancient h3 { font-size:24px; letter-spacing:7px; color:#fff2c8;
-      text-shadow:0 0 12px rgba(255,215,0,.95), 0 0 28px rgba(255,180,80,.7);
-      margin-bottom:18px;
+      border:4px double rgba(255,215,0,.95);
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(120,80,20,.98) 0%, rgba(50,30,8,.97) 35%, rgba(8,4,0,.99) 80%),
+        repeating-linear-gradient(0deg, rgba(255,200,80,.04) 0px, rgba(255,200,80,.04) 2px, transparent 2px, transparent 5px);
+      box-shadow:
+        0 0 100px rgba(255,200,80,.65),
+        inset 0 0 60px rgba(255,200,80,.22),
+        inset 0 0 0 1px rgba(255,255,210,.28);
+      padding:42px 56px; max-width:620px;
+      animation:tip-ancient-pulse 2.2s ease-in-out infinite,
+                tip-ancient-shake 9s ease-in-out infinite;
+      position:fixed; }
+    /* Vignetted dim layer behind the popup that fades the rest of the
+       screen — punches focus onto the box. */
+    #generic-tip.theme-ancient::before {
+      content:''; position:fixed; inset:0; pointer-events:none; z-index:-1;
+      background:radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(0,0,0,0.78) 100%);
+      animation:tip-ancient-vignette 3s ease-in-out infinite; }
+    #generic-tip.theme-ancient h3 {
+      font-size:32px; letter-spacing:9px; color:#fff8d0;
+      text-shadow:
+        0 0 14px rgba(255,215,0,1),
+        0 0 32px rgba(255,180,80,.85),
+        0 0 60px rgba(255,180,80,.5);
+      margin-bottom:22px;
+      font-family:Georgia, "Times New Roman", serif;
       animation:tip-ancient-title 3.2s ease-in-out infinite; }
-    #generic-tip.theme-ancient p { font-size:14px; line-height:1.85; color:#fff0d0; }
-    #generic-tip.theme-ancient b   { color:#ffd866; text-shadow:0 0 6px rgba(255,200,80,.55); }
-    #generic-tip.theme-ancient .lh-cta { color:#ffe080; opacity:.75; }
+    #generic-tip.theme-ancient p {
+      font-size:15px; line-height:2.0; color:#fff0d0;
+      font-family:Georgia, serif; }
+    #generic-tip.theme-ancient b   {
+      color:#ffe680;
+      text-shadow:0 0 8px rgba(255,200,80,.85), 0 0 18px rgba(255,160,40,.55); }
+    #generic-tip.theme-ancient .lh-cta { color:#ffe080; opacity:.8; }
     @keyframes tip-ancient-pulse {
-      0%,100% { box-shadow:0 0 60px rgba(255,200,80,.40), inset 0 0 24px rgba(255,200,80,.15); }
-      50%     { box-shadow:0 0 110px rgba(255,200,80,.75), inset 0 0 36px rgba(255,200,80,.28); }
+      0%,100% { box-shadow:
+        0 0 80px rgba(255,200,80,.55),
+        inset 0 0 50px rgba(255,200,80,.20),
+        inset 0 0 0 1px rgba(255,255,210,.22); }
+      50%     { box-shadow:
+        0 0 140px rgba(255,200,80,.95),
+        inset 0 0 70px rgba(255,200,80,.36),
+        inset 0 0 0 1px rgba(255,255,210,.40); }
     }
     @keyframes tip-ancient-title {
-      0%,100% { text-shadow:0 0 12px rgba(255,215,0,.85), 0 0 22px rgba(255,180,80,.5); }
-      50%     { text-shadow:0 0 22px rgba(255,215,0,1.0), 0 0 44px rgba(255,180,80,.85); }
+      0%,100% { text-shadow:0 0 14px rgba(255,215,0,.90),  0 0 26px rgba(255,180,80,.55); transform:scale(1.0); }
+      50%     { text-shadow:0 0 24px rgba(255,215,0,1.0), 0 0 50px rgba(255,180,80,.95); transform:scale(1.025); }
+    }
+    @keyframes tip-ancient-shake {
+      0%,100% { transform:translate(-50%, -50%); }
+      20%     { transform:translate(-50.4%, -50.2%); }
+      45%     { transform:translate(-49.6%, -49.8%); }
+      70%     { transform:translate(-50.2%, -50.3%); }
+    }
+    @keyframes tip-ancient-vignette {
+      0%,100% { opacity:0.85; }
+      50%     { opacity:1.0; }
     }
 
     /* Battle countdown overlay — large center number that ticks 3 → 2 → 1 → FIGHT! */
@@ -782,10 +821,11 @@
   <div id="combat-flash"></div>
   <div id="battle-vignette"></div>
   <div id="gold-toast"></div>
+  <!-- Tracker compass HUD — distance label only. The directional arrow
+       was removed because the gold STAR in the sky already shows the
+       player which direction to walk; the 2D needle was redundant and
+       confusing alongside the 3D in-world cue. -->
   <div id="tracker-compass">
-    <svg viewBox="0 0 16 16" fill="currentColor">
-      <polygon points="8,1 14,15 8,11 2,15"/>
-    </svg>
     <span id="tracker-compass-text">FOLLOW THE STAR</span>
   </div>
   <div id="compass-pointer">
@@ -5868,15 +5908,13 @@ class UI {
 
   // Tracker compass — shown only when Ancient Tracker booster is owned and
   // The Ancient One is uncollected. Updates each frame from main.js.
-  updateTrackerCompass(visible, distanceMeters, dirDeg) {
+  updateTrackerCompass(visible, distanceMeters /* dirDeg unused — see HTML */) {
     const el = document.getElementById('tracker-compass');
     if (!el) return;
     if (!visible) { el.classList.remove('active'); return; }
     el.classList.add('active');
     const txt = el.querySelector('#tracker-compass-text');
     if (txt) txt.textContent = `★ FOLLOW THE STAR — ${Math.round(distanceMeters)}m`;
-    const svg = el.querySelector('svg');
-    if (svg) svg.style.transform = `rotate(${dirDeg}deg)`;
   }
 
   // Compass-booster pointer — separate element, top-left of screen.
@@ -12474,12 +12512,13 @@ const FIGHT_TUTORIAL = {
     body : 'Legendaries hit harder — you have to <b>find them again</b> and defeat them <b>three times</b> total before they\'ll hand over their feet.',
   },
   secret: {
-    title: 'THE ANCIENT ONE',
+    title: '⚔ THE ANCIENT ONE ⚔',
     theme: 'ancient',
     body :
-      'The final test. The ground rises to meet you. ' +
-      'The <b>ANCIENT ONE</b>\'s kicks hit you <b>harder</b> than any legendary, and every blow <b>knocks you back</b> a full step. ' +
-      'Strike fast, circle wide, and <b>dodge when the leg lifts</b> — that is your only window.',
+      'The final test, mortal. The ground rises to meet you. ' +
+      'THE <b>ANCIENT ONE</b>\'s <b>KICKS</b> strike with the weight of centuries — harder than any legendary you have faced — ' +
+      'and every blow <b>HURLS YOU BACK</b> a full step. ' +
+      'Strike fast. Circle wide. <b>DODGE when the leg lifts</b> — that is your only window.',
   },
 };
 let _firstMythicFought    = false;
@@ -13656,22 +13695,21 @@ function _updateCompassPointer(dt) {
 // entry in npc.js and the maze layout in buildSecretAlley).
 const _ANCIENT_POS = { x: -115.5, z: -234 };
 
-// 3D guiding star — a big glowing 5-point star that hovers ~80 m above
-// the alley. Built once at module init, hidden by default; revealed
-// when the player owns the Ancient Tracker booster and the secret has
-// not been collected. The mesh slowly spins so it twinkles, and a
-// PointLight rides along to push warm light onto the scene.
+// 3D guiding star — a HUGE glowing 5-point star high above the alley,
+// big enough to read clearly from any rooftop. Two crossed shape-geom
+// stars give it volume; nested additive halo + outer shimmer + a broad
+// point-light spill light up the surrounding sky. A vertical pillar of
+// light beneath drops a column of glow toward the alley so the player
+// can trace the star down to the ground target.
 const _ancientStar = (() => {
   const g = new THREE.Group();
-  // 5-point star using two crossed flat shapes — cheap and reads
-  // perfectly at distance. Front face uses MeshBasic with full
-  // emissive-feeling brightness so it reads against the sky.
+  const STAR_R_OUTER = 12, STAR_R_INNER = 4.8;
+  // Two crossed flat 5-point stars for a 3D feel.
   const star2D = (rotZ) => {
     const sh = new THREE.Shape();
     const N = 5;
-    const ro = 4.5, ri = 1.8;
     for (let i = 0; i < N * 2; i++) {
-      const r = (i % 2 === 0) ? ro : ri;
+      const r = (i % 2 === 0) ? STAR_R_OUTER : STAR_R_INNER;
       const a = (i / (N * 2)) * Math.PI * 2 - Math.PI / 2;
       const x = Math.cos(a) * r, y = Math.sin(a) * r;
       if (i === 0) sh.moveTo(x, y); else sh.lineTo(x, y);
@@ -13680,38 +13718,52 @@ const _ancientStar = (() => {
     const m = new THREE.Mesh(
       new THREE.ShapeGeometry(sh),
       new THREE.MeshBasicMaterial({
-        color: 0xfff2a8, side: THREE.DoubleSide,
-        transparent: true, opacity: 0.96,
+        color: 0xfff8c8, side: THREE.DoubleSide,
+        transparent: true, opacity: 1.0,
       }),
     );
     m.rotation.z = rotZ;
     return m;
   };
   g.add(star2D(0));
-  g.add(star2D(Math.PI / 2));    // crossed plane for 3D feel
-  // Halo glow
+  g.add(star2D(Math.PI / 2));
+  // Inner halo
   const halo = new THREE.Mesh(
-    new THREE.SphereGeometry(7.5, 18, 14),
+    new THREE.SphereGeometry(20, 22, 16),
     new THREE.MeshBasicMaterial({
-      color: 0xffd866, transparent: true, opacity: 0.18,
+      color: 0xffd866, transparent: true, opacity: 0.36,
       depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
   g.add(halo);
   // Outer shimmer
   const shim = new THREE.Mesh(
-    new THREE.SphereGeometry(11, 16, 12),
+    new THREE.SphereGeometry(34, 20, 14),
     new THREE.MeshBasicMaterial({
-      color: 0xfff2c8, transparent: true, opacity: 0.08,
+      color: 0xfff2c8, transparent: true, opacity: 0.16,
       depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
   g.add(shim);
-  // Warm point light spilling from the star
-  const lt = new THREE.PointLight(0xffe6a0, 0.9, 60, 1.2);
+  // Beam of light dropping toward the ground — tall translucent cone.
+  const beamH = 110;
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(2, 14, beamH, 18, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xffeaa0, transparent: true, opacity: 0.18,
+      side: THREE.DoubleSide, depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  beam.position.y = -beamH / 2 - 4;
+  g.add(beam);
+  // Bright point light from the star
+  const lt = new THREE.PointLight(0xffe6a0, 1.6, 200, 1.2);
   g.add(lt);
 
-  g.position.set(_ANCIENT_POS.x, 80, _ANCIENT_POS.z);
+  // Hover at y=130 — well above the city's tallest buildings (~130 m
+  // shafts) so it's visible from the streets but not blocked by them.
+  g.position.set(_ANCIENT_POS.x, 130, _ANCIENT_POS.z);
   g.visible = false;
   scene.add(g);
   return g;
