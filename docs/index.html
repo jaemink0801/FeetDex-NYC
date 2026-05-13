@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T025327';
+  var BAKED = '20260513T032038';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -274,76 +274,84 @@
     #lock-overlay h1 { font-size:78px; letter-spacing:9px; margin-bottom:12px;
       text-shadow:0 0 24px rgba(255,215,0,.5); }
     #lock-overlay p  { font-size:18px; opacity:.75; letter-spacing:2px; }
-    #lock-overlay .goal { margin-top:22px; max-width:680px; font-size:18px;
-      line-height:1.6; text-align:center; color:#ffe080;
+    #lock-overlay .goal { margin-top:22px; max-width:760px; font-size:21px;
+      line-height:1.55; text-align:center; color:#ffe080;
       text-shadow:1px 1px 3px #000; letter-spacing:.5px;
       background:rgba(40,28,4,.45); border:1px solid rgba(255,215,0,.35);
-      border-radius:8px; padding:18px 26px; }
+      border-radius:8px; padding:22px 32px; }
     #lock-overlay .goal b { color:#FFD700; }
 
     /* Two-column lower section: simplified controls on the left,
        ESC reminder + volume foot-frame on the right. */
-    #lock-overlay .lock-cols { display:flex; gap:54px; margin-top:32px;
+    #lock-overlay .lock-cols { display:flex; gap:64px; margin-top:36px;
       align-items:flex-start; justify-content:center; width:100%;
-      max-width:920px; }
+      max-width:1080px; }
     #lock-overlay .lock-col { display:flex; flex-direction:column; }
     #lock-overlay .lock-col-left  { align-items:flex-start; text-align:left; }
     #lock-overlay .lock-col-right { align-items:flex-end;   text-align:right; }
 
-    #lock-overlay .controls-title { font-size:13px; letter-spacing:4px;
-      color:#FFD700; opacity:.75; margin-bottom:10px; font-weight:bold; }
+    #lock-overlay .controls-title { font-size:16px; letter-spacing:5px;
+      color:#FFD700; opacity:.8; margin-bottom:14px; font-weight:bold;
+      text-shadow:0 0 10px rgba(255,215,0,.5); }
     #lock-overlay .controls-grid {
-      display:grid; grid-template-columns:auto auto; gap:6px 18px;
-      align-items:center; font-size:15px; line-height:1.4; }
+      display:grid; grid-template-columns:auto auto; gap:10px 24px;
+      align-items:center; font-size:19px; line-height:1.4; }
     #lock-overlay .controls-grid .k { color:#FFD700; font-weight:bold;
       letter-spacing:2px; text-align:right; white-space:nowrap; }
     #lock-overlay .controls-grid .d { color:#e8e8e8; text-align:left; }
 
-    #lock-overlay .esc-tip { font-size:15px; color:#ff9a44;
-      letter-spacing:1px; font-weight:bold; max-width:280px;
+    #lock-overlay .esc-tip { font-size:18px; color:#ff9a44;
+      letter-spacing:1px; font-weight:bold; max-width:340px;
       text-shadow:0 0 10px rgba(255,140,40,.55); line-height:1.5;
-      margin-bottom:22px; }
+      margin-bottom:24px; }
+    #lock-overlay .esc-tip b { color:#FFEC60;
+      text-shadow:0 0 12px rgba(255,236,96,.85); }
 
-    /* Foot-shaped frame around the volume widget. The decorative SVG
-       sits behind the content with a pulsing gold glow; the slider and
-       label are absolutely centered inside it. */
-    #lock-overlay .vol-foot-frame { position:relative; width:260px; height:310px;
+    /* Foot-shaped frame around the volume widget. The decorative SVG is
+       drawn as a SINGLE outline path (no overlapping internal lines).
+       Slider sits in the sole/ankle area, well clear of the toes. */
+    #lock-overlay .vol-foot-frame { position:relative; width:340px; height:400px;
       pointer-events:auto; }
     #lock-overlay .vol-foot-frame .vol-foot-svg {
       position:absolute; inset:0; width:100%; height:100%;
-      fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:3;
-      filter:drop-shadow(0 0 18px rgba(255,215,0,.55));
-      animation:vol-foot-pulse 2.4s ease-in-out infinite; }
+      filter:drop-shadow(0 0 22px rgba(255,215,0,.65));
+      animation:vol-foot-pulse 2.4s ease-in-out infinite;
+      overflow:visible; }
+    #lock-overlay .vol-foot-frame .vol-foot-svg path {
+      fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:2.2;
+      stroke-linejoin:round; stroke-linecap:round; }
     @keyframes vol-foot-pulse {
-      0%,100% { filter:drop-shadow(0 0 14px rgba(255,215,0,.45));
+      0%,100% { filter:drop-shadow(0 0 16px rgba(255,215,0,.5));
                 transform:scale(1); }
-      50%     { filter:drop-shadow(0 0 28px rgba(255,215,0,.85));
+      50%     { filter:drop-shadow(0 0 34px rgba(255,215,0,.95));
                 transform:scale(1.025); }
     }
     /* Sparkle dots around the foot frame */
     #lock-overlay .vol-foot-frame::before,
     #lock-overlay .vol-foot-frame::after {
-      content:''; position:absolute; width:8px; height:8px; border-radius:50%;
-      background:#FFEC60; box-shadow:0 0 12px rgba(255,236,96,.95);
+      content:''; position:absolute; width:10px; height:10px; border-radius:50%;
+      background:#FFEC60; box-shadow:0 0 14px rgba(255,236,96,.95);
       pointer-events:none; animation:vol-spark 1.6s ease-in-out infinite; }
-    #lock-overlay .vol-foot-frame::before { top:18%; left:6%;  animation-delay:.0s; }
-    #lock-overlay .vol-foot-frame::after  { top:38%; right:4%; animation-delay:.8s; }
+    #lock-overlay .vol-foot-frame::before { top:14%; left:2%;  animation-delay:.0s; }
+    #lock-overlay .vol-foot-frame::after  { top:34%; right:0%; animation-delay:.8s; }
     @keyframes vol-spark {
       0%,100% { opacity:.3; transform:scale(.7); }
       50%     { opacity:1;  transform:scale(1.25); }
     }
-    #lock-overlay .vol-content { position:absolute; left:50%; top:50%;
+    /* Volume content sits in the SOLE/ARCH area of the foot, well below
+       the toes so the slider never overlaps the toe shapes. */
+    #lock-overlay .vol-content { position:absolute; left:50%; top:62%;
       transform:translate(-50%, -50%); display:flex; flex-direction:column;
-      align-items:center; gap:14px; width:78%; }
-    #lock-overlay .volume-tip { font-size:14px; font-weight:bold;
-      letter-spacing:2px; color:#FFEC60; text-align:center; line-height:1.35;
+      align-items:center; gap:18px; width:72%; }
+    #lock-overlay .volume-tip { font-size:18px; font-weight:bold;
+      letter-spacing:3px; color:#FFEC60; text-align:center; line-height:1.35;
       text-shadow:0 0 12px rgba(255,236,96,.75);
       animation:vol-tip-pulse 1.6s ease-in-out infinite; }
     @keyframes vol-tip-pulse {
       0%,100% { transform:scale(1);    text-shadow:0 0 12px rgba(255,236,96,.55); }
       50%     { transform:scale(1.04); text-shadow:0 0 22px rgba(255,236,96,1); }
     }
-    #lock-overlay #lock-vol-slider { width:180px; accent-color:#FFD700;
+    #lock-overlay #lock-vol-slider { width:230px; accent-color:#FFD700;
       pointer-events:auto; }
 
     /* Full-screen map overlay (M key). The map fills as much of the
@@ -1097,16 +1105,30 @@
       <div class="lock-col lock-col-right">
         <div class="esc-tip">Press <b>[ESC]</b> to return to see these controls at any time.</div>
         <div class="vol-foot-frame">
-          <!-- Decorative foot silhouette. Geometry mirrors the discovery
-               overlay foot so the brand language stays consistent. -->
-          <svg class="vol-foot-svg" viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
-            <rect x="16" y="30" width="68" height="65" rx="18"/>
-            <ellipse cx="50" cy="92" rx="34" ry="20"/>
-            <circle cx="22" cy="28" r="11"/>
-            <circle cx="37" cy="20" r="13"/>
-            <circle cx="53" cy="17" r="12"/>
-            <circle cx="68" cy="21" r="10"/>
-            <circle cx="79" cy="30" r="9"/>
+          <!-- Single-path foot silhouette: outline traced clockwise from
+               the inside of the big toe, around each toe peak (big = largest
+               and highest, middle slightly elevated, others cascading), down
+               the outer ball, around the heel, and back up the arch. No
+               overlapping internal lines because it's ONE continuous path. -->
+          <svg class="vol-foot-svg" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid meet">
+            <path d="
+              M 8,30
+              C 8,14 12,4 24,4
+              C 36,4 40,14 38,28
+              C 42,22 44,16 50,16
+              C 58,16 60,22 56,32
+              C 60,28 62,20 66,22
+              C 72,24 72,30 68,36
+              C 72,32 74,30 78,32
+              C 84,34 84,40 80,44
+              C 84,42 86,42 88,44
+              C 92,48 92,52 88,56
+              C 92,62 94,72 94,82
+              C 94,104 80,124 50,124
+              C 20,124 6,104 6,82
+              C 6,68 8,52 8,30
+              Z
+            "/>
           </svg>
           <div class="vol-content">
             <div class="volume-tip">TURN UP VOLUME<br/>FOR FULL EXPERIENCE!</div>
