@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T063200';
+  var BAKED = '20260513T063459';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -12613,7 +12613,7 @@ function _handleE() {
           Audio.interact();
           ui.showTip('NOT YET WORTHY',
             '<span class="locked-sword">You do not deserve to fight me until you unlock the SWORD.</span><br/><br/>' +
-            'Buy the <b>Lightsaber</b> at Morton\'s Shop, then return.',
+            'Buy the <b>Sword</b> at Morton\'s Shop, then return.',
             targetNpc.rarity
           );
           return;
@@ -12750,7 +12750,7 @@ function _handleDialogueResult(result) {
       if (npcRef) { npcRef.isInDialogue = false; npcRef._dialogueEndTime = Date.now(); }
       ui.showTip('NOT YET WORTHY',
         '<span class="locked-sword">You do not deserve to fight me until you unlock the SWORD.</span><br/><br/>' +
-        'Buy the <b>Lightsaber</b> at Morton\'s Shop, then return.',
+        'Buy the <b>Sword</b> at Morton\'s Shop, then return.',
         rar // theme: 'mythic' or 'legendary' (orange/gold border)
       );
       requestLock();
@@ -12788,7 +12788,7 @@ function _handleDialogueResult(result) {
       if (npcRef) { npcRef.isInDialogue = false; npcRef._dialogueEndTime = Date.now(); }
       ui.showTip('NOT YET WORTHY',
         '<span class="locked-sword">You do not deserve to fight me until you unlock the SWORD.</span><br/><br/>' +
-        'Buy the <b>Lightsaber</b> at Morton\'s Shop, then return.',
+        'Buy the <b>Sword</b> at Morton\'s Shop, then return.',
         'legendary'
       );
       requestLock();
@@ -13287,7 +13287,7 @@ const BOOSTER_TIPS = {
     body: 'Hold <b>[C]</b> and a glowing arrow points to the nearest <b>mythic</b> or <b>legendary</b>.' },
   armor:          { title: 'ARMOR',
     body: 'Your HP doubles. Mythics and legendaries hit ~30% softer.' },
-  lightsaber:     { title: 'LIGHTSABER (SWORD)',
+  lightsaber:     { title: 'SWORD',
     body: '<b>LEFT CLICK</b> to swing. <b>Required</b> to challenge mythics and legendaries. <b>4× damage</b> and <b>3× attack speed</b> against them.' },
   metrocard:      { title: 'METROCARD',
     body: 'Walk up to any <b>subway entrance</b>, press <b>[E]</b>, then click a <b style="color:#0066ff">blue dot</b> on the map to ride there instantly.' },
