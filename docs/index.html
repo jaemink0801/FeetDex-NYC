@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T053121';
+  var BAKED = '20260513T053808';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -942,17 +942,18 @@
     /* ── Missions corner ─────────────────────────────────────────────── */
     /* Sits below the FeetDex:NYC title so it doesn't compete for the
        top-left attention slot during the tutorial. */
-    #missions-corner { position:fixed; top:44px; left:14px; width:300px;
-      z-index:55; pointer-events:none; font-size:12px; letter-spacing:.5px;
+    #missions-corner { position:fixed; top:52px; left:14px; width:380px;
+      z-index:55; pointer-events:none; font-size:15px; letter-spacing:.5px;
       display:none; }
     #missions-corner.active { display:block; }
-    #missions-corner h4 { margin:0 0 6px 0; font-size:11px; color:#FFD700;
-      letter-spacing:3px; text-shadow:1px 1px 2px #000; }
-    .mission-row { background:rgba(20,16,8,.78);
-      border:1px solid rgba(255,215,0,.32); border-radius:5px;
-      padding:7px 9px; margin-bottom:6px; display:flex; align-items:flex-start;
-      gap:8px; transition:opacity .35s, transform .35s, border-color .25s,
-      background-color .25s; }
+    #missions-corner h4 { margin:0 0 8px 0; font-size:14px; color:#FFD700;
+      letter-spacing:4px; text-shadow:1px 1px 2px #000, 0 0 10px rgba(255,215,0,.45); }
+    .mission-row { background:rgba(20,16,8,.84);
+      border:2px solid rgba(255,215,0,.40); border-radius:6px;
+      padding:10px 12px; margin-bottom:8px; display:flex; align-items:flex-start;
+      gap:10px; transition:opacity .35s, transform .35s, border-color .25s,
+      background-color .25s;
+      box-shadow:0 2px 8px rgba(0,0,0,.45); }
     .mission-row.complete { border-color:#9bdc9b; background:rgba(40,80,40,.85);
       animation:mission-pop .55s ease-out; }
     .mission-row.complete .m-box { color:#9bdc9b;
@@ -1944,6 +1945,33 @@ const Audio = {
   npcHurt() {
     sweep(440, 200, 0.10, 'square', 0.16);
     tone(310, 0.06, 'triangle', 0.10, 0.02);
+  },
+
+  // Coin toss/jingle — used when the player opens Morton's shop. Mimics a
+  // real coin flip: a sharp metallic "ting" up front, a brief mid-air ring
+  // (offset pitches that beat against each other like a spinning coin), and
+  // a settled "clink" landing. Same async-resume guard as goldKaching so it
+  // plays the first time after the AudioContext wakes from autoplay-suspend.
+  coinToss() {
+    const c = getCtx();
+    const play = () => {
+      // Flip-off-thumb ring — bright + glassy
+      tone(2400, 0.05, 'triangle', 0.18, 0.00);
+      tone(3200, 0.04, 'sine',     0.10, 0.00);
+      // Spin (~80 ms in) — slightly detuned pair gives the warble of a
+      // rotating coin catching the light/edges at different angles.
+      tone(2050, 0.07, 'triangle', 0.12, 0.07);
+      tone(2120, 0.06, 'sine',     0.08, 0.08);
+      // Land + secondary bounce — lower pitch + softer
+      tone(1500, 0.10, 'triangle', 0.16, 0.22);
+      tone(1900, 0.05, 'sine',     0.06, 0.24);
+      tone(1300, 0.08, 'triangle', 0.08, 0.32);
+    };
+    if (c.state === 'suspended') {
+      c.resume().then(play).catch(() => play());
+    } else {
+      play();
+    }
   },
 
   // "Ka-ching!" — old-school cash register bell. Played on every gold reward.
@@ -4670,25 +4698,25 @@ class NPCManager {
                                     // front of them, not just whoever they're
                                     // standing on.
 
-    // Wider cursor range — about 9 m of reach, lined up with the in-front
-    // dot-cone test in main.js. Shopkeepers stay extra-reachable since the
-    // counter blocks the player from physically getting close.
-    const CURSOR_RANGE_DEFAULT = 9.0;
-    const CURSOR_RANGE_SHOP    = 7.0;
+    // Single interaction range: this is BOTH the white-highlight radius and
+    // the cursor pick radius. Used to be two separate numbers (highlight 2.5 m,
+    // cursor 9 m) and the gap was confusing — the player could click someone
+    // who wasn't highlighted and wonder why a different NPC was responding.
+    // Now: NPC is highlighted ⟺ you can cursor-aim at them. Shopkeepers get
+    // a wider reach because the counter pushes the player back.
+    const INTERACT_RANGE_DEFAULT = 4.0;
+    const INTERACT_RANGE_SHOP    = 5.5;
 
     for (const npc of this.npcs) {
       const d = playerPos.distanceTo(npc.group.position);
       if (d < 60 || npc.rarity === 'legendary') npc.update(elapsedTime);
       const isShop = npc.feetId === 'shopkeeper_morton' ||
                      npc.feetId === 'shopkeeper_fleetfeet';
-      const proxRange   = isShop ? 4.5 : 2.5;
-      const cursorRange = isShop ? CURSOR_RANGE_SHOP : CURSOR_RANGE_DEFAULT;
-      if (d < proxRange) {
+      const range = isShop ? INTERACT_RANGE_SHOP : INTERACT_RANGE_DEFAULT;
+      if (d < range) {
         inRange.push(npc);
-        if (d < closestDist) { closestDist = d; closest = npc; }
-      }
-      if (d < cursorRange) {
         inCursorRange.push(npc);
+        if (d < closestDist) { closestDist = d; closest = npc; }
       }
     }
 
@@ -12131,30 +12159,67 @@ function _handleE() {
 
     case 'playing':
     case 'interior': {
-      // Cursor-aim interaction. Two passes, in priority order:
+      // Cursor-aim interaction. Two pickers:
       //
-      // Strict cursor-aim using screen-space projection: the target must
-      // be visibly under the crosshair on screen, accounting for both yaw
-      // AND pitch. The old horizontal-cone test ignored pitch and was so
-      // wide (60° half-angle) that any character roughly in front of the
-      // player counted. This now projects the target's head position to
-      // normalized device coords (NDC) and checks distance from screen
-      // center. AIM_NDC = 0.18 means "within 18% of screen radius of the
-      // crosshair" — roughly the visual extent of an NPC at conversation
-      // range.
+      //   _measure(x,y,z)   — point test, used for doors and subway stations
+      //                       (single anchor point + an NDC-radius tolerance).
+      //   _measureBody(npc) — silhouette test, used for NPCs. Projects the
+      //                       character's head + feet + side reference to NDC
+      //                       and checks whether the crosshair (NDC 0,0) is
+      //                       INSIDE the projected box. This means clicking
+      //                       any visible part of the NPC — head, torso,
+      //                       hand, foot — counts as aimed, not just the
+      //                       head point. Width scales with each NPC's
+      //                       bodyScale so larger characters get a
+      //                       proportionally larger pick area.
+      //
       // Exit doors are exempt and always succeed (you should always be
       // able to leave a building no matter which way you face).
-      const AIM_NDC = 0.18;
+      const AIM_NDC = 0.18;                                 // fallback radius for non-body targets
       const _scrTmp = new THREE.Vector3();
       const _measure = (tx, ty, tz) => {
         const dx = tx - player.position.x, dz = tz - player.position.z;
         const dist = Math.hypot(dx, dz);
         _scrTmp.set(tx, ty, tz);
         _scrTmp.project(camera);
-        // Behind the camera — never picks.
         if (_scrTmp.z > 1) return { aimed: false, dist, ndcR: 99 };
         const ndcR = Math.hypot(_scrTmp.x, _scrTmp.y);
         return { aimed: ndcR < AIM_NDC, dist, ndcR };
+      };
+      const _bodyTop = new THREE.Vector3();
+      const _bodyBot = new THREE.Vector3();
+      const _bodySide = new THREE.Vector3();
+      const _measureBody = (npc) => {
+        const p = npc.group.position;
+        const dx = p.x - player.position.x, dz = p.z - player.position.z;
+        const dist = Math.hypot(dx, dz);
+        // Per-NPC tuning. Default NPCs are ~2 m tall with ~0.5 m shoulders;
+        // bodyScale (set in npc.js) widens BOTH dims for the chunkier ones.
+        const scale  = npc.bodyScale ?? 1.0;
+        const top    = p.y + 2.2 * scale;
+        const bot    = p.y + 0.0;
+        const sideOff = 0.55 * scale;          // half body width in metres
+        _bodyTop .set(p.x, top, p.z);
+        _bodyBot .set(p.x, bot, p.z);
+        _bodySide.set(p.x + sideOff, (top + bot) * 0.5, p.z);
+        _bodyTop .project(camera);
+        _bodyBot .project(camera);
+        _bodySide.project(camera);
+        // If BOTH endpoints are behind the camera, we can't pick.
+        if (_bodyTop.z > 1 && _bodyBot.z > 1) return { aimed: false, dist, ndcR: 99 };
+        const cx = (_bodyTop.x + _bodyBot.x) * 0.5;
+        const cy = (_bodyTop.y + _bodyBot.y) * 0.5;
+        const minY = Math.min(_bodyTop.y, _bodyBot.y);
+        const maxY = Math.max(_bodyTop.y, _bodyBot.y);
+        // Projected half-width in NDC. abs() because side may project to
+        // either side of the centerline depending on FOV/pitch.
+        const halfW = Math.max(0.02, Math.abs(_bodySide.x - cx));
+        // Cursor sits at NDC (0,0). aimed = cursor inside projected box.
+        const aimed = (Math.abs(cx) <= halfW) && (minY <= 0) && (0 <= maxY);
+        // ndcR = how far the cursor is from the NPC's silhouette CENTER.
+        // Used as the tiebreaker for cursor priority sorting below.
+        const ndcR = Math.hypot(cx, cy);
+        return { aimed, dist, ndcR };
       };
 
       const proxDoor = world.checkDoorProximity(player.position);
@@ -12175,10 +12240,8 @@ function _handleE() {
         if (m.aimed) aimed.push({ ...cand, dist: m.dist, ndcR: m.ndcR });
       };
       for (const npc of inRangeNpcs) {
-        // Aim at NPC head height (~1.4 m above base) so the cursor needs
-        // to be on their upper body, not the patch of ground at their feet.
-        _consider({ kind: 'npc', npc },
-                  _measure(npc.group.position.x, npc.group.position.y + 1.4, npc.group.position.z));
+        // Body silhouette test — clicking ANY visible part of the NPC counts.
+        _consider({ kind: 'npc', npc }, _measureBody(npc));
       }
       if (proxDoor && proxDoor.action === 'near-entry') {
         _consider({ kind: 'door', door: proxDoor },
@@ -12192,10 +12255,17 @@ function _handleE() {
 
       let top = null;
       if (aimed.length > 0) {
-        // Among on-screen-aimed targets, pick the closest one. Screen-radius
-        // is a tiebreaker so two targets at near-identical distance resolve
-        // to whichever is more directly under the crosshair.
-        aimed.sort((a, b) => (a.dist - b.dist) || (a.ndcR - b.ndcR));
+        // Cursor position wins, with world-distance as a tiebreaker ONLY when
+        // two candidates sit nearly on the same line from the camera. Earlier
+        // we sorted by world distance first and that picked Tanya when the
+        // crosshair was clearly on Morton (because Tanya was closer). Now the
+        // smaller-ndcR target wins outright, and dist breaks ties only inside
+        // a tight ~3% screen-radius window where the two are visually stacked.
+        aimed.sort((a, b) => {
+          const ndcDelta = a.ndcR - b.ndcR;
+          if (Math.abs(ndcDelta) < 0.03) return a.dist - b.dist;
+          return ndcDelta;
+        });
         top = aimed[0];
       }
       // Door fallback: if nothing precise was aimed but the player is
@@ -12212,9 +12282,11 @@ function _handleE() {
       if (top.kind === 'npc') {
         const targetNpc = top.npc;
         // Morton routes to the shop UI instead of the discovery dialogue flow.
+        // Coin-toss SFX (instead of the generic interact sweep) cues that
+        // money's about to change hands the moment the shop opens.
         if (targetNpc.feetId === 'shopkeeper_morton') {
           _activeNPC = targetNpc;
-          Audio.interact();
+          Audio.coinToss();
           _openShop();
           return;
         }
@@ -14145,12 +14217,18 @@ function _handleM() {
 const _mmDiv = document.createElement('div');
 Object.assign(_mmDiv.style, { position:'fixed', top:'50px', right:'16px', pointerEvents:'none', zIndex:'10' });
 const _mmCan = document.createElement('canvas');
-_mmCan.width = _mmCan.height = 160;
-Object.assign(_mmCan.style, { border:'1px solid rgba(255,255,255,.25)', background:'rgba(0,0,0,.55)', display:'block' });
+// Bumped from 160 → 220 so the minimap is easier to glance at without
+// squinting. World coverage (_MMH) is unchanged; only the on-screen size
+// (and therefore the drawn-dot footprint) scales up.
+_mmCan.width = _mmCan.height = 220;
+Object.assign(_mmCan.style, {
+  border:'2px solid rgba(255,215,0,.55)', background:'rgba(0,0,0,.6)', display:'block',
+  borderRadius:'6px', boxShadow:'0 2px 12px rgba(0,0,0,.55), 0 0 14px rgba(255,215,0,.20)',
+});
 _mmDiv.appendChild(_mmCan);
 document.body.appendChild(_mmDiv);
 const _mmCtx = _mmCan.getContext('2d');
-const _MM = 160, _MMH = 200, _MMS = _MM / (_MMH * 2);
+const _MM = 220, _MMH = 200, _MMS = _MM / (_MMH * 2);
 
 function _mm(wx, wz) { return [(wx + _MMH) * _MMS, (wz + _MMH) * _MMS]; }
 
@@ -14291,6 +14369,25 @@ function _drawMinimap(elapsed) {
     }
     _mmCtx.closePath();
     _mmCtx.fill();
+    _mmCtx.restore();
+  }
+
+  // Player-placed beacon — pulsing red dot so the player can see where they
+  // dropped a marker on the full map without opening it. Uses the same
+  // _beaconPulseT clock as the in-world beam for visual consistency.
+  if (_beacon) {
+    const [bx, bz] = _mm(_beacon.wx, _beacon.wz);
+    const pulse = 0.7 + Math.sin(_beaconPulseT * 4) * 0.3;
+    _mmCtx.save();
+    _mmCtx.fillStyle   = '#ff2244';
+    _mmCtx.strokeStyle = 'rgba(0,0,0,0.8)';
+    _mmCtx.shadowColor = 'rgba(255,40,60,0.9)';
+    _mmCtx.shadowBlur  = 8;
+    _mmCtx.beginPath();
+    _mmCtx.arc(bx, bz, 4.5 + pulse * 2.0, 0, Math.PI * 2);
+    _mmCtx.fill();
+    _mmCtx.lineWidth = 1.2;
+    _mmCtx.stroke();
     _mmCtx.restore();
   }
 
@@ -14567,28 +14664,46 @@ function _nearestSubway() {
 // Pick whoever the cursor is currently aimed at among the wider cursor-range
 // NPC set. Mirrors the priority logic in _handleE so the hint always reflects
 // what pressing E would actually trigger — not whoever happens to be closest.
-const _HINT_TMP_FWD = new THREE.Vector3();
+const _HINT_TMP_FWD  = new THREE.Vector3();
+const _HINT_TMP_BOT  = new THREE.Vector3();
+const _HINT_TMP_SIDE = new THREE.Vector3();
 function _cursorAimedNPC() {
   const candidates = npcMgr.inCursorRange ?? npcMgr.inRange ?? [];
   if (!candidates.length) return null;
-  // Screen-space projection. The hint matches the strict aim used by
-  // _handleE: NPC must be within ~18% of screen radius of the crosshair.
-  const AIM_NDC = 0.18;
-  let best = null, bestDist = Infinity;
+  // Body-silhouette test — mirrors _measureBody in _handleE so the hint
+  // shows for any NPC that has the cursor anywhere on their projected
+  // body (head, torso, hand, foot), not just the head point.
+  const _t = _HINT_TMP_FWD;
+  const _b = _HINT_TMP_BOT;
+  const _s = _HINT_TMP_SIDE;
+  let best = null, bestNdcR = Infinity, bestDist = Infinity;
   for (const npc of candidates) {
-    _HINT_TMP_FWD.set(
-      npc.group.position.x,
-      npc.group.position.y + 1.4,
-      npc.group.position.z,
-    );
-    _HINT_TMP_FWD.project(camera);
-    if (_HINT_TMP_FWD.z > 1) continue;          // behind camera
-    const ndcR = Math.hypot(_HINT_TMP_FWD.x, _HINT_TMP_FWD.y);
-    if (ndcR >= AIM_NDC) continue;              // not under crosshair
-    const dx = npc.group.position.x - player.position.x;
-    const dz = npc.group.position.z - player.position.z;
+    const p = npc.group.position;
+    const scale = npc.bodyScale ?? 1.0;
+    _t.set(p.x, p.y + 2.2 * scale, p.z);
+    _b.set(p.x, p.y,                p.z);
+    _s.set(p.x + 0.55 * scale, p.y + 1.1 * scale, p.z);
+    _t.project(camera); _b.project(camera); _s.project(camera);
+    if (_t.z > 1 && _b.z > 1) continue;
+    const cx = (_t.x + _b.x) * 0.5;
+    const cy = (_t.y + _b.y) * 0.5;
+    const minY = Math.min(_t.y, _b.y);
+    const maxY = Math.max(_t.y, _b.y);
+    const halfW = Math.max(0.02, Math.abs(_s.x - cx));
+    const inside = (Math.abs(cx) <= halfW) && (minY <= 0) && (0 <= maxY);
+    if (!inside) continue;
+    const ndcR = Math.hypot(cx, cy);
+    const dx = p.x - player.position.x;
+    const dz = p.z - player.position.z;
     const len = Math.hypot(dx, dz);
-    if (len < bestDist) { bestDist = len; best = npc; }
+    // Cursor-first: smaller ndcR (closer to NPC's silhouette center) wins.
+    // Tie-break by world distance for visually stacked NPCs.
+    const ndcDelta = ndcR - bestNdcR;
+    if (ndcDelta < -0.03 || (Math.abs(ndcDelta) <= 0.03 && len < bestDist)) {
+      best = npc;
+      bestNdcR = ndcR;
+      bestDist = len;
+    }
   }
   return best;
 }
