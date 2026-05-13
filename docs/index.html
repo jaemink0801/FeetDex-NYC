@@ -8,21 +8,46 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T051557';
+  var BAKED = '20260513T052538';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "version.txt?t=" + Date.now(), false);
+    xhr.send();
+    var latest = (xhr.responseText || "").trim();
+    if (latest && latest !== BAKED) {
+      u.searchParams.set("v", latest);
+      location.replace(u.toString());
+      // Hide the (about to be navigated-away) page so the stale
+      // splash never flashes in front of the user.
+      document.documentElement.style.visibility = "hidden";
+      // Stop parsing/executing the rest of this stale document.
+      throw new Error("reloading to " + latest);
+    }
+    // No version mismatch — stamp the URL so the user lands on a
+    // version-keyed cache entry next time and we can short-circuit
+    // the XHR via the early-return above.
+    if (!u.searchParams.get("v")) {
+      u.searchParams.set("v", BAKED);
+      history.replaceState(null, "", u.toString());
+    }
+  } catch (e) {
+    if (e && /reloading to/.test(e.message)) throw e;
+    // XHR blocked (rare extension/CSP case) — fall back to async
+    // fetch. Not as bulletproof but better than nothing.
     fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
       .then(function(r){ return r.ok ? r.text() : ""; })
       .then(function(latest){
         latest = (latest || "").trim();
         if (latest && latest !== BAKED) {
-          u.searchParams.set("v", latest);
-          location.replace(u.toString());
+          var u2 = new URL(location.href);
+          u2.searchParams.set("v", latest);
+          location.replace(u2.toString());
         }
       })
       .catch(function(){});
-  } catch (e) {}
+  }
 })();</script>
 
   
@@ -1093,7 +1118,8 @@
     <span id="map-close-hint">[M] or [ESC] — close map</span>
     <div id="map-instructions">
       <span class="key">[LEFT CLICK]</span> the map to drop a
-      <span class="red">MARKER</span>. Click again to remove.
+      <span class="red">MARKER</span>. Click again to remove.<br/>
+      A red <span class="red">BEACON</span> shines through buildings, characters, and objects so you can find the spot.
     </div>
   </div>
 
@@ -5778,8 +5804,8 @@ const EPIC_SCRIPTS = {
   ],
   epic_sonion: [
     "AH! A fellow scholar of the sole! Welcome, pilgrim.",
-    "Before you collect my feet, you'll fight me — a little warm-up so you know what bosses feel like.",
-    "There are tougher ones waiting out there. Buy a sword at Morton's before tangling with mythics and legendaries.",
+    "I'm an <b>EPIC</b> — the gentlest of the bosses. Bosses (epic, mythic, legendary) won't hand over their feet without a fight.",
+    "Each tier hits harder than the last. Beat me here, then buy a sword at Morton's before the mythics and legendaries.",
     "Ready your fists. Show me how you move.",
   ],
   epic_sydney: [
@@ -13003,7 +13029,7 @@ function _enterLandmark(id, name) {
       tutorial.advance('enter-esb');
       setTimeout(() => {
         ui.openFeetGodDialogue(
-          "Inside. Find the character ahead, walk up, press <b>[E]</b> to talk."
+          "Find the character ahead, walk up, press <b>[E]</b> to talk."
         );
       }, 450);
     }
@@ -14550,10 +14576,9 @@ function _updateHint() {
 }
 
 // ── Map beacon (left-click waypoint) ─────────────────────────────────────────
-// Tall red light pillar. Depth-tested so buildings/NPCs occlude it normally —
-// the player has to be in line-of-sight to see the beam, which keeps the
-// minimap as the primary "where is my marker" affordance. No physics or
-// collision. One beacon at a time.
+// Pure-light pillar with depthTest:false so it visibly punches through every
+// wall, NPC, and building in the city — the player can spot it from anywhere
+// and walk toward it. No physics, no collision. One beacon at a time.
 function _buildBeaconMesh() {
   const g = new THREE.Group();
   const H = 240;                        // total pillar height — taller than any building
@@ -14562,32 +14587,35 @@ function _buildBeaconMesh() {
     new THREE.CylinderGeometry(0.45, 0.45, H, 10),
     new THREE.MeshBasicMaterial({
       color: 0xff1a30, transparent: true, opacity: 0.85,
-      depthWrite: false,
+      depthTest: false, depthWrite: false,
     }),
   );
   core.position.y = H / 2;
+  core.renderOrder = 999;
   g.add(core);
   // Fatter glow halo around the core
   const glow = new THREE.Mesh(
     new THREE.CylinderGeometry(1.4, 1.4, H, 12),
     new THREE.MeshBasicMaterial({
       color: 0xff5566, transparent: true, opacity: 0.30,
-      depthWrite: false,
+      depthTest: false, depthWrite: false,
       blending: THREE.AdditiveBlending,
     }),
   );
   glow.position.y = H / 2;
+  glow.renderOrder = 998;
   g.add(glow);
   // Ground disc — a wide flat circle so the player can see "this is the spot"
   const disc = new THREE.Mesh(
     new THREE.CircleGeometry(1.8, 24),
     new THREE.MeshBasicMaterial({
       color: 0xff2244, transparent: true, opacity: 0.55,
-      depthWrite: false, side: THREE.DoubleSide,
+      depthTest: false, depthWrite: false, side: THREE.DoubleSide,
     }),
   );
   disc.rotation.x = -Math.PI / 2;
   disc.position.y = 0.05;
+  disc.renderOrder = 997;
   g.add(disc);
   return g;
 }
