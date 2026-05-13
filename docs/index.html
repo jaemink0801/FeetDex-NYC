@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T035057';
+  var BAKED = '20260513T035557';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -310,10 +310,14 @@
     /* Foot-shaped frame around the volume widget. The decorative SVG is
        drawn as a SINGLE outline path (no overlapping internal lines).
        Slider sits in the sole/ankle area, well clear of the toes. */
+    /* Frame itself doesn't catch clicks — decorative SVG underneath must
+       let clicks through to the slider on top of it. Slider/label set
+       pointer-events:auto explicitly so the user can drag the volume. */
     #lock-overlay .vol-foot-frame { position:relative; width:340px; height:400px;
-      pointer-events:auto; }
+      pointer-events:none; }
     #lock-overlay .vol-foot-frame .vol-foot-svg {
       position:absolute; inset:0; width:100%; height:100%;
+      pointer-events:none;
       filter:drop-shadow(0 0 22px rgba(255,215,0,.65));
       animation:vol-foot-pulse 2.4s ease-in-out infinite;
       overflow:visible; }
@@ -346,7 +350,8 @@
        the toes so the slider never overlaps the toe shapes. */
     #lock-overlay .vol-content { position:absolute; left:50%; top:62%;
       transform:translate(-50%, -50%); display:flex; flex-direction:column;
-      align-items:center; gap:14px; width:58%; }
+      align-items:center; gap:14px; width:58%;
+      pointer-events:auto; }
     #lock-overlay .volume-tip { font-size:18px; font-weight:bold;
       letter-spacing:3px; color:#FFEC60; text-align:center; line-height:1.35;
       text-shadow:0 0 12px rgba(255,236,96,.75);
