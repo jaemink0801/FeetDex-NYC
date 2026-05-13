@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T061125';
+  var BAKED = '20260513T061214';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -10211,6 +10211,9 @@ function buildGenericInteriors(scene, enterables, _SO) {
     registerSolid(intSolids, ox + 5.5, oz + 10, 4.5, 0.3); // S wall right of door
     registerSolid(intSolids, ox - 10,  oz,      0.3, 10);  // W wall
     registerSolid(intSolids, ox + 10,  oz,      0.3, 10);  // E wall
+    // Exit door is solid — press [E] to leave instead of walking through.
+    // 1.4 m wide door at (ox, oz+9.85): hw=0.7, hd=0.15.
+    registerSolid(intSolids, ox,       oz + 9.85, 0.7, 0.15);
     for (const { cx, cz, hw, hd } of (FLOOR_PROPS[typeName] ?? [])) {
       registerSolid(intSolids, ox + cx, oz + cz, hw, hd);
     }
@@ -10731,6 +10734,10 @@ function buildInteriors(scene, _SO) {
     registerSolid(intSolids, ox,        oz - 10, 10,  0.3); // N wall
     registerSolid(intSolids, ox - 5.5,  oz + 10, 4.5, 0.3); // S wall left of door
     registerSolid(intSolids, ox + 5.5,  oz + 10, 4.5, 0.3); // S wall right of door
+    // Exit door itself is solid so the player can't just walk through it —
+    // they have to press [E] to leave the landmark. Door is 2 m wide / 0.2 m
+    // thick at (ox, oz+9.85); hw=1.0, hd=0.15 covers exactly that footprint.
+    registerSolid(intSolids, ox,        oz + 9.85, 1.0, 0.15);
     registerSolid(intSolids, ox - 10,   oz,      0.3, 10);  // W wall
     registerSolid(intSolids, ox + 10,   oz,      0.3, 10);  // E wall
 
