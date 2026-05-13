@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T061435';
+  var BAKED = '20260513T061836';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -861,13 +861,16 @@
       50%      { transform:translateX(-50%) translateY(8px); }
     }
 
-    /* Pinned to the LOWER-left so it doesn't collide with the missions
-       panel that lives at the top-left. z-index is intentionally just
-       ABOVE the bottom dialogue panel (50) but BELOW the missions corner
-       (60) — tutorial steps stay visible over dialogue but never cover
-       the missions board. */
-    #tutorial-checklist { position:fixed; bottom:90px; left:16px;
-      width:320px; z-index:52; pointer-events:none;
+    /* Sits in the MIDDLE-left, between the missions corner at the top and
+       the dialogue panel at the bottom 30% of the viewport. top:42% with
+       a centered transform keeps it roughly in the upper-middle on any
+       viewport size — high enough to clear the dialogue, low enough to
+       leave the missions board its space. z-index 52 is also between
+       dialogue (50) and missions (60) so stacking matches the visual
+       hierarchy: tutorial > dialogue, tutorial < missions. */
+    #tutorial-checklist { position:fixed; top:42%; left:16px;
+      transform:translateY(-50%); width:320px; z-index:52;
+      pointer-events:none;
       background:rgba(20,16,8,.85); border:2px solid rgba(255,215,0,.55);
       border-radius:8px; padding:16px 18px; font-size:16px; letter-spacing:1px;
       display:none; box-shadow:0 0 20px rgba(255,215,0,.25); }
@@ -12095,7 +12098,18 @@ document.addEventListener('pointerlockchange', () => {
         };
       }, 250);
     }
-  } else if (!_mapOpen && (state === 'playing' || state === 'interior')) {
+  } else if (!_mapOpen
+             && state !== 'shop' && state !== 'fleet'
+             && state !== 'minigame' && state !== 'feetdex') {
+    // Show the start/lock overlay any time pointer-lock exits and we're
+    // not already inside a non-pointer-locked UI screen (shop, fleet,
+    // minigame, feetdex). The body.lock-overlay-up class on
+    // showLockOverlay hides every game-side widget (dialogue panel,
+    // Feet God overlay, tutorial hand, missions, HUD, etc.) so the
+    // player sees ONLY the start screen, not the tutorial state behind
+    // it. Pre-fix this branch was gated to 'playing' / 'interior' only,
+    // so ESC during a dialogue or tutorial popup left those overlays
+    // floating in front of the canvas.
     ui.showLockOverlay();
   }
 });
@@ -12482,8 +12496,31 @@ function _handleE() {
 
       const proxDoor = world.checkDoorProximity(player.position);
       if (proxDoor && proxDoor.action === 'near-exit') {
-        _exitLandmark();
-        return;
+        // Exit doors used to fire on proximity alone. The user wants
+        // the same cursor-aim rule as NPC interaction: only exit if
+        // the crosshair is actually ON the door silhouette. Door is
+        // ~2 m wide × 3 m tall centered on proxDoor.pos. Project the
+        // top/bottom/side reference points to NDC and check whether
+        // the cursor (NDC 0,0) sits inside the projected rectangle.
+        const dp = proxDoor.pos;
+        _bodyTop .set(dp.x, dp.y + 1.5, dp.z);
+        _bodyBot .set(dp.x, dp.y - 1.5, dp.z);
+        _bodySide.set(dp.x + 1.0, dp.y,        dp.z);
+        _bodyTop .project(camera);
+        _bodyBot .project(camera);
+        _bodySide.project(camera);
+        if (!(_bodyTop.z > 1 && _bodyBot.z > 1)) {
+          const cxd  = (_bodyTop.x + _bodyBot.x) * 0.5;
+          const minY = Math.min(_bodyTop.y, _bodyBot.y);
+          const maxY = Math.max(_bodyTop.y, _bodyBot.y);
+          const halfW = Math.max(0.02, Math.abs(_bodySide.x - cxd));
+          if (Math.abs(cxd) <= halfW && minY <= 0 && 0 <= maxY) {
+            _exitLandmark();
+            return;
+          }
+        }
+        // Cursor not on the door — fall through; the player can still
+        // press E to talk to an NPC inside without accidentally leaving.
       }
 
       // Cursor picker uses the WIDER inCursorRange list (≈9 m) so the player
@@ -15049,6 +15086,31 @@ function _doorDisplayName(name) {
   return _BUILDING_DISPLAY_NAME[name] ?? name;
 }
 
+// Project the door's top/bottom/side reference points to NDC and check
+// whether the cursor (NDC 0,0) sits inside the projected rectangle. Used
+// to gate the "[E] Exit building" hint AND the actual exit action on
+// cursor aim — exiting now requires the same crosshair-on-target rule as
+// talking to NPCs.
+const _DOOR_TMP_T = new THREE.Vector3();
+const _DOOR_TMP_B = new THREE.Vector3();
+const _DOOR_TMP_S = new THREE.Vector3();
+function _doorUnderCursor(door) {
+  if (!door?.pos) return false;
+  const dp = door.pos;
+  _DOOR_TMP_T.set(dp.x, dp.y + 1.5, dp.z);
+  _DOOR_TMP_B.set(dp.x, dp.y - 1.5, dp.z);
+  _DOOR_TMP_S.set(dp.x + 1.0, dp.y, dp.z);
+  _DOOR_TMP_T.project(camera);
+  _DOOR_TMP_B.project(camera);
+  _DOOR_TMP_S.project(camera);
+  if (_DOOR_TMP_T.z > 1 && _DOOR_TMP_B.z > 1) return false;
+  const cx   = (_DOOR_TMP_T.x + _DOOR_TMP_B.x) * 0.5;
+  const minY = Math.min(_DOOR_TMP_T.y, _DOOR_TMP_B.y);
+  const maxY = Math.max(_DOOR_TMP_T.y, _DOOR_TMP_B.y);
+  const halfW = Math.max(0.02, Math.abs(_DOOR_TMP_S.x - cx));
+  return Math.abs(cx) <= halfW && minY <= 0 && 0 <= maxY;
+}
+
 function _updateHint() {
   if (state !== 'playing' && state !== 'interior') {
     ui.clearInteractHint();
@@ -15068,8 +15130,21 @@ function _updateHint() {
   }
   const door = world.checkDoorProximity(player.position);
   if (door) {
-    ui.setInteractHint(door.action === 'near-entry' ? `[E] Enter ${_doorDisplayName(door.name)}` : '[E] Exit building');
-    return;
+    // Entry hint: always show when proximity passes — entry is forgiving
+    // (the actual handler accepts proximity OR cursor aim, so the player
+    // can walk through without precise aim).
+    // Exit hint: REQUIRES cursor aim on the door silhouette, matching the
+    // exit-by-aim rule. Otherwise the hint would advertise "Exit
+    // building" but pressing E would do nothing because the cursor is
+    // pointed elsewhere.
+    if (door.action === 'near-entry') {
+      ui.setInteractHint(`[E] Enter ${_doorDisplayName(door.name)}`);
+      return;
+    }
+    if (door.action === 'near-exit' && _doorUnderCursor(door)) {
+      ui.setInteractHint('[E] Exit building');
+      return;
+    }
   }
   // Subway station — E opens the map and lets the player pick a destination
   // if they own the MetroCard. Without it, the hint nudges them to buy one.
