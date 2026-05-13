@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T041542';
+  var BAKED = '20260513T045308';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -364,21 +364,13 @@
       0%,100% { transform:scale(1);    text-shadow:0 0 12px rgba(255,236,96,.55); }
       50%     { transform:scale(1.04); text-shadow:0 0 22px rgba(255,236,96,1); }
     }
-    /* Explicitly styled range input so the thumb is large, visible against
-       the dark amber foot interior, and obviously grabbable. Default native
-       slider thumbs were nearly invisible against the gold/amber palette. */
-    #lock-overlay #lock-vol-slider { -webkit-appearance:none; appearance:none;
-      width:180px; height:10px; border-radius:5px; cursor:pointer;
-      background:linear-gradient(to right, #FFD700, rgba(255,215,0,0.25));
-      pointer-events:auto; outline:none; }
-    #lock-overlay #lock-vol-slider::-webkit-slider-thumb {
-      -webkit-appearance:none; width:22px; height:22px; border-radius:50%;
-      background:#FFEC60; border:2px solid #FFD700; cursor:pointer;
-      box-shadow:0 0 12px rgba(255,236,96,.9); }
-    #lock-overlay #lock-vol-slider::-moz-range-thumb {
-      width:22px; height:22px; border-radius:50%;
-      background:#FFEC60; border:2px solid #FFD700; cursor:pointer;
-      box-shadow:0 0 12px rgba(255,236,96,.9); }
+    /* Slider — native rendering with gold accent. Keeping native styling
+       guarantees the thumb's interactive area matches its visual position;
+       custom -webkit-slider-thumb styling was misaligning the hit zone in
+       some browsers and breaking the drag. */
+    #lock-overlay #lock-vol-slider { width:200px; height:28px;
+      accent-color:#FFD700; cursor:pointer;
+      pointer-events:auto; position:relative; z-index:10; }
 
     /* Full-screen map overlay (M key). The map fills as much of the
        viewport as possible while staying square; the legend rides
