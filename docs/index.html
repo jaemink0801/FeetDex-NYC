@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T234218';
+  var BAKED = '20260513T235022';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1098,7 +1098,7 @@
 
     /* ── Time-attack popup ────────────────────────────────────────────── */
     #time-attack-popup { position:fixed; inset:0; display:none;
-      background:rgba(0,0,0,.65); z-index:200;
+      background:rgba(0,0,0,.65); z-index:200; cursor:pointer;
       align-items:center; justify-content:center;
       animation:tap-fade .25s ease-out; }
     #time-attack-popup.show { display:flex; }
@@ -6691,20 +6691,36 @@ class UI {
   // Modal popup announcing a fresh time-attack mission. onOk is invoked
   // once the player clicks the start button — caller starts the timer
   // and spawns the NPC. The popup blocks ESC etc. via main.js's state.
-  showTimeAttackPopup(name, onOk) {
+  showTimeAttackPopup(_unused, onOk) {
     const el   = document.getElementById('time-attack-popup');
     const body = document.getElementById('tap-body');
     const btn  = document.getElementById('tap-ok');
     if (!el || !btn) { onOk?.(); return; }
     if (body) body.innerHTML =
-      `Find <b>${name}</b> before time runs out to discover hidden characters!`;
+      `Find the hidden character before time runs out!`;
     el.classList.add('show');
-    const handler = () => {
-      btn.removeEventListener('click', handler);
+    // Autofocus so Enter / Space dismiss without any mouse movement — and
+    // also so screen readers announce the button. The pointer is already
+    // released by main.js, so the cursor is free for instant click.
+    setTimeout(() => btn.focus(), 0);
+    const keyHandler = (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault();
+        btn.click();
+      }
+    };
+    const clickHandler = () => {
+      btn.removeEventListener('click', clickHandler);
+      el.removeEventListener('click', clickHandler);
+      document.removeEventListener('keydown', keyHandler, true);
       el.classList.remove('show');
       onOk?.();
     };
-    btn.addEventListener('click', handler);
+    btn.addEventListener('click', clickHandler);
+    // Make the entire backdrop dismiss-on-click too — wherever the cursor
+    // lands after pointer-lock release, ONE click anywhere starts the timer.
+    el.addEventListener('click', clickHandler);
+    document.addEventListener('keydown', keyHandler, true);
   }
 
   isTimeAttackPopupOpen() {
@@ -12836,8 +12852,7 @@ function _showTimeAttackPopup(mission) {
   // Release pointer lock so the cursor can click the OK button.
   if (document.pointerLockElement === canvas) document.exitPointerLock();
 
-  const targetName = TIME_ATTACK_NAMES[mission.target] || 'the character';
-  ui.showTimeAttackPopup(targetName, () => {
+  ui.showTimeAttackPopup(null, () => {
     _timeAttackPopupShown = false;
     // Start the 40s timer and spawn the NPC into the world.
     const m = feetdex.startPendingFind();
