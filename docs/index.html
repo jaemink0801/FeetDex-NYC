@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T063039';
+  var BAKED = '20260513T063200';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -861,15 +861,16 @@
       50%      { transform:translateX(-50%) translateY(8px); }
     }
 
-    /* Pinned to the top-left — same anchor the missions panel uses later.
-       The two NEVER show at the same moment (missions reveal happens
-       inside the tutorial finale's Feet God overlay, which fully covers
-       the screen; tutorial.finish() hides the checklist before the
-       overlay dismisses), so they can safely share the top-left slot.
-       This keeps the checklist well clear of the bottom-30% dialogue
-       panel during Sonion / Morton / Feet God conversations. z-index 52
-       still sits above dialogue (50) and below missions (60). */
-    #tutorial-checklist { position:fixed; top:52px; left:14px;
+    /* Tutorial checklist sits in the upper-middle band on the left:
+       BELOW where the missions corner ends (top:52 + up to ~300 px of
+       missions = ~350) and ABOVE the bottom-30% dialogue panel
+       (≥ 70 % of viewport height). top:30% pins it well clear of both
+       on common viewports (800–1440 px tall). missions doesn't show
+       during the steps anyway — tutorial.finish() hides this box right
+       before _revealMissions() in the finale — so the two never share
+       screen space. z-index 52 keeps it above dialogue (50) but under
+       missions (60) for the brief swap moment. */
+    #tutorial-checklist { position:fixed; top:30%; left:14px;
       width:380px; z-index:52; pointer-events:none;
       background:rgba(20,16,8,.85); border:2px solid rgba(255,215,0,.55);
       border-radius:8px; padding:14px 16px; font-size:15px; letter-spacing:1px;
