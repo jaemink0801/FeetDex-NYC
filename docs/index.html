@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T040212';
+  var BAKED = '20260513T041542';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -327,7 +327,11 @@
     #lock-overlay .vol-foot-frame .vol-foot-svg path,
     #lock-overlay .vol-foot-frame .vol-foot-svg circle {
       fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:3;
-      stroke-linejoin:round; stroke-linecap:round; }
+      stroke-linejoin:round; stroke-linecap:round;
+      /* Belt-and-suspenders: SVG children default to pointer-events:
+         visiblePainted, which would catch clicks on the painted body and
+         block the slider from receiving them. Force none on every shape. */
+      pointer-events:none; }
     @keyframes vol-foot-pulse {
       0%,100% { filter:drop-shadow(0 0 16px rgba(255,215,0,.5));
                 transform:scale(1); }
@@ -6937,9 +6941,10 @@ class UI {
         this.onVolume?.(v);
         if (pauseVol) pauseVol.value = String(v);
       });
-      // Stop the click from bubbling up to the lock-overlay's click-to-play.
-      lockVol.addEventListener('click',     e => e.stopPropagation());
-      lockVol.addEventListener('mousedown', e => e.stopPropagation());
+      // Stop click from bubbling to the lock-overlay's click-to-play.
+      // (Mousedown is NOT blocked — the browser needs it to start native
+      // slider-thumb drag; blocking it would defeat the slider.)
+      lockVol.addEventListener('click', e => e.stopPropagation());
     }
     this._el.fdexClose.addEventListener('click', () => this.closeFeetDex());
     this._el.winPlayAgain.addEventListener('click', () => {
