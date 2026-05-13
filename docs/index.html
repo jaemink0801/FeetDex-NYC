@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T063624';
+  var BAKED = '20260513T064250';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2976,92 +2976,146 @@ class Player {
       else             this._rightHip = hip;
     }
 
-    // ── Lightsaber (visible when the Lightsaber booster is owned) ──
-    // Anchored to the camera lower-right like a hand-held weapon. Hidden
-    // by default; setLightsaberVisible(true) reveals it. swingLightsaber()
-    // plays a quick swing animation + audio cue.
+    // ── Lightsaber / Sword (visible when the Sword booster is owned) ──
+    // Built VERTICAL this time: hilt is upright (along local Y), emitter
+    // at the top, blade extends UPWARD out of the emitter. Previous
+    // version had everything rotated 90° around X to lie along the camera
+    // -Z direction, which is why "blade grows up" never looked right —
+    // we were scaling a horizontal cylinder. New geometry:
+    //
+    //    blade (cylinder, 1.0 m long, vertical along local Y)
+    //       ↑ grows up from emitter as _saberIgniteT animates 0→1
+    //    emitter (silver shroud, slightly wider, at y≈+0.115)
+    //    hilt body (dark grey cylinder, y -0.10 to +0.10)
+    //       + activation button (red box on +Z face at y≈+0.04)
+    //       + two grip ridges (silver bands at y≈-0.04 and y≈-0.07)
+    //       + belt clip (silver bar on +X side)
+    //    pommel cap (silver, at y≈-0.115)
+    //
+    // Group is placed lower-right of the FPV. Battle pose is a slight
+    // forward tilt + left-leaning roll so the saber reads as held in
+    // the player's right hand, blade pointing up into upper screen.
     this._saber = new THREE.Group();
-    this._saber.position.set(0.32, -0.30, -0.55);
-    this._saber.rotation.set(-0.30, 0.15, 0.05);
     camera.add(this._saber);
 
+    const hiltMat   = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, metalness: 0.85, roughness: 0.30 });
+    const ringMat   = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, metalness: 0.95, roughness: 0.18 });
+    const accentMat = new THREE.MeshStandardMaterial({ color: 0x686868, metalness: 0.85, roughness: 0.25 });
+    const buttonMat = new THREE.MeshStandardMaterial({
+      color: 0xcc2222, emissive: 0x661010, emissiveIntensity: 0.5,
+      metalness: 0.3, roughness: 0.4,
+    });
+
+    // Main hilt body — vertical, centered at origin, y -0.10 to +0.10.
     const hilt = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.025, 0.030, 0.18, 12),
-      new THREE.MeshLambertMaterial({ color: 0x202020 }),
+      new THREE.CylinderGeometry(0.020, 0.020, 0.20, 18),
+      hiltMat,
     );
-    hilt.rotation.x = Math.PI / 2;     // lay along -Z (forward)
-    hilt.position.z = 0;
     this._saber.add(hilt);
 
-    // Saber blade — long emissive cylinder. Built so its base is at the
-    // hilt's tip and it extends forward (–Z), giving a hand-held look.
-    // THINNER + more opaque so the blade reads as a solid line of light
-    // rather than a translucent hose. The wider halo behind it still
-    // sells the glow.
+    // Emitter shroud — silver ring at the TOP of the hilt where the
+    // blade emerges. Slightly fatter than the hilt body.
+    const emitter = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.024, 0.024, 0.030, 18),
+      ringMat,
+    );
+    emitter.position.y = 0.115;
+    this._saber.add(emitter);
+
+    // Pommel cap — silver, at the BOTTOM of the hilt.
+    const pommel = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.022, 0.022, 0.022, 18),
+      accentMat,
+    );
+    pommel.position.y = -0.111;
+    this._saber.add(pommel);
+
+    // Activation button — small red box on the front face of the hilt.
+    const button = new THREE.Mesh(
+      new THREE.BoxGeometry(0.012, 0.022, 0.010),
+      buttonMat,
+    );
+    button.position.set(0, 0.04, 0.024);
+    this._saber.add(button);
+
+    // Two grip ridges — silver bands that suggest a knurled grip.
+    for (const gy of [-0.040, -0.075]) {
+      const g = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.022, 0.022, 0.006, 18),
+        accentMat,
+      );
+      g.position.y = gy;
+      this._saber.add(g);
+    }
+
+    // Belt clip — small silver bar on the +X side of the hilt.
+    const clip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.005, 0.050, 0.012),
+      accentMat,
+    );
+    clip.position.set(0.024, -0.015, 0);
+    this._saber.add(clip);
+
+    // ── Blade (slim, very opaque) ────────────────────────────────────
+    // Cylinder length 1.0, vertical. Starts at top of emitter (y=0.130)
+    // and extends UP. scale.y drives the unsheathe animation; position.y
+    // updates so the BASE stays planted at the emitter while the tip
+    // advances upward.
     const bladeMat = new THREE.MeshStandardMaterial({
-      color: 0xeaffff, emissive: 0x66e8ff, emissiveIntensity: 1.5,
+      color: 0xf0ffff, emissive: 0x4dd6ff, emissiveIntensity: 1.6,
       transparent: true, opacity: 0.98,
     });
     const blade = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.011, 0.011, 1.2, 12),
+      new THREE.CylinderGeometry(0.020, 0.020, 1.0, 18),
       bladeMat,
     );
-    blade.rotation.x = Math.PI / 2;
-    blade.position.set(0, 0, -0.69);
+    // Initial position is at full extension (y=0.630, spans 0.130–1.130);
+    // _setSaberLength(0) below collapses it before render.
+    blade.position.y = 0.630;
     this._saber.add(blade);
-    this._saberBladeMat = bladeMat;       // exposed so the swing animation
-                                          // can flash emissive intensity
+    this._saberBladeMat = bladeMat;
 
-    // Soft halo around the blade for the glow look
+    // Halo — slightly fatter additive-looking cylinder for the glow.
     const haloMat = new THREE.MeshBasicMaterial({
       color: 0x88eeff, transparent: true, opacity: 0.22,
     });
     const halo = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.030, 0.030, 1.2, 12),
+      new THREE.CylinderGeometry(0.030, 0.030, 1.0, 18),
       haloMat,
     );
-    halo.rotation.x = Math.PI / 2;
-    halo.position.set(0, 0, -0.69);
+    halo.position.y = 0.630;
     this._saber.add(halo);
     this._saberHaloMat = haloMat;
 
-    // Wide motion-trail blade — invisible at rest, briefly bloomed during
-    // the swing strike so the flashy diagonal arc reads even at a glance.
+    // Wide motion-trail — invisible at rest, briefly blooms during a
+    // swing so the chop reads at a glance.
     const trailMat = new THREE.MeshBasicMaterial({
       color: 0xbbf2ff, transparent: true, opacity: 0,
     });
     const trail = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.13, 0.13, 1.25, 16),
+      new THREE.CylinderGeometry(0.085, 0.085, 1.04, 16),
       trailMat,
     );
-    trail.rotation.x = Math.PI / 2;
-    trail.position.set(0, 0, -0.69);
+    trail.position.y = 0.620;
     this._saber.add(trail);
     this._saberTrailMat = trailMat;
 
     this._saber.visible = false;
     this._saberSwingT  = 0;       // 0..1 progress of current swing
-    // Two distinct poses: a tip-UP "sheathed" carry (not in battle) and
-    // the original lower-right "battle" stance used during combat. The
-    // ignition animation eases the saber from sheathed → battle pose
-    // while the blade extends, so the unsheathe reads as a real motion.
-    this._saberSheathPose = { rx: -1.05, ry: 0.05, rz: 0.05, py: -0.18, pz: -0.40 };
-    this._saberBattlePose = { rx: -0.30, ry: 0.15, rz: 0.05, py: -0.30, pz: -0.55 };
+    // Single rest pose — saber held lower-right, slight forward tilt and
+    // a small left-leaning roll for a natural "sword raised" look. The
+    // old sheathPose/battlePose lerp was visually noisy and is gone.
+    this._saberRest = { rx: -0.20, ry: 0.10, rz: -0.15, px: 0.32, py: -0.42, pz: -0.55 };
 
-    // Sheath state. When sheathed (default), blade + halo + trail are
-    // hidden entirely (visible=false) — the cylinder geometry's end caps
-    // would otherwise render as glowing disks even at scale.z≈0. The
-    // ignition animation grows them back out. _saberSheathed flags
-    // sheathed; _saberIgniteT 0..1 is the unsheathe progress.
     this._saberBlade = blade;
     this._saberHalo  = halo;
     this._saberTrail = trail;
     this._saberSheathed = true;
     this._saberIgniteT  = 0;
     this._setSaberLength(0);     // start fully collapsed (and hidden)
-    // Apply sheathed pose to the saber group on construction.
-    this._saber.position.set(0.32, this._saberSheathPose.py, this._saberSheathPose.pz);
-    this._saber.rotation.set(this._saberSheathPose.rx, this._saberSheathPose.ry, this._saberSheathPose.rz);
+    // Apply rest pose to the saber group on construction.
+    this._saber.position.set(this._saberRest.px, this._saberRest.py, this._saberRest.pz);
+    this._saber.rotation.set(this._saberRest.rx, this._saberRest.ry, this._saberRest.rz);
 
     window.addEventListener('keydown', e => {
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') this._sprint = true;
@@ -3126,32 +3180,31 @@ class Player {
     this._saberSwingT = 1.0;        // animation timer counts down to 0
   }
 
-  // Scale blade/halo/trail along their long axis so 0 = collapsed (just
-  // the hilt visible) and 1 = full length. The cylinder geometry stores
-  // length along its LOCAL Y axis; the meshes are then tilted with
-  // rotation.x = π/2 so that local Y ends up aligned with world Z.
-  // Scaling must therefore happen on scale.Y (length), NOT scale.Z
-  // (which scales the post-rotation radial axis and just squashes the
-  // cylinder elliptically — the bug that made the blade pop instantly
-  // to full length instead of telescoping out of the hilt). Position
-  // shifts so the base stays planted at the hilt's forward tip.
+  // Scale the blade/halo/trail along their long axis so 0 = nothing
+  // (just the hilt visible) and 1 = full length. Geometry is vertical
+  // along local Y; we scale on local Y (the length axis) and offset
+  // position.y so the BASE of the blade stays planted at the emitter
+  // (y = 0.130 — top of the emitter ring at y=0.115 + half its height
+  // 0.015). The blade therefore appears to EXTRUDE UPWARD from the
+  // hilt's top as k grows from 0 to 1 — the iconic ignition.
   _setSaberLength(t) {
     const k = Math.max(0, Math.min(1, t));
     const visible = k > 0.001;
+    const base = 0.130;        // top of emitter ring
     if (this._saberBlade) {
       this._saberBlade.visible = visible;
       this._saberBlade.scale.y = visible ? k : 0.0001;
-      this._saberBlade.position.z = -0.09 - 0.60 * k;     // base at hilt tip
+      this._saberBlade.position.y = base + 0.50 * k;     // half-length above base
     }
     if (this._saberHalo) {
       this._saberHalo.visible = visible;
       this._saberHalo.scale.y = visible ? k : 0.0001;
-      this._saberHalo.position.z = -0.09 - 0.60 * k;
+      this._saberHalo.position.y = base + 0.50 * k;
     }
     if (this._saberTrail) {
       this._saberTrail.visible = visible;
       this._saberTrail.scale.y = visible ? k : 0.0001;
-      this._saberTrail.position.z = -0.09 - 0.625 * k;
+      this._saberTrail.position.y = base + 0.52 * k;
     }
   }
 
@@ -3171,62 +3224,56 @@ class Player {
 
   _animateLightsaber(dt) {
     if (!this._saber || !this._saber.visible) return;
-    // Pose target — sheathed pose when carrying the hilt around the city,
-    // battle pose any time the saber is ignited. Previously this LERPED
-    // from sheath → battle while the blade was growing, which made the
-    // whole saber rotate and translate at the same time as the extension.
-    // That motion masked the actual unsheathe — the blade looked like it
-    // was swinging into place rather than telescoping out. Now: hard snap
-    // to battle pose the instant igniteLightsaber() is called, so the
-    // ONLY visual change during 3-2-1 is the blade growing in a straight
-    // line out of the hilt tip.
-    const rest = this._saberSheathed ? this._saberSheathPose : this._saberBattlePose;
+    // Single rest pose now — see constructor. No pose lerp during ignite;
+    // the only visible motion during the 3-2-1 countdown is the blade
+    // growing upward out of the emitter.
+    const rest = this._saberRest;
     if (this._saberSwingT > 0) {
-      // Slower decay (was 3.6) — total swing runtime ~0.4 s instead of
-      // ~0.28 s. The strike is now unmistakable instead of a one-frame
-      // blink at lower frame rates.
+      // Total swing runtime ~0.4 s.
       this._saberSwingT = Math.max(0, this._saberSwingT - dt * 2.5);
       const phase = 1 - this._saberSwingT;        // 0..1 forward
-      const arc   = Math.sin(phase * Math.PI);    // 0 → 1 → 0  (peaks mid-swing)
-      // chop drives the vertical arc. Now goes +1 → -1 so the blade STARTS
-      // pointing UP (windup, rotation.x positive ⇒ tip toward sky) and
-      // ENDS pointing DOWN (strike, rotation.x negative ⇒ tip through the
-      // opponent). Previously it ran -1 → +1, which inverted the motion.
-      const chop  =  Math.cos(phase * Math.PI);   // +1 → -1  (high windup → low strike)
+      const arc   = Math.sin(phase * Math.PI);    // 0 → 1 → 0
+      // chop +1 → -1 over the swing.
+      const chop  =  Math.cos(phase * Math.PI);
 
-      // HIGH→LOW CHOP — pure rotation.x. Tip raised above head at start,
-      // drops through the centerline by the end. Wider amplitude (1.55 rad
-      // ≈ 88°) sells the arc; a subtle wrist twist via z keeps it from
-      // looking like a flat hinge.
-      this._saber.rotation.x = rest.rx + chop * 1.55;          // big high→low chop
-      this._saber.rotation.z = rest.rz + arc * 0.22;           // wrist twist
-      this._saber.rotation.y = rest.ry;                         // no horizontal sweep
-      this._saber.position.z = rest.pz - arc * 0.34;           // forward thrust
-      // High at windup (chop +1 ⇒ +0.30), low at follow-through (chop -1 ⇒
-      // -0.30). Sign flipped from previous version which produced a
-      // low→high lift.
-      this._saber.position.y = rest.py + chop * 0.30;
+      // HIGH → LOW CHOP. Saber is built blade-up (local +Y); rotation.x
+      // rotates the saber in the Y-Z plane around the player's right hand.
+      //   chop=+1  (windup peak): rotation.x = rest.rx + 1.0
+      //                              ≈ +0.80 rad — tip leans BACK over
+      //                              the player's head (toward +Z)
+      //   chop= 0  (mid-swing):   rotation.x = rest.rx
+      //                              ≈ -0.20 rad — tip just past vertical,
+      //                              starting forward
+      //   chop=-1  (strike):      rotation.x = rest.rx - 1.0
+      //                              ≈ -1.20 rad — tip well forward AND
+      //                              well below the camera, "through the
+      //                              opponent's skull"
+      // Net swing: ~115° of arc starting back-up and ending forward-down.
+      this._saber.rotation.x = rest.rx + chop * 1.00;
+      this._saber.rotation.z = rest.rz + arc * 0.25;  // wrist twist
+      this._saber.rotation.y = rest.ry;
+      // Hand pumps up on the windup, drives down on the strike.
+      this._saber.position.y = rest.py + chop * 0.18;
+      this._saber.position.z = rest.pz - arc * 0.18;  // forward thrust
 
-      // FLASH — emissive intensity peaks at mid-swing and the wide trail
-      // mesh briefly blooms, leaving an obvious cyan slash arc.
       if (this._saberBladeMat) {
-        this._saberBladeMat.emissiveIntensity = 1.2 + arc * 3.6;
+        this._saberBladeMat.emissiveIntensity = 1.6 + arc * 3.4;
       }
       if (this._saberHaloMat) {
-        this._saberHaloMat.opacity = 0.25 + arc * 0.55;
+        this._saberHaloMat.opacity = 0.22 + arc * 0.55;
       }
       if (this._saberTrailMat) {
         this._saberTrailMat.opacity = arc * 0.65;
       }
     } else {
-      // Idle — drift back to rest (and dim flash effects).
+      // Idle — drift back to rest.
       this._saber.rotation.x += (rest.rx - this._saber.rotation.x) * 0.20;
       this._saber.rotation.y += (rest.ry - this._saber.rotation.y) * 0.20;
       this._saber.rotation.z += (rest.rz - this._saber.rotation.z) * 0.20;
       this._saber.position.y += (rest.py - this._saber.position.y) * 0.20;
       this._saber.position.z += (rest.pz - this._saber.position.z) * 0.20;
-      if (this._saberBladeMat) this._saberBladeMat.emissiveIntensity = 1.2;
-      if (this._saberHaloMat)  this._saberHaloMat.opacity = 0.25;
+      if (this._saberBladeMat) this._saberBladeMat.emissiveIntensity = 1.6;
+      if (this._saberHaloMat)  this._saberHaloMat.opacity = 0.22;
       if (this._saberTrailMat) this._saberTrailMat.opacity = 0;
     }
 
