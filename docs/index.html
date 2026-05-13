@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T062710';
+  var BAKED = '20260513T062752';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -12412,13 +12412,6 @@ function _handleE() {
     _closeFleet(); _activeNPC = null; return;
   }
 
-  // Subway map: E used to also close the map as a convenience toggle,
-  // but the user wants each key to have one clear job — M closes the
-  // map, ESC opens the start menu. E is reserved for "progress whatever
-  // interaction is going on" (dialogue, shop line, popup) and falls
-  // through to do nothing while the map is open.
-  if (_mapOpen) return;
-
   // Discovery overlay — the popup says "[E] Add to FeetDex"; close on E.
   if (state === 'discovery') { _confirmDiscovery(); return; }
 
@@ -12428,6 +12421,15 @@ function _handleE() {
     _handleDialogueResult(result);
     return;
   }
+
+  // While the map is open: keep advancing any popup/dialogue the player
+  // had going (handled by the branches above this comment — legendary
+  // hint, Feet God, generic tip, shop, fleet, discovery, dialogue), but
+  // DON'T let E close the map or trip the cursor-aim picker. The map
+  // is closed only by M (returns to gameplay) or ESC (returns to start
+  // menu). This keeps each key's job distinct: M = close map, ESC =
+  // start menu, E = continue interactions.
+  if (_mapOpen) return;
 
   switch (state) {
 
