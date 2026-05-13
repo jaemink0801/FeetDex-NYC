@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T055153';
+  var BAKED = '20260513T055729';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -145,7 +145,7 @@
     #ms-morton-line { font-size:22px; color:#e5cfa3; font-style:italic;
       margin-top:28px; max-width:900px; text-align:center; min-height:60px;
       line-height:1.5; padding:0 16px; }
-    #ms-close-hint { position:absolute; bottom:24px; font-size:18px;
+    #ms-close-hint { position:absolute; bottom:24px; right:32px; font-size:18px;
       opacity:.75; letter-spacing:3px; color:#FFD27A; font-weight:bold; }
 
     /* Fleet Feet (cosmetic shop) overlay */
@@ -196,7 +196,7 @@
     #ff-vance-line { font-size:22px; color:#ffb088; font-style:italic;
       margin-top:18px; max-width:900px; text-align:center; min-height:60px;
       line-height:1.5; padding:0 16px; }
-    #ff-close-hint { position:absolute; bottom:24px; font-size:18px;
+    #ff-close-hint { position:absolute; bottom:24px; right:32px; font-size:18px;
       opacity:.75; letter-spacing:3px; color:#ff9966; font-weight:bold; }
 
     /* Win-screen budgeting portfolio */
@@ -811,11 +811,12 @@
     }
 
     /* Pinned to the LOWER-left so it doesn't collide with the missions
-       panel that lives at the top-left — earlier this was centered
-       vertically and the two boards would overlap once enough missions
-       accumulated. */
+       panel that lives at the top-left. z-index is intentionally just
+       ABOVE the bottom dialogue panel (50) but BELOW the missions corner
+       (60) — tutorial steps stay visible over dialogue but never cover
+       the missions board. */
     #tutorial-checklist { position:fixed; bottom:90px; left:16px;
-      width:320px; z-index:55; pointer-events:none;
+      width:320px; z-index:52; pointer-events:none;
       background:rgba(20,16,8,.85); border:2px solid rgba(255,215,0,.55);
       border-radius:8px; padding:16px 18px; font-size:16px; letter-spacing:1px;
       display:none; box-shadow:0 0 20px rgba(255,215,0,.25); }
@@ -949,7 +950,7 @@
     /* Sits below the FeetDex:NYC title so it doesn't compete for the
        top-left attention slot during the tutorial. */
     #missions-corner { position:fixed; top:52px; left:14px; width:380px;
-      z-index:55; pointer-events:none; font-size:15px; letter-spacing:.5px;
+      z-index:60; pointer-events:none; font-size:15px; letter-spacing:.5px;
       display:none; }
     #missions-corner.active { display:block; }
     #missions-corner h4 { margin:0 0 8px 0; font-size:14px; color:#FFD700;
@@ -1953,6 +1954,23 @@ const Audio = {
     tone(310, 0.06, 'triangle', 0.10, 0.02);
   },
 
+  // Shopkeeper voice blips — played every few characters of the shop-line
+  // typewriter so Morton/Vance feel like they're TALKING instead of just
+  // printing text. Pitched to match their existing NPC voice profiles so
+  // the voice sounds the same as their in-world dialogue.
+  mortonBlip() {
+    const c = getCtx();
+    if (c.state === 'suspended') c.resume().catch(() => {});
+    tone(135, 0.06, 'sine',     0.14, 0);
+    tone(270, 0.05, 'triangle', 0.06, 0);
+  },
+  vanceBlip() {
+    const c = getCtx();
+    if (c.state === 'suspended') c.resume().catch(() => {});
+    tone(235, 0.05, 'sine',     0.12, 0);
+    tone(470, 0.04, 'square',   0.05, 0);
+  },
+
   // Coin toss/jingle — used when the player opens Morton's shop. Mimics a
   // real coin flip: a sharp metallic "ting" up front, a brief mid-air ring
   // (offset pitches that beat against each other like a spinning coin), and
@@ -2918,12 +2936,15 @@ class Player {
 
     // Saber blade — long emissive cylinder. Built so its base is at the
     // hilt's tip and it extends forward (–Z), giving a hand-held look.
+    // THINNER + more opaque so the blade reads as a solid line of light
+    // rather than a translucent hose. The wider halo behind it still
+    // sells the glow.
     const bladeMat = new THREE.MeshStandardMaterial({
-      color: 0xddffff, emissive: 0x55ddff, emissiveIntensity: 1.2,
-      transparent: true, opacity: 0.92,
+      color: 0xeaffff, emissive: 0x66e8ff, emissiveIntensity: 1.5,
+      transparent: true, opacity: 0.98,
     });
     const blade = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.018, 0.018, 1.2, 12),
+      new THREE.CylinderGeometry(0.011, 0.011, 1.2, 12),
       bladeMat,
     );
     blade.rotation.x = Math.PI / 2;
@@ -2934,10 +2955,10 @@ class Player {
 
     // Soft halo around the blade for the glow look
     const haloMat = new THREE.MeshBasicMaterial({
-      color: 0x88eeff, transparent: true, opacity: 0.25,
+      color: 0x88eeff, transparent: true, opacity: 0.22,
     });
     const halo = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.045, 0.045, 1.2, 12),
+      new THREE.CylinderGeometry(0.030, 0.030, 1.2, 12),
       haloMat,
     );
     halo.rotation.x = Math.PI / 2;
@@ -3150,20 +3171,21 @@ class Player {
     }
 
     // Ignition / sheathe animation. When _saberSheathed is false and
-    // _saberIgniteT < 1, grow the blade from 0 to 1 over ~2.0s — slow
-    // enough that the player can clearly watch the blade extend during
-    // the 3-2-1 countdown (the sequence runs ~2.75s total). The blade
+    // _saberIgniteT < 1, grow the blade from 0 to 1 over ~2.7s — paced to
+    // fill across the entire 3-2-1 countdown (≈2.75s total). The blade
     // material also brightens as it fully extends, giving a satisfying
-    // bloom right as "FIGHT!" appears.
+    // bloom right as "FIGHT!" appears. The growth happens from the hilt
+    // TIP outward (see _setSaberLength: base position is fixed at the
+    // hilt's forward edge while the far end advances).
     if (!this._saberSheathed && this._saberIgniteT < 1) {
-      this._saberIgniteT = Math.min(1, this._saberIgniteT + dt / 2.0);
+      this._saberIgniteT = Math.min(1, this._saberIgniteT + dt / 2.7);
       this._setSaberLength(this._saberIgniteT);
       // Brief ignition flash that builds with the blade's growth
       if (this._saberBladeMat) {
-        this._saberBladeMat.emissiveIntensity = 0.6 + this._saberIgniteT * 1.4;
+        this._saberBladeMat.emissiveIntensity = 0.7 + this._saberIgniteT * 1.6;
       }
       if (this._saberHaloMat) {
-        this._saberHaloMat.opacity = 0.10 + this._saberIgniteT * 0.20;
+        this._saberHaloMat.opacity = 0.08 + this._saberIgniteT * 0.18;
       }
     }
   }
@@ -4736,20 +4758,29 @@ class NPCManager {
       }
     }
 
-    // inRange = proximity (highlight, "[E] Talk to X" hint).
+    // inRange = proximity (used for which NPCs are eligible to be picked).
     // inCursorRange = cursor-aim picker (main.js iterates this so aiming at
     // a farther but visible NPC actually picks them).
     this.inRange       = inRange;
     this.inCursorRange = inCursorRange;
 
-    if (this._highlighted !== closest) {
-      if (this._highlighted) this._highlighted.setHighlighted(false);
-      if (closest)           closest.setHighlighted(true);
-      this._highlighted = closest;
-    }
+    // Highlight is now CURSOR-DRIVEN (main.js calls setHighlightedNpc each
+    // frame with whoever the crosshair is on). It used to follow the closest
+    // NPC, which contradicted the on-screen "[E] Talk to X" hint whenever
+    // a nearer NPC was off-cursor.
 
     _separateNPCs(this.npcs);
     return closest;
+  }
+
+  /** Drive the white "interactable" outline from main.js's cursor-aim logic.
+   *  Pass null to clear. Safe to call every frame; the diff against the
+   *  previously-highlighted NPC means we don't thrash the material toggle. */
+  setHighlightedNpc(npc) {
+    if (this._highlighted === npc) return;
+    if (this._highlighted) this._highlighted.setHighlighted(false);
+    if (npc)               npc.setHighlighted(true);
+    this._highlighted = npc;
   }
 
   interactWithNearest() {
@@ -5875,6 +5906,13 @@ const EPIC_SCRIPTS = {
     "Each tier hits harder than the last. Beat me here, then buy a sword at Morton's before the mythics and legendaries.",
     "Ready your fists. Show me how you move.",
   ],
+  // Lines used AFTER Sonion has been defeated and his feet collected. The
+  // dialogue lookup picks this list when npc.feetCollected is true.
+  epic_sonion_defeated: [
+    "AH — the pilgrim returns. My feet rest in your FeetDex now, well earned.",
+    "Don't slow down on me. The mythics are louder, faster, and they hit twice as hard. Sharpen the blade.",
+    "Walk well, scholar. The sole rewards the patient.",
+  ],
   epic_sydney: [
     "Hi! I'm just a regular person. Just a totally normal person walking around New York. Definitely not anyone you'd recognize. Please don't photograph me.",
     "My job? I, um. I do things. Professionally. Physical things. For a production. A production I can't name. The NDA is very thorough.",
@@ -6243,13 +6281,12 @@ class UI {
       }
     };
     render();
-    if (lineEl) lineEl.textContent = mortonLine ?? '';
+    this._typeShopLine('morton', mortonLine ?? '');
     overlay.classList.add('active');
   }
 
   setShopLine(text) {
-    const lineEl = document.getElementById('ms-morton-line');
-    if (lineEl) lineEl.textContent = text ?? '';
+    this._typeShopLine('morton', text ?? '');
   }
 
   closeShop() {
@@ -6334,13 +6371,12 @@ class UI {
     };
 
     this._fleetRender();
-    if (lineEl) lineEl.textContent = vanceLine ?? '';
+    this._typeShopLine('vance', vanceLine ?? '');
     overlay.classList.add('active');
   }
 
   setFleetLine(text) {
-    const lineEl = document.getElementById('ff-vance-line');
-    if (lineEl) lineEl.textContent = text ?? '';
+    this._typeShopLine('vance', text ?? '');
   }
 
   refreshFleetFeetShop() {
@@ -6841,6 +6877,37 @@ class UI {
     this._el.winScreen.classList.add('active');
   }
 
+  // ── Shop-line typewriter ──────────────────────────────────────────────────
+  // Morton & Vance share this animator: char-by-char reveal of their bottom
+  // remark, with a per-shopkeeper voice blip every few characters so it
+  // reads like they're speaking instead of pasting text. Calling it again
+  // mid-animation cancels the previous run and starts the new line — used
+  // by setShopLine on every purchase.
+  _typeShopLine(who, text) {
+    const elId = who === 'morton' ? 'ms-morton-line' : 'ff-vance-line';
+    const el = document.getElementById(elId);
+    if (!el) return;
+    if (this._shopTimer) { clearInterval(this._shopTimer); this._shopTimer = null; }
+    el.textContent = '';
+    if (!text) return;
+    const blip = who === 'morton' ? Audio.mortonBlip : Audio.vanceBlip;
+    let i = 0;
+    const step = () => {
+      const ch = text[i];
+      el.textContent += ch ?? '';
+      // Voice blip every ~3 characters, skipping pure whitespace runs so we
+      // don't blip for spaces between words.
+      if (ch && /\S/.test(ch) && (i % 3 === 0)) {
+        try { blip?.call(Audio); } catch (_) {}
+      }
+      i++;
+      if (i >= text.length) { clearInterval(this._shopTimer); this._shopTimer = null; }
+    };
+    // 28 ms/char ≈ 35 char/s — fast enough to read along but slow enough
+    // to feel like a speaker pacing a sentence.
+    this._shopTimer = setInterval(step, 28);
+  }
+
   // ── Private: typewriter ───────────────────────────────────────────────────
 
   _typeLine(text) {
@@ -6881,7 +6948,13 @@ class UI {
       case 'none':      return [NONE_LINES[Math.floor(Math.random() * NONE_LINES.length)]];
       case 'common':    return COMMON_SCRIPTS[npc.feetId] ?? ["Nice kicks.", "Can't go wrong with the classics."];
       case 'rare':      return RARE_SCRIPTS[npc.feetId]   ?? ["Let me tell you about these.", "Real craftsmanship.", "Worth every penny."];
-      case 'epic':      return EPIC_SCRIPTS[npc.feetId]   ?? ["You have taste.", "Not off the shelf.", "Long story.", "You wouldn't believe me."];
+      case 'epic': {
+        // Special-case Sonion after defeat — he gets a different script.
+        if (npc.feetId === 'epic_sonion' && npc.feetCollected) {
+          return EPIC_SCRIPTS['epic_sonion_defeated'];
+        }
+        return EPIC_SCRIPTS[npc.feetId] ?? ["You have taste.", "Not off the shelf.", "Long story.", "You wouldn't believe me."];
+      }
       case 'mythic':    return MYTHIC_SCRIPTS[npc.feetId] ?? MYTHIC_SCRIPTS['m1'];
       case 'legendary':
         if (npc.feetCollected) return _getLegendaryCollectedLines(npc.name);
@@ -12677,10 +12750,31 @@ function _runMortonTutorial() {
   };
   showNext();
 }
+// Queue of booster ids whose how-to tips are owed to the player. Buying
+// fills it; closing the shop flushes it. Lets the player keep browsing
+// Morton's shelf without a popup interrupting every purchase.
+const _pendingBoosterTips = [];
 function _closeShop() {
   ui.closeShop();
   state = currentInteriorId ? 'interior' : 'playing';
   requestLock();
+  _flushPendingBoosterTips();
+}
+
+// Show queued booster tips one after the other once Morton's shop is closed.
+// Each tip's "next" is chained via _afterTipCallback so the player presses
+// [E] to advance through whatever they bought.
+function _flushPendingBoosterTips() {
+  if (_pendingBoosterTips.length === 0) return;
+  const nextId = _pendingBoosterTips.shift();
+  // Slight delay so the shop-close fade doesn't visually race with the tip
+  // popup; matches the original 350 ms cadence the old code used.
+  setTimeout(() => {
+    _showBoosterTip(nextId);
+    _afterTipCallback = () => {
+      if (_pendingBoosterTips.length > 0) _flushPendingBoosterTips();
+    };
+  }, 350);
 }
 
 // ── Fleet Feet (cosmetic shop) ──────────────────────────────────────────────
@@ -13044,12 +13138,12 @@ function _onBuyBooster(id) {
     return;
   }
 
-  // Close the shop and pop the how-to tip so the player understands what
-  // they just bought before re-entering the world.
-  setTimeout(() => {
-    if (state === 'shop') _closeShop();
-    _showBoosterTip(id);
-  }, 350);
+  // Queue the how-to tip for AFTER the player leaves the shop. The shop
+  // stays open so they can keep reading Morton's reactions and keep
+  // shopping; tips fire one-by-one once they press [E]/[ESC] out.
+  if (!_pendingBoosterTips.includes(id) && !_shownTips.has(id)) {
+    _pendingBoosterTips.push(id);
+  }
 }
 
 // Legendary 3-meeting hint — shown once, the first time the player finishes a
@@ -14755,9 +14849,16 @@ function _cursorAimedNPC() {
 function _updateHint() {
   if (state !== 'playing' && state !== 'interior') {
     ui.clearInteractHint();
+    npcMgr.setHighlightedNpc?.(null);
     return;
   }
   const npc = _cursorAimedNPC();
+  // Drive the white "interactable" outline from cursor aim so the highlight
+  // and the "[E] Talk to X" hint always agree. Without this they could
+  // disagree — the hint pointed at the cursor target while the outline sat
+  // on the closest body. Pass null when no NPC is under the crosshair so
+  // the previously-highlighted character drops back to normal shading.
+  npcMgr.setHighlightedNpc?.(npc ?? null);
   if (npc) {
     ui.setInteractHint(`[E] Talk to ${npc.name}`);
     return;
