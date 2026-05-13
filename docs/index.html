@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T023137';
+  var BAKED = '20260513T024412';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -290,6 +290,18 @@
     #lock-overlay .esc-tip { margin-top:22px; font-size:15px; color:#ff9a44;
       letter-spacing:1px; font-weight:bold;
       text-shadow:0 0 10px rgba(255,140,40,.55); }
+    #lock-overlay .volume-tip { margin-top:20px; font-size:18px;
+      font-weight:bold; letter-spacing:3px; color:#FFEC60;
+      text-shadow:0 0 12px rgba(255,236,96,.75); animation:vol-tip-pulse 1.6s ease-in-out infinite; }
+    @keyframes vol-tip-pulse {
+      0%,100% { transform:scale(1);    text-shadow:0 0 12px rgba(255,236,96,.55); }
+      50%     { transform:scale(1.04); text-shadow:0 0 22px rgba(255,236,96,1); }
+    }
+    #lock-overlay .lock-vol-row { margin-top:10px; display:flex;
+      align-items:center; gap:14px; pointer-events:auto; }
+    #lock-overlay .lock-vol-row label { font-size:14px; color:#FFD700;
+      letter-spacing:2px; font-weight:bold; }
+    #lock-overlay #lock-vol-slider { width:220px; accent-color:#FFD700; }
 
     /* Full-screen map overlay (M key). The map fills as much of the
        viewport as possible while staying square; the legend rides
@@ -310,14 +322,16 @@
     #map-can-static, #map-can-dyn { position:absolute; top:0; left:0;
       width:100%; height:100%; }
     #map-close-hint { font-size:11px; opacity:.35; margin-top:10px; }
-    #map-instructions { position:absolute; bottom:14px; left:50%;
-      transform:translateX(-50%); background:rgba(20,8,8,.92);
-      border:1px solid rgba(255,80,80,.55); border-radius:6px;
-      padding:10px 22px; font-size:14px; color:#ffd0d0;
-      letter-spacing:1px; pointer-events:none;
-      box-shadow:0 0 18px rgba(255,40,40,.35); z-index:10; }
-    #map-instructions .key { color:#FFEC60; font-weight:bold; }
-    #map-instructions .red { color:#ff5566; font-weight:bold; }
+    #map-instructions { position:absolute; bottom:18px; left:50%;
+      transform:translateX(-50%); background:rgba(20,8,8,.94);
+      border:2px solid rgba(255,80,80,.7); border-radius:8px;
+      padding:14px 28px; font-size:18px; font-weight:bold; color:#ffd0d0;
+      letter-spacing:1.5px; pointer-events:none; max-width:90vw; text-align:center;
+      box-shadow:0 0 26px rgba(255,40,40,.5); z-index:10; line-height:1.4; }
+    #map-instructions .key { color:#FFEC60; font-weight:900;
+      text-shadow:0 0 10px rgba(255,236,96,.8); }
+    #map-instructions .red { color:#ff5566; font-weight:900;
+      text-shadow:0 0 8px rgba(255,80,80,.6); }
 
     /* Side-panel legend listing landmark colors and station markers */
     #map-legend { width:170px; height:min(98vh, calc(100vw - 200px));
@@ -676,23 +690,32 @@
       50%      { transform:translateX(-50%) translateY(8px); }
     }
 
-    #tutorial-checklist { position:fixed; top:50%; left:14px;
-      transform:translateY(-50%); width:230px; z-index:55; pointer-events:none;
-      background:rgba(20,16,8,.78); border:1px solid rgba(255,215,0,.45);
-      border-radius:6px; padding:12px 14px; font-size:12px; letter-spacing:1px;
-      display:none; }
+    #tutorial-checklist { position:fixed; top:50%; left:16px;
+      transform:translateY(-50%); width:320px; z-index:55; pointer-events:none;
+      background:rgba(20,16,8,.85); border:2px solid rgba(255,215,0,.55);
+      border-radius:8px; padding:16px 18px; font-size:16px; letter-spacing:1px;
+      display:none; box-shadow:0 0 20px rgba(255,215,0,.25); }
     #tutorial-checklist.active { display:block; }
-    #tutorial-checklist h4 { margin:0 0 8px 0; font-size:11px;
-      color:#FFD700; letter-spacing:3px; }
-    .tut-row { display:flex; align-items:flex-start; gap:6px;
-      padding:5px 0; opacity:.5; transition:opacity .2s, color .2s; }
-    .tut-row.current { opacity:1; color:#FFE680; }
-    .tut-row.done    { opacity:.7; color:#9bdc9b; text-decoration:line-through; }
-    .tut-row .tut-box { font-size:14px; line-height:1; flex-shrink:0; }
+    #tutorial-checklist h4 { margin:0 0 12px 0; font-size:15px;
+      color:#FFD700; letter-spacing:4px; text-shadow:0 0 8px rgba(255,215,0,.5); }
+    .tut-row { display:flex; align-items:flex-start; gap:8px;
+      padding:7px 0; opacity:.55; transition:opacity .2s, color .2s;
+      font-size:15px; line-height:1.35; }
+    .tut-row.current { opacity:1; color:#FFE680; font-weight:bold; }
+    .tut-row.done    { opacity:.8; color:#9bdc9b; text-decoration:line-through; }
+    .tut-row .tut-box { font-size:19px; line-height:1; flex-shrink:0; }
     .tut-row.current { animation:tut-glow 1.6s ease-in-out infinite; }
+    /* Brief pop when a step gets checked off — used by the JS side via the
+       .tut-just-done class to draw the eye to the step that just completed. */
+    .tut-row.tut-just-done { animation:tut-step-pop .55s ease-out; }
     @keyframes tut-glow {
       0%, 100% { text-shadow:none; }
-      50%      { text-shadow:0 0 8px rgba(255,215,0,.7); }
+      50%      { text-shadow:0 0 10px rgba(255,215,0,.8); }
+    }
+    @keyframes tut-step-pop {
+      0%   { transform:scale(1);     background:rgba(155,220,155,0); }
+      35%  { transform:scale(1.08);  background:rgba(155,220,155,.25); }
+      100% { transform:scale(1);     background:rgba(155,220,155,0); }
     }
 
     /* Feet God tip theme — distinct from default/mythic/legendary */
@@ -888,7 +911,7 @@
     <div id="feetgod-panel">
       <div id="feetgod-name">THE FEET GOD</div>
       <div id="feetgod-text"></div>
-      <div id="feetgod-hint"><span class="key">[SPACE]</span> CONTINUE</div>
+      <div id="feetgod-hint"><span class="key">[E]</span> CONTINUE</div>
     </div>
   </div>
 
@@ -968,14 +991,14 @@
        <b>three times</b> across the city before they hand over their feet.<br/><br/>
        They relocate between fights — keep your eyes open.<br/>
        Their HP and damage dwarf a mythic. Use your <b>Sword</b> — and grab <b>Armor</b> too if you haven't.</p>
-    <div class="lh-cta">Press <span class="key">[SPACE]</span> to continue</div>
+    <div class="lh-cta">Press <span class="key">[E]</span> to continue</div>
   </div>
 
   <!-- Generic tip popup (used for booster purchase tips + fight tutorials) -->
   <div id="generic-tip">
     <h3 id="tip-title">TIP</h3>
     <p id="tip-body"></p>
-    <div class="lh-cta">Press <span class="key">[SPACE]</span> to continue</div>
+    <div class="lh-cta">Press <span class="key">[E]</span> to continue</div>
   </div>
 
   <!-- Battle countdown overlay (3-2-1-FIGHT) -->
@@ -1001,8 +1024,8 @@
     <span id="map-close-hint">[M] or [ESC] — close map</span>
     <div id="map-instructions">
       <span class="key">[LEFT CLICK]</span> any city spot to drop a
-      <span class="red">RED BEACON</span>.
-      Click it again to remove it. The beacon shines through buildings.
+      <span class="red">MARKER</span>. Click it again to remove.<br/>
+      A red <span class="red">BEACON</span> in the world will guide you to your marker — it shines through buildings.
     </div>
   </div>
 
@@ -1017,16 +1040,21 @@
     </div>
     <div class="controls-grid">
       <div class="k">WASD / &uarr;&darr;&larr;&rarr;</div><div class="d">Move</div>
-      <div class="k">MOUSE</div><div class="d">Look around</div>
-      <div class="k">LEFT CLICK</div><div class="d">Attack in combat &middot; place beacon on map</div>
+      <div class="k">MOUSE</div><div class="d">Look around (point cursor at things to interact)</div>
+      <div class="k">LEFT CLICK</div><div class="d">Attack in combat &middot; place marker on map</div>
       <div class="k">SHIFT</div><div class="d">Sprint (after buying Sprint Feet)</div>
-      <div class="k">E</div><div class="d">Interact &mdash; talk, enter, ride subway</div>
-      <div class="k">SPACE</div><div class="d">Continue dialogue / dismiss popups</div>
+      <div class="k">SPACE</div><div class="d">Jump &mdash; works anytime, even mid-dialogue</div>
+      <div class="k">E</div><div class="d">Interact &mdash; talk, enter, ride, continue dialogue, dismiss popups</div>
       <div class="k">M</div><div class="d">Open the map</div>
       <div class="k">F</div><div class="d">Open your FeetDex (collection)</div>
       <div class="k">C</div><div class="d">Hold for compass (after buying it)</div>
     </div>
     <div class="esc-tip">Press [ESC] at any time to pause and see these controls again.</div>
+    <div class="volume-tip">TURN UP VOLUME FOR FULL EXPERIENCE!</div>
+    <div class="lock-vol-row">
+      <label for="lock-vol-slider">Volume</label>
+      <input type="range" id="lock-vol-slider" min="0" max="1" step="0.05" value="0.5"/>
+    </div>
   </div>
 
   <!-- Dialogue panel -->
@@ -1037,7 +1065,7 @@
       <span id="dialogue-encounter"></span>
     </div>
     <div id="dialogue-text"></div>
-    <div id="dialogue-hint"><span class="key">[SPACE]</span> Continue</div>
+    <div id="dialogue-hint"><span class="key">[E]</span> Continue</div>
   </div>
 
   <!-- Discovery overlay -->
@@ -1083,11 +1111,11 @@
       <div style="text-align:center;font-size:13px;opacity:.7;margin-bottom:10px;letter-spacing:3px;">CONTROLS</div>
       <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 20px;">
         <span style="color:#FFD700;font-weight:bold;">WASD / &uarr;&darr;&larr;&rarr;</span><span>Move</span>
-        <span style="color:#FFD700;font-weight:bold;">MOUSE</span><span>Look around</span>
-        <span style="color:#FFD700;font-weight:bold;">LEFT CLICK</span><span>Attack / place beacon on map</span>
+        <span style="color:#FFD700;font-weight:bold;">MOUSE</span><span>Look around (cursor selects what you interact with)</span>
+        <span style="color:#FFD700;font-weight:bold;">LEFT CLICK</span><span>Attack / place marker on map</span>
         <span style="color:#FFD700;font-weight:bold;">SHIFT</span><span>Sprint</span>
-        <span style="color:#FFD700;font-weight:bold;">E</span><span>Interact — talk, enter, ride subway</span>
-        <span style="color:#FFD700;font-weight:bold;">SPACE</span><span>Continue dialogue / dismiss popups</span>
+        <span style="color:#FFD700;font-weight:bold;">SPACE</span><span>Jump (works anytime)</span>
+        <span style="color:#FFD700;font-weight:bold;">E</span><span>Interact / continue dialogue / dismiss popups</span>
         <span style="color:#FFD700;font-weight:bold;">M</span><span>Open the map</span>
         <span style="color:#FFD700;font-weight:bold;">F</span><span>Open FeetDex</span>
         <span style="color:#FFD700;font-weight:bold;">C</span><span>Hold for compass</span>
@@ -1337,6 +1365,13 @@ const Audio = {
 
   uiClick() {
     tone(600, 0.03, 'square', 0.08);
+  },
+
+  // Two-note ascending chime fired every time a tutorial step is checked
+  // off — satisfying without being intrusive.
+  tutorialStep() {
+    tone(660, 0.10, 'sine', 0.18);
+    tone(990, 0.16, 'sine', 0.20, 0.08);
   },
 
   discover() {
@@ -2573,11 +2608,16 @@ class Player {
     this._shoeAccessories = [];       // active skin add-ons (cleared on swap)
     this._legShoes = [];     // cached for cosmetic recolor
 
-    const pantMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a28 });
-    const skinMat  = new THREE.MeshLambertMaterial({ color: 0xcca888 });
+    // Slight emissive on the body/foot materials so the legs are visible
+    // even in dim interiors (Morton's basement, ESB lobby corner) where
+    // pure-Lambert surfaces went almost black against the dark floor.
+    const pantMat  = new THREE.MeshLambertMaterial({ color: 0x1a1a28, emissive: 0x0c0c14, emissiveIntensity: 0.6 });
+    const skinMat  = new THREE.MeshLambertMaterial({ color: 0xcca888, emissive: 0x664a30, emissiveIntensity: 0.5 });
     // Player starts barefoot — same skin tone. Buying and equipping a
     // collected foot through Fleet Feet recolors this.
-    this._defaultShoeMat = new THREE.MeshLambertMaterial({ color: 0xcca888 });
+    this._defaultShoeMat = new THREE.MeshLambertMaterial({
+      color: 0xcca888, emissive: 0x664a30, emissiveIntensity: 0.5,
+    });
 
     // Pelvis + tapered torso. The torso is a cone that runs from the hip
     // line UP THROUGH and PAST the camera's eye level (top at y=1.78,
@@ -2805,6 +2845,15 @@ class Player {
   // Show / hide the lightsaber. Called from main.js when the lightsaber
   // booster is bought and on game-state transitions where weapons should
   // not display.
+  // Explicit jump — invoked from main.js on Space justPressed. Works in any
+  // game state so the player can hop mid-conversation.
+  jump() {
+    if (this.onGround) {
+      this.velocity.y = JUMP_VEL;
+      this.onGround = false;
+    }
+  }
+
   setLightsaberVisible(on) {
     if (this._saber) this._saber.visible = !!on;
   }
@@ -3168,8 +3217,9 @@ class Player {
     this.velocity.x = mx * speed;
     this.velocity.z = mz * speed;
 
-    // Space is reserved for advancing dialogue/tips — no jump binding,
-    // otherwise pressing past a popup would launch the player.
+    // Space jump is triggered explicitly from main.js (player.jump()) so it
+    // works in any state — including dialogue/discovery — without leaking
+    // WASD movement to those states.
 
     // Gravity uses onGround from the START of this frame (before ground test below)
     if (!this.onGround) this.velocity.y -= GRAVITY * dt;
@@ -4889,15 +4939,13 @@ class CombatEncounter {
     this._npcHP      = Math.round((_NPC_HP[npc.rarity] ?? PLAYER_MAX) * bodyMult);
     this._npcMaxHP   = this._npcHP;
 
-    // Per-rarity attack-speed multiplier. Legendary attack speed
-    // reverted from 2.58× back to 2.06× (the +25% bump removed).
-    // Ancient One reduced 35% from that baseline — final 1.34× —
-    // so the heavy kicks land less often, giving the player breathing
-    // room to dodge.
+    // Per-rarity attack-speed multiplier. Bosses (epic/mythic/legendary)
+    // get an extra 0.8× pass so attacks land 20% slower than before —
+    // gives the player a longer window to read the windup and step away.
     const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 0.65
-                     : npc.rarity === 'legendary' ? 1.65 * 1.25
-                     : npc.rarity === 'mythic'    ? 1.65
-                     : npc.rarity === 'epic'      ? 0.825   // half of mythic
+                     : npc.rarity === 'legendary' ? 1.65 * 1.25 * 0.8
+                     : npc.rarity === 'mythic'    ? 1.65        * 0.8
+                     : npc.rarity === 'epic'      ? 0.825       * 0.8
                      : 1;
     this._atkCd  = NPC_ATK_CD / speedMult;
     this._windup = NPC_WINDUP / speedMult;
@@ -4917,6 +4965,10 @@ class CombatEncounter {
     this._origGroupY    = npc.group.position.y;
     this._origGroupRotX = npc.group.rotation.x;
     this._bodyScale     = npc.group.scale.x;
+    // Stash the rest Y on the NPC itself too — the KO animation sinks the
+    // body 0.6 m and the post-win celebration code (handleMinigameResult in
+    // main.js) needs a reference Y to stand them back up after combat.
+    npc._restY = this._origGroupY;
 
     // Hit-feedback timers (0 = inactive)
     this._hurtFlashUntil  = 0;   // NPC scale-pulse after player hits
@@ -5068,15 +5120,17 @@ class CombatEncounter {
           this._nextSwing = now + this._atkCd;
         }
       } else {
-        // Standard mythic / legendary punch swing.
+        // Standard epic / mythic / legendary punch swing. Wider arm sweep
+        // and bigger body lean on the wind-up so the player can clearly
+        // read "they're about to swing" and step away in time.
         if (t < 0.55) {
           const k = t / 0.55;
-          npc.group.rotation.x = this._origGroupRotX + 0.32 * k;
-          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.55 * k;
+          npc.group.rotation.x = this._origGroupRotX + 0.50 * k;     // bigger lean (was 0.32)
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.95 * k;  // wider arm raise (was 0.55)
         } else if (t < 1) {
           const k = (t - 0.55) / 0.45;
-          npc.group.rotation.x = this._origGroupRotX + 0.32 * (1 - k) - 0.18 * k;
-          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.55 - 2.0 * k;
+          npc.group.rotation.x = this._origGroupRotX + 0.50 * (1 - k) - 0.22 * k;
+          if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0.95 - 2.6 * k;
         } else {
           npc.group.rotation.x = this._origGroupRotX;
           if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
@@ -5846,16 +5900,20 @@ class UI {
 
   // ── Tutorial UI ───────────────────────────────────────────────────────────
 
-  renderTutorial(steps, currentStepIdx, completed, active) {
+  renderTutorial(steps, currentStepIdx, completed, active, justCompletedId = null) {
     const wrap = document.getElementById('tutorial-checklist');
     const rows = document.getElementById('tut-rows');
     if (!wrap || !rows) return;
     if (!active) { wrap.classList.remove('active'); return; }
     wrap.classList.add('active');
     rows.innerHTML = steps.map((s, i) => {
-      const done = completed.has(s.id);
-      const cls  = done ? 'done' : (i === currentStepIdx ? 'current' : '');
-      const box  = done ? '☑' : '☐';
+      const done    = completed.has(s.id);
+      const just    = (s.id === justCompletedId);
+      const cls     = [
+        done ? 'done' : (i === currentStepIdx ? 'current' : ''),
+        just ? 'tut-just-done' : '',
+      ].filter(Boolean).join(' ');
+      const box     = done ? '☑' : '☐';
       return `<div class="tut-row ${cls}"><span class="tut-box">${box}</span><span>${s.label}</span></div>`;
     }).join('');
   }
@@ -6302,7 +6360,7 @@ class UI {
     _setBadge(this._el.dlgBadge, npc.rarity);
     this._el.dlgEncounter.textContent = npc.rarity === 'legendary'
       ? (['1st meeting', '2nd meeting', '3rd meeting'][legendaryCount] ?? '') : '';
-    this._el.dlgHint.innerHTML      = '<span class="key">[SPACE]</span> Continue';
+    this._el.dlgHint.innerHTML      = '<span class="key">[E]</span> Continue';
 
     // Voice class — animates name label for mythic/legendary/secret
     if (this._voiceClassActive) this._el.dialoguePanel.classList.remove(this._voiceClassActive);
@@ -6342,9 +6400,9 @@ class UI {
       if (isLast) {
         const r = this._dlgNPC.rarity;
         if      (r === 'epic' || r === 'mythic' || r === 'secret')
-                                    this._el.dlgHint.innerHTML = '<span class="key">[SPACE]</span> Accept Challenge';
+                                    this._el.dlgHint.innerHTML = '<span class="key">[E]</span> Accept Challenge';
         else if (r === 'none' || r === 'legendary')
-                                    this._el.dlgHint.innerHTML = '<span class="key">[SPACE]</span> Close';
+                                    this._el.dlgHint.innerHTML = '<span class="key">[E]</span> Close';
       }
       return 'next';
     }
@@ -6766,6 +6824,20 @@ class UI {
       if (confirm('Reset all progress? This cannot be undone.')) this.onResetProgress?.();
     });
     this._el.volSlider.addEventListener('input', e => this.onVolume?.(parseFloat(e.target.value)));
+    // Lock-screen volume slider — same wiring, plus mirror its value into the
+    // pause-menu slider so they stay in sync if the user changes either one.
+    const lockVol = document.getElementById('lock-vol-slider');
+    if (lockVol) {
+      const pauseVol = this._el.volSlider;
+      lockVol.addEventListener('input', e => {
+        const v = parseFloat(e.target.value);
+        this.onVolume?.(v);
+        if (pauseVol) pauseVol.value = String(v);
+      });
+      // Stop the click from bubbling up to the lock-overlay's click-to-play.
+      lockVol.addEventListener('click',     e => e.stopPropagation());
+      lockVol.addEventListener('mousedown', e => e.stopPropagation());
+    }
     this._el.fdexClose.addEventListener('click', () => this.closeFeetDex());
     this._el.winPlayAgain.addEventListener('click', () => {
       this._el.winScreen.classList.remove('active');
@@ -11600,7 +11672,8 @@ const tutorial = {
     if (this.completed.has(id)) return;
     if (TUTORIAL_STEPS[this.stepIdx]?.id !== id) return; // out-of-order — ignore
     this.completed.add(id);
-    Audio.uiClick();
+    Audio.tutorialStep?.();
+    this._justCompleted = id;
     while (this.stepIdx < TUTORIAL_STEPS.length &&
            this.completed.has(TUTORIAL_STEPS[this.stepIdx].id)) {
       this.stepIdx++;
@@ -11612,7 +11685,8 @@ const tutorial = {
     this.render();
   },
   render() {
-    ui.renderTutorial(TUTORIAL_STEPS, this.stepIdx, this.completed, this.active);
+    ui.renderTutorial(TUTORIAL_STEPS, this.stepIdx, this.completed, this.active, this._justCompleted);
+    this._justCompleted = null;
   },
 };
 
@@ -11825,13 +11899,32 @@ document.getElementById('fdex-close-btn').addEventListener('click', () => {
 });
 
 // ── Key handlers ──────────────────────────────────────────────────────────────
-// Key split:
-//   E     — INTERACT only. Opens dialogue, enters doors, rides subway.
-//           Also toggles open menus (shop/fleet/map) closed.
-//   SPACE — Advances/dismisses dialogue, tips, discovery overlays.
-// This keeps "start a thing" and "skip past a thing" on different fingers so
-// players don't accidentally start a new interaction while skipping text.
+// E does everything dialogue / interaction-related. SPACE is reserved for
+// jump only (handled in the game loop, not here). Single-key UX so the player
+// never has to guess which finger advances a popup.
 function _handleE() {
+  // Dismiss the legendary 3-meeting hint first if it's up.
+  if (_dismissLegendaryHint()) return;
+
+  // Feet God dialogue — first E skips typewriter, second E closes + runs cb.
+  if (ui.isFeetGodDialogueOpen) {
+    const r = ui.advanceFeetGodDialogue();
+    if (r === 'done') {
+      const cb = _afterTipCallback; _afterTipCallback = null;
+      if (cb) cb();
+    }
+    return;
+  }
+
+  // Generic tip overlay (booster how-to, fight tutorial). Dismiss + run
+  // any chained callback (e.g., the countdown into a fight).
+  if (ui.isTipOpen) {
+    ui.hideTip();
+    const cb = _afterTipCallback; _afterTipCallback = null;
+    if (cb) cb();
+    return;
+  }
+
   // Shop overlay: E closes it
   if (state === 'shop') { _closeShop(); _activeNPC = null; return; }
   if (state === 'fleet') { _closeFleet(); _activeNPC = null; return; }
@@ -11840,6 +11933,16 @@ function _handleE() {
   // OPENED it from a station. Players naturally try the same key to
   // dismiss it; without this they were stuck reaching for M/ESC.
   if (_mapOpen) { _closeMap(true); return; }
+
+  // Discovery overlay — the popup says "[E] Add to FeetDex"; close on E.
+  if (state === 'discovery') { _confirmDiscovery(); return; }
+
+  // Dialogue advance — first E skips typewriter, second E advances.
+  if (state === 'dialogue') {
+    const result = ui.advanceDialogue();
+    _handleDialogueResult(result);
+    return;
+  }
 
   switch (state) {
 
@@ -11886,11 +11989,12 @@ function _handleE() {
       // whoever they're physically standing next to. Fall back to the tight
       // inRange / nearest if cursor-range hasn't been populated yet.
       const inRangeNpcs = npcMgr.inCursorRange ?? npcMgr.inRange ?? (_nearestNPC ? [_nearestNPC] : []);
-      const aimed   = [];
-      const overlap = [];
+      // Cursor-aim is the ONLY way to interact. No overlap fallback — you
+      // must be looking at the target. (Doors/subway are also gated on the
+      // crosshair; they go through the same cone check below.)
+      const aimed = [];
       const _consider = (cand, m) => {
-        if (m.dot >= AIM_COS) aimed.push({ ...cand, dot: m.dot });
-        else if (m.dist < NEAR_FB) overlap.push({ ...cand, dist: m.dist });
+        if (m.dot >= AIM_COS) aimed.push({ ...cand, dot: m.dot, dist: m.dist });
       };
       for (const npc of inRangeNpcs) {
         _consider({ kind: 'npc', npc },
@@ -11908,13 +12012,9 @@ function _handleE() {
 
       let top = null;
       if (aimed.length > 0) {
-        // Cursor-aimed wins, regardless of how close any other target is.
-        aimed.sort((a, b) => b.dot - a.dot);
+        // Closest cursor-aimed wins; dot product is the tiebreaker.
+        aimed.sort((a, b) => (a.dist - b.dist) || (b.dot - a.dot));
         top = aimed[0];
-      } else if (overlap.length > 0) {
-        // Nothing in the cone — fall back to the closest overlapping target.
-        overlap.sort((a, b) => a.dist - b.dist);
-        top = overlap[0];
       }
       if (!top) break;
 
@@ -11984,70 +12084,43 @@ function _handleE() {
   }
 }
 
-// SPACE handler — advances or dismisses anything that's currently asking the
-// player to read text. Order matters: most-overlay-y wins. Returns silently
-// if nothing is open.
-function _handleSpace() {
-  if (_dismissLegendaryHint()) return;
 
-  if (ui.isFeetGodDialogueOpen) {
-    const r = ui.advanceFeetGodDialogue();
-    if (r === 'done') {
-      const cb = _afterTipCallback; _afterTipCallback = null;
-      if (cb) cb();
-    }
-    return;
-  }
-
-  if (ui.isTipOpen) {
-    ui.hideTip();
-    const cb = _afterTipCallback; _afterTipCallback = null;
-    if (cb) cb();
-    return;
-  }
-
-  if (state === 'dialogue') {
-    const result = ui.advanceDialogue();
-    _handleDialogueResult(result);
-    return;
-  }
-
-  if (state === 'discovery') {
-    const entry = ui.confirmDiscovery();
-    const wasSonion = _activeNPC?.feetId === 'epic_sonion';
-    if (entry) {
-      const result = feetdex.collect(entry.id);
-      if (result.isNew) {
-        if (_activeNPC) _activeNPC.feetCollected = true;
-        ui.updateCollection(feetdex.count, feetdex.total);
-        ui.updateGold(feetdex.gold, _nextBoosterTarget());
-        if (result.goldAwarded > 0) {
-          Audio.goldKaching();
-          ui.showGoldToast(result.goldAwarded);
-        }
-        _onCharacterCollected(entry.id);
-        if (feetdex.isComplete) {
-          state = 'playing';
-          setTimeout(() => ui.showWinScreen(feetdex), 300);
-          return;
-        }
+// Discovery overlay close — extracted so both E (prompt label) and SPACE
+// (dialogue-advance key) can dismiss the "Added to FeetDex" screen.
+function _confirmDiscovery() {
+  const entry = ui.confirmDiscovery();
+  const wasSonion = _activeNPC?.feetId === 'epic_sonion';
+  if (entry) {
+    const result = feetdex.collect(entry.id);
+    if (result.isNew) {
+      if (_activeNPC) _activeNPC.feetCollected = true;
+      ui.updateCollection(feetdex.count, feetdex.total);
+      ui.updateGold(feetdex.gold, _nextBoosterTarget());
+      if (result.goldAwarded > 0) {
+        Audio.goldKaching();
+        ui.showGoldToast(result.goldAwarded);
+      }
+      _onCharacterCollected(entry.id);
+      if (feetdex.isComplete) {
+        state = 'playing';
+        setTimeout(() => ui.showWinScreen(feetdex), 300);
+        return;
       }
     }
-    state = 'playing';
-    _activeNPC = null;
-    requestLock();
-    if (wasSonion && tutorial.isStep('find-sonion')) {
-      tutorial.advance('find-sonion');
-      ui.updateGold(feetdex.gold, _nextBoosterTarget());
-      setTimeout(() => {
-        ui.openFeetGodDialogue(
-          "Feet pay you <b>gold</b> whenever you discover new feet. " +
-          "Your next tool available for purchase is marked in the <b>top right</b> so you know what to save toward — " +
-          "open the <b>[M]</b> map and head to <b>Morton's Shop</b>."
-        );
-      }, 600);
-    }
-    return;
+  }
+  state = 'playing';
+  _activeNPC = null;
+  requestLock();
+  if (wasSonion && tutorial.isStep('find-sonion')) {
+    tutorial.advance('find-sonion');
+    ui.updateGold(feetdex.gold, _nextBoosterTarget());
+    setTimeout(() => {
+      ui.openFeetGodDialogue(
+        "Feet pay you <b>gold</b> whenever you discover new feet. " +
+        "Your next tool available for purchase is marked in the <b>top right</b> so you know what to save toward — " +
+        "open the <b>[M]</b> map and head to <b>Morton's Shop</b>."
+      );
+    }, 600);
   }
 }
 
@@ -12280,11 +12353,12 @@ function _runMortonTutorial() {
     },
     {
       title: 'MORTON',
-      body: "Catch is, you can't afford 'em all. Every coin on one tool is a coin gone for the next — fancy folks call that <b>opportunity cost</b>, and trust me, it's the whole game. Pick what fits how you play, skip the rest."
+      body: "Catch is, you can't afford 'em all. Every coin on one tool is a coin gone for the next — fancy folks call that <b>opportunity cost</b>, and trust me, it's the whole game."
     },
     {
       title: 'MORTON',
-      body: "First time's on me. <i>*slides <b style=\"color:#FFD700\">20 gold</b> across the counter*</i> On the house, kid. Grab the <b>Sprint Feet</b> over there — cheap, pays itself back the rest of the run."
+      body: "First time's on me. <i>*slides <b style=\"color:#FFD700\">20 gold</b> across the counter*</i> On the house, kid. Grab the <b>Sprint Feet</b> over there — cheap, pays itself back the rest of the run.",
+      onShow: () => { try { Audio.goldKaching?.(); } catch (_) {} },
     },
   ];
   let i = 0;
@@ -12307,6 +12381,7 @@ function _runMortonTutorial() {
     }
     const line = lines[i++];
     ui.showTip(line.title, line.body);
+    line.onShow?.();
     _afterTipCallback = showNext;
   };
   showNext();
@@ -13154,6 +13229,9 @@ function handleMinigameResult(npc, won) {
       npc.feetCollected = true;
       npc.group.rotation.x = 0;
       npc.group.rotation.z = 0;
+      // Stand them back UP — the KO fall lowered position.y by 0.6 m, so
+      // without this reset the body sits half-buried in the floor.
+      if (typeof npc._restY === 'number') npc.group.position.y = npc._restY;
       const ms = npc._bodyScale ?? 1;
       npc.group.scale.set(ms, ms, ms);
       if (npc._rightArmPivot) npc._rightArmPivot.rotation.x = 0;
@@ -14304,18 +14382,18 @@ function _cursorAimedNPC() {
   if (!candidates.length) return null;
   camera.getWorldDirection(_HINT_TMP_FWD);
   const AIM_COS = 0.5;            // matches the 60° cone in _handleE
-  let best = null, bestDot = AIM_COS;
+  // Strict: must be in the cursor cone. No proximity fallback — the prompt
+  // only appears when the player is actually aiming at someone.
+  let best = null, bestDist = Infinity;
   for (const npc of candidates) {
     const dx = npc.group.position.x - player.position.x;
     const dz = npc.group.position.z - player.position.z;
     const len = Math.hypot(dx, dz);
     if (len < 0.05) continue;
     const dot = (dx / len) * _HINT_TMP_FWD.x + (dz / len) * _HINT_TMP_FWD.z;
-    if (dot > bestDot) { bestDot = dot; best = npc; }
+    if (dot >= AIM_COS && len < bestDist) { bestDist = len; best = npc; }
   }
-  // No aimed pick — fall back to the proximity nearest so the player still
-  // sees a hint when they're standing on someone but looking elsewhere.
-  return best ?? _nearestNPC ?? null;
+  return best;
 }
 
 function _updateHint() {
@@ -14437,7 +14515,9 @@ function gameLoop() {
   interaction.update(dt);
 
   if (input.justPressed('KeyE'))   _handleE();
-  if (input.justPressed('Space'))  _handleSpace();
+  // SPACE = jump, always. Works during dialogue / popups too — jumping
+  // shouldn't pause for an open menu.
+  if (input.justPressed('Space'))  player.jump?.();
   if (input.justPressed('KeyF'))   _handleF();
   if (input.justPressed('KeyM'))   _handleM();
   if (input.justPressed('KeyC'))   _handleC();
