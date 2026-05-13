@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T052538';
+  var BAKED = '20260513T052644';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -376,26 +376,50 @@
       50%     { opacity:1;  transform:scale(1.25); }
     }
     /* Volume content sits in the SOLE/ARCH area of the foot, well below
-       the toes so the slider never overlaps the toe shapes. */
+       the toes so the slider never overlaps the toe shapes. user-select:none
+       on the whole block so the text above the slider doesn't show an I-beam
+       cursor on hover — users were mistaking the glowing label for the
+       slider and trying to drag the text. */
     #lock-overlay .vol-content { position:absolute; left:50%; top:62%;
       transform:translate(-50%, -50%); display:flex; flex-direction:column;
-      align-items:center; gap:14px; width:58%;
-      pointer-events:auto; z-index:2; }
+      align-items:center; gap:14px; width:70%;
+      pointer-events:auto; z-index:2;
+      user-select:none; cursor:default; }
     #lock-overlay .volume-tip { font-size:18px; font-weight:bold;
       letter-spacing:3px; color:#FFEC60; text-align:center; line-height:1.35;
       text-shadow:0 0 12px rgba(255,236,96,.75);
-      animation:vol-tip-pulse 1.6s ease-in-out infinite; }
+      animation:vol-tip-pulse 1.6s ease-in-out infinite;
+      user-select:none; cursor:default; pointer-events:none; }
     @keyframes vol-tip-pulse {
       0%,100% { transform:scale(1);    text-shadow:0 0 12px rgba(255,236,96,.55); }
       50%     { transform:scale(1.04); text-shadow:0 0 22px rgba(255,236,96,1); }
     }
-    /* Slider — native rendering with gold accent. Keeping native styling
-       guarantees the thumb's interactive area matches its visual position;
-       custom -webkit-slider-thumb styling was misaligning the hit zone in
-       some browsers and breaking the drag. */
-    #lock-overlay #lock-vol-slider { width:200px; height:28px;
-      accent-color:#FFD700; cursor:pointer;
-      pointer-events:auto; position:relative; z-index:10; }
+    /* Custom slider — the native track was nearly invisible on the dark
+       overlay (just a thin gray line), so users couldn't tell where to drag.
+       Now a clearly visible gold track + a big round gold thumb.
+       -webkit-appearance:none lets us style; we redefine the thumb hit area
+       at the same visual size to keep drag/click alignment exact. */
+    #lock-overlay #lock-vol-slider {
+      -webkit-appearance:none; appearance:none;
+      width:220px; height:14px; margin:8px 0;
+      background:linear-gradient(to right, rgba(255,215,0,0.55) 0%, rgba(255,215,0,0.18) 100%);
+      border:2px solid rgba(255,215,0,0.85); border-radius:8px;
+      box-shadow:inset 0 1px 4px rgba(0,0,0,.4), 0 0 14px rgba(255,215,0,0.35);
+      cursor:pointer; pointer-events:auto; position:relative; z-index:10;
+      outline:none; }
+    #lock-overlay #lock-vol-slider::-webkit-slider-thumb {
+      -webkit-appearance:none; appearance:none;
+      width:24px; height:24px; border-radius:50%;
+      background:#FFD700; border:2px solid #fff;
+      box-shadow:0 0 12px rgba(255,215,0,1), 0 2px 4px rgba(0,0,0,.6);
+      cursor:pointer; }
+    #lock-overlay #lock-vol-slider::-moz-range-thumb {
+      width:24px; height:24px; border-radius:50%;
+      background:#FFD700; border:2px solid #fff;
+      box-shadow:0 0 12px rgba(255,215,0,1), 0 2px 4px rgba(0,0,0,.6);
+      cursor:pointer; }
+    #lock-overlay #lock-vol-slider::-webkit-slider-thumb:hover { transform:scale(1.1); }
+    #lock-overlay #lock-vol-slider::-moz-range-thumb:hover     { transform:scale(1.1); }
 
     /* Full-screen map overlay (M key). The map fills as much of the
        viewport as possible while staying square; the legend rides
