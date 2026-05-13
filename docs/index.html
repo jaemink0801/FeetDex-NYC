@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T021326';
+  var BAKED = '20260513T021358';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -999,7 +999,7 @@
     <p>Click to play</p>
     <div class="goal">
       Talk to NYC's strangest characters to win their feet. Earn <b>gold</b> from quick chats,
-      buy <b>tools</b> at Morton's Shop, then take down <b>mythic</b> and <b>legendary</b> bosses
+      buy <b>tools</b> at Morton's Shop, then take down <b>bosses</b>
       to complete your FeetDex &mdash; all <b>18 feet</b>.
     </div>
     <div class="controls-grid">
@@ -1062,7 +1062,7 @@
     <div id="pause-objective" style="font-size:15px;color:#ffe080;letter-spacing:1px;
       text-align:center;max-width:520px;line-height:1.55;margin-bottom:18px;">
       <b>OBJECTIVE</b> — Talk to NYC characters to win their feet. Earn gold, buy tools at Morton's,
-      then defeat <b>mythic</b> and <b>legendary</b> bosses to complete all 18 feet.
+      then take down <b>bosses</b> to complete all 18 feet.
     </div>
     <div id="pause-controls" style="font-size:15px;color:#cfcfcf;letter-spacing:1px;
       max-width:520px;line-height:1.6;margin-bottom:18px;
@@ -11534,8 +11534,8 @@ document.addEventListener('pointerlockchange', () => {
         ui.showTip('OBJECTIVE',
           "Collect all <b style=\"color:#FFD700\">18 feet</b> in your FeetDex.<br/><br/>" +
           "Press <b>[E]</b> to talk to <b>characters</b>. Some give their feet for a quick chat — " +
-          "<b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b> make you fight for them. " +
-          "Buy the <b>Sword</b> at Morton's Shop before tangling with bosses."
+          "<b style=\"color:#ffd700\">bosses</b> make you fight for them. " +
+          "Buy the <b>Sword</b> at Morton's Shop before tangling with the tougher ones."
         );
         // After OBJECTIVE is dismissed, show the Feet God's first directive.
         _afterTipCallback = () => {
