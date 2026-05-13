@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T061836';
+  var BAKED = '20260513T062216';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -861,18 +861,18 @@
       50%      { transform:translateX(-50%) translateY(8px); }
     }
 
-    /* Sits in the MIDDLE-left, between the missions corner at the top and
-       the dialogue panel at the bottom 30% of the viewport. top:42% with
-       a centered transform keeps it roughly in the upper-middle on any
-       viewport size — high enough to clear the dialogue, low enough to
-       leave the missions board its space. z-index 52 is also between
-       dialogue (50) and missions (60) so stacking matches the visual
-       hierarchy: tutorial > dialogue, tutorial < missions. */
-    #tutorial-checklist { position:fixed; top:42%; left:16px;
-      transform:translateY(-50%); width:320px; z-index:52;
-      pointer-events:none;
+    /* Pinned to the top-left — same anchor the missions panel uses later.
+       The two NEVER show at the same moment (missions reveal happens
+       inside the tutorial finale's Feet God overlay, which fully covers
+       the screen; tutorial.finish() hides the checklist before the
+       overlay dismisses), so they can safely share the top-left slot.
+       This keeps the checklist well clear of the bottom-30% dialogue
+       panel during Sonion / Morton / Feet God conversations. z-index 52
+       still sits above dialogue (50) and below missions (60). */
+    #tutorial-checklist { position:fixed; top:52px; left:14px;
+      width:380px; z-index:52; pointer-events:none;
       background:rgba(20,16,8,.85); border:2px solid rgba(255,215,0,.55);
-      border-radius:8px; padding:16px 18px; font-size:16px; letter-spacing:1px;
+      border-radius:8px; padding:14px 16px; font-size:15px; letter-spacing:1px;
       display:none; box-shadow:0 0 20px rgba(255,215,0,.25); }
     #tutorial-checklist.active { display:block; }
     #tutorial-checklist h4 { margin:0 0 12px 0; font-size:15px;
@@ -14572,6 +14572,12 @@ function _closeMap(attemptLock = false) {
 
 function _handleM() {
   if (_mapOpen) { _closeMap(true); return; }  // M key is a valid lock gesture
+  // Don't open the map from the start screen or any other unlocked
+  // context — gameplay inputs are otherwise gated behind pointer-lock,
+  // and we exempt M only so it can CLOSE an already-open map. Without
+  // this guard, pressing M while the title screen is up would silently
+  // pop open the map behind the lock overlay.
+  if (document.pointerLockElement !== canvas) return;
   if (state === 'playing' || state === 'interior') {
     _openMap();
     if (tutorial.isStep('find-shop')) tutorial.advance('find-shop');
@@ -15272,21 +15278,22 @@ function gameLoop() {
 
   interaction.update(dt);
 
-  // Gate game inputs behind pointer-lock so the start/lock overlay
-  // genuinely freezes the game: no E to talk, no M to map, no F or C,
-  // no ESC menu. Clicking anywhere on the overlay re-locks the cursor
-  // and inputs come back online. Without this gate the player could
-  // mash keys at the title screen and trigger dialogue/map/etc. behind
-  // the curtain. ESC remains routable when NOT locked only for the
-  // explicit non-gameplay close paths (map already early-returns).
+  // Gate gameplay inputs behind pointer-lock so the start/lock overlay
+  // genuinely freezes the game. ESC and M are EXEMPT because the player
+  // legitimately needs to close non-pointer-locked UIs from any state —
+  // M closes an open map (map opens with document.exitPointerLock(), so
+  // by the time the user hits M to close, `locked` is already false);
+  // ESC closes shop / fleet / minigame screens which are also unlocked.
+  // _handleM has its own guard (won't open the map unless pointer is
+  // actually locked into the game canvas), so an exempt M at the title
+  // screen does nothing.
+  if (input.justPressed('Escape')) _handleESC();
+  if (input.justPressed('KeyM'))   _handleM();
   if (locked) {
     if (input.justPressed('KeyE'))   _handleE();
-    // SPACE = jump, always-while-locked. Skipped if the overlay is up.
     if (input.justPressed('Space'))  player.jump?.();
     if (input.justPressed('KeyF'))   _handleF();
-    if (input.justPressed('KeyM'))   _handleM();
     if (input.justPressed('KeyC'))   _handleC();
-    if (input.justPressed('Escape')) _handleESC();
   }
 
   // Show the lightsaber any time the lightsaber booster is owned and
