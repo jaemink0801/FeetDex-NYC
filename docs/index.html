@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T024412';
+  var BAKED = '20260513T024936';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -280,28 +280,71 @@
       background:rgba(40,28,4,.45); border:1px solid rgba(255,215,0,.35);
       border-radius:8px; padding:18px 26px; }
     #lock-overlay .goal b { color:#FFD700; }
-    #lock-overlay .controls-grid { margin-top:24px;
-      display:grid; grid-template-columns:auto auto; gap:8px 24px;
-      align-items:center; font-size:16px; line-height:1.4;
-      max-width:580px; }
+
+    /* Two-column lower section: simplified controls on the left,
+       ESC reminder + volume foot-frame on the right. */
+    #lock-overlay .lock-cols { display:flex; gap:54px; margin-top:32px;
+      align-items:flex-start; justify-content:center; width:100%;
+      max-width:920px; }
+    #lock-overlay .lock-col { display:flex; flex-direction:column; }
+    #lock-overlay .lock-col-left  { align-items:flex-start; text-align:left; }
+    #lock-overlay .lock-col-right { align-items:flex-end;   text-align:right; }
+
+    #lock-overlay .controls-title { font-size:13px; letter-spacing:4px;
+      color:#FFD700; opacity:.75; margin-bottom:10px; font-weight:bold; }
+    #lock-overlay .controls-grid {
+      display:grid; grid-template-columns:auto auto; gap:6px 18px;
+      align-items:center; font-size:15px; line-height:1.4; }
     #lock-overlay .controls-grid .k { color:#FFD700; font-weight:bold;
       letter-spacing:2px; text-align:right; white-space:nowrap; }
     #lock-overlay .controls-grid .d { color:#e8e8e8; text-align:left; }
-    #lock-overlay .esc-tip { margin-top:22px; font-size:15px; color:#ff9a44;
-      letter-spacing:1px; font-weight:bold;
-      text-shadow:0 0 10px rgba(255,140,40,.55); }
-    #lock-overlay .volume-tip { margin-top:20px; font-size:18px;
-      font-weight:bold; letter-spacing:3px; color:#FFEC60;
-      text-shadow:0 0 12px rgba(255,236,96,.75); animation:vol-tip-pulse 1.6s ease-in-out infinite; }
+
+    #lock-overlay .esc-tip { font-size:15px; color:#ff9a44;
+      letter-spacing:1px; font-weight:bold; max-width:280px;
+      text-shadow:0 0 10px rgba(255,140,40,.55); line-height:1.5;
+      margin-bottom:22px; }
+
+    /* Foot-shaped frame around the volume widget. The decorative SVG
+       sits behind the content with a pulsing gold glow; the slider and
+       label are absolutely centered inside it. */
+    #lock-overlay .vol-foot-frame { position:relative; width:260px; height:310px;
+      pointer-events:auto; }
+    #lock-overlay .vol-foot-frame .vol-foot-svg {
+      position:absolute; inset:0; width:100%; height:100%;
+      fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:3;
+      filter:drop-shadow(0 0 18px rgba(255,215,0,.55));
+      animation:vol-foot-pulse 2.4s ease-in-out infinite; }
+    @keyframes vol-foot-pulse {
+      0%,100% { filter:drop-shadow(0 0 14px rgba(255,215,0,.45));
+                transform:scale(1); }
+      50%     { filter:drop-shadow(0 0 28px rgba(255,215,0,.85));
+                transform:scale(1.025); }
+    }
+    /* Sparkle dots around the foot frame */
+    #lock-overlay .vol-foot-frame::before,
+    #lock-overlay .vol-foot-frame::after {
+      content:''; position:absolute; width:8px; height:8px; border-radius:50%;
+      background:#FFEC60; box-shadow:0 0 12px rgba(255,236,96,.95);
+      pointer-events:none; animation:vol-spark 1.6s ease-in-out infinite; }
+    #lock-overlay .vol-foot-frame::before { top:18%; left:6%;  animation-delay:.0s; }
+    #lock-overlay .vol-foot-frame::after  { top:38%; right:4%; animation-delay:.8s; }
+    @keyframes vol-spark {
+      0%,100% { opacity:.3; transform:scale(.7); }
+      50%     { opacity:1;  transform:scale(1.25); }
+    }
+    #lock-overlay .vol-content { position:absolute; left:50%; top:50%;
+      transform:translate(-50%, -50%); display:flex; flex-direction:column;
+      align-items:center; gap:14px; width:78%; }
+    #lock-overlay .volume-tip { font-size:14px; font-weight:bold;
+      letter-spacing:2px; color:#FFEC60; text-align:center; line-height:1.35;
+      text-shadow:0 0 12px rgba(255,236,96,.75);
+      animation:vol-tip-pulse 1.6s ease-in-out infinite; }
     @keyframes vol-tip-pulse {
       0%,100% { transform:scale(1);    text-shadow:0 0 12px rgba(255,236,96,.55); }
       50%     { transform:scale(1.04); text-shadow:0 0 22px rgba(255,236,96,1); }
     }
-    #lock-overlay .lock-vol-row { margin-top:10px; display:flex;
-      align-items:center; gap:14px; pointer-events:auto; }
-    #lock-overlay .lock-vol-row label { font-size:14px; color:#FFD700;
-      letter-spacing:2px; font-weight:bold; }
-    #lock-overlay #lock-vol-slider { width:220px; accent-color:#FFD700; }
+    #lock-overlay #lock-vol-slider { width:180px; accent-color:#FFD700;
+      pointer-events:auto; }
 
     /* Full-screen map overlay (M key). The map fills as much of the
        viewport as possible while staying square; the legend rides
@@ -1038,22 +1081,39 @@
       buy <b>tools</b> at Morton's Shop, then take down <b>bosses</b>
       to complete your FeetDex &mdash; all <b>18 feet</b>.
     </div>
-    <div class="controls-grid">
-      <div class="k">WASD / &uarr;&darr;&larr;&rarr;</div><div class="d">Move</div>
-      <div class="k">MOUSE</div><div class="d">Look around (point cursor at things to interact)</div>
-      <div class="k">LEFT CLICK</div><div class="d">Attack in combat &middot; place marker on map</div>
-      <div class="k">SHIFT</div><div class="d">Sprint (after buying Sprint Feet)</div>
-      <div class="k">SPACE</div><div class="d">Jump &mdash; works anytime, even mid-dialogue</div>
-      <div class="k">E</div><div class="d">Interact &mdash; talk, enter, ride, continue dialogue, dismiss popups</div>
-      <div class="k">M</div><div class="d">Open the map</div>
-      <div class="k">F</div><div class="d">Open your FeetDex (collection)</div>
-      <div class="k">C</div><div class="d">Hold for compass (after buying it)</div>
-    </div>
-    <div class="esc-tip">Press [ESC] at any time to pause and see these controls again.</div>
-    <div class="volume-tip">TURN UP VOLUME FOR FULL EXPERIENCE!</div>
-    <div class="lock-vol-row">
-      <label for="lock-vol-slider">Volume</label>
-      <input type="range" id="lock-vol-slider" min="0" max="1" step="0.05" value="0.5"/>
+    <div class="lock-cols">
+      <div class="lock-col lock-col-left">
+        <div class="controls-title">CONTROLS</div>
+        <div class="controls-grid">
+          <div class="k">WASD / &uarr;&darr;&larr;&rarr;</div><div class="d">Move</div>
+          <div class="k">MOUSE</div><div class="d">Aim / look</div>
+          <div class="k">LEFT CLICK</div><div class="d">Attack &middot; map marker</div>
+          <div class="k">SHIFT</div><div class="d">Sprint</div>
+          <div class="k">SPACE</div><div class="d">Jump</div>
+          <div class="k">E</div><div class="d">Interact / continue</div>
+          <div class="k">M</div><div class="d">Map</div>
+        </div>
+      </div>
+      <div class="lock-col lock-col-right">
+        <div class="esc-tip">Press <b>[ESC]</b> to return to see these controls at any time.</div>
+        <div class="vol-foot-frame">
+          <!-- Decorative foot silhouette. Geometry mirrors the discovery
+               overlay foot so the brand language stays consistent. -->
+          <svg class="vol-foot-svg" viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
+            <rect x="16" y="30" width="68" height="65" rx="18"/>
+            <ellipse cx="50" cy="92" rx="34" ry="20"/>
+            <circle cx="22" cy="28" r="11"/>
+            <circle cx="37" cy="20" r="13"/>
+            <circle cx="53" cy="17" r="12"/>
+            <circle cx="68" cy="21" r="10"/>
+            <circle cx="79" cy="30" r="9"/>
+          </svg>
+          <div class="vol-content">
+            <div class="volume-tip">TURN UP VOLUME<br/>FOR FULL EXPERIENCE!</div>
+            <input type="range" id="lock-vol-slider" min="0" max="1" step="0.05" value="0.5"/>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
