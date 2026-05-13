@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T034233';
+  var BAKED = '20260513T034444';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -310,7 +310,7 @@
     /* Foot-shaped frame around the volume widget. The decorative SVG is
        drawn as a SINGLE outline path (no overlapping internal lines).
        Slider sits in the sole/ankle area, well clear of the toes. */
-    #lock-overlay .vol-foot-frame { position:relative; width:380px; height:450px;
+    #lock-overlay .vol-foot-frame { position:relative; width:340px; height:400px;
       pointer-events:auto; }
     #lock-overlay .vol-foot-frame .vol-foot-svg {
       position:absolute; inset:0; width:100%; height:100%;
@@ -319,20 +319,14 @@
       overflow:visible; }
     #lock-overlay .vol-foot-frame .vol-foot-svg path,
     #lock-overlay .vol-foot-frame .vol-foot-svg rect,
-    #lock-overlay .vol-foot-frame .vol-foot-svg ellipse {
+    #lock-overlay .vol-foot-frame .vol-foot-svg ellipse,
+    #lock-overlay .vol-foot-frame .vol-foot-svg circle {
       fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:3;
       stroke-linejoin:round; stroke-linecap:round; }
-    /* Toes glow bright yellow with a soft pulsing fill so they read as
-       discrete "lit" toe pads against the deeper-amber sole. */
+    /* Toes use a brighter yellow fill so they read as glowing pads — the
+       parent SVG's drop-shadow handles the actual halo. */
     #lock-overlay .vol-foot-frame .vol-foot-svg circle {
-      fill:#FFE03A; stroke:#FFEC60; stroke-width:2.4;
-      stroke-linejoin:round;
-      filter:drop-shadow(0 0 4px rgba(255,215,0,.9));
-      animation:vol-toe-pulse 1.8s ease-in-out infinite; }
-    @keyframes vol-toe-pulse {
-      0%, 100% { fill-opacity:.85; }
-      50%      { fill-opacity:1; }
-    }
+      fill:rgba(255,215,0,.65); }
     @keyframes vol-foot-pulse {
       0%,100% { filter:drop-shadow(0 0 16px rgba(255,215,0,.5));
                 transform:scale(1); }
