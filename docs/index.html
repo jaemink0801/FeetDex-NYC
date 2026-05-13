@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260510T162620';
+  var BAKED = '20260513T015608';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -48,9 +48,9 @@
        Default orientation sits ABOVE the target (hand-above); when the
        target is too close to the top of the screen we use hand-below
        which sits BELOW the target and points up. */
-    #tutorial-hand { position:fixed; left:0; top:0; font-size:84px;
+    #tutorial-hand { position:fixed; left:0; top:0; font-size:168px;
       line-height:1; user-select:none; pointer-events:none;
-      filter:drop-shadow(3px 3px 6px #000) drop-shadow(0 0 12px rgba(255,215,0,.7));
+      filter:drop-shadow(4px 4px 10px #000) drop-shadow(0 0 24px rgba(255,215,0,.85));
       opacity:0; transition:opacity .25s, left .15s linear, top .15s linear;
       z-index:240; transform:translate(-50%, -100%); }
     #tutorial-hand.hand-below { transform:translate(-50%, 0%); }
@@ -58,11 +58,11 @@
     #tutorial-hand.active.hand-below  { animation:tut-hand-bob-up   0.9s ease-in-out infinite; }
     @keyframes tut-hand-bob-down {
       0%, 100% { transform:translate(-50%, -100%)            scale(1);    }
-      50%      { transform:translate(-50%, calc(-100% - 14px)) scale(1.12); }
+      50%      { transform:translate(-50%, calc(-100% - 24px)) scale(1.08); }
     }
     @keyframes tut-hand-bob-up {
       0%, 100% { transform:translate(-50%, 0%)               scale(1);    }
-      50%      { transform:translate(-50%, calc(0% + 14px))  scale(1.12); }
+      50%      { transform:translate(-50%, calc(0% + 24px))  scale(1.08); }
     }
 
     /* Floating "+N gold" toast that drifts up and fades on collection */
@@ -251,9 +251,14 @@
     .map-station-icon { fill:#FFD700; stroke:#000; stroke-width:1.4;
       cursor:pointer; }
     .map-station-icon:hover { fill:#fff5aa; }
-    #hud-interact { position:absolute; bottom:28px; left:50%; transform:translateX(-50%);
-      font-size:13px; text-shadow:1px 1px 3px #000; background:rgba(0,0,0,0.45);
-      padding:4px 14px; border-radius:4px; transition:opacity .3s; }
+    #hud-interact { position:absolute; bottom:32px; left:50%; transform:translateX(-50%);
+      font-size:22px; font-weight:700; letter-spacing:1px;
+      text-shadow:1px 1px 3px #000, 0 0 8px rgba(0,0,0,.6);
+      background:rgba(0,0,0,0.65);
+      padding:9px 26px; border-radius:6px; transition:opacity .3s;
+      border:1px solid rgba(255,255,255,.18); }
+    #hud-interact .hint-key { color:#FFD700; font-weight:900; margin-right:6px;
+      text-shadow:0 0 6px rgba(255,215,0,.7); }
 
     /* Crosshair */
     #crosshair { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
@@ -263,12 +268,28 @@
     #crosshair::after  { width:100%; height:2px; top:50%; transform:translateY(-50%); }
 
     /* Click-to-play */
-    #lock-overlay { position:fixed; inset:0; background:rgba(0,0,0,.75);
+    #lock-overlay { position:fixed; inset:0; background:rgba(0,0,0,.85);
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      cursor:pointer; z-index:100; }
-    #lock-overlay h1 { font-size:52px; letter-spacing:6px; margin-bottom:10px; }
-    #lock-overlay p  { font-size:15px; opacity:.65; }
-    #lock-overlay .controls { margin-top:28px; font-size:12px; opacity:.4; line-height:2; text-align:center; }
+      cursor:pointer; z-index:100; padding:32px; }
+    #lock-overlay h1 { font-size:78px; letter-spacing:9px; margin-bottom:12px;
+      text-shadow:0 0 24px rgba(255,215,0,.5); }
+    #lock-overlay p  { font-size:18px; opacity:.75; letter-spacing:2px; }
+    #lock-overlay .goal { margin-top:22px; max-width:680px; font-size:18px;
+      line-height:1.6; text-align:center; color:#ffe080;
+      text-shadow:1px 1px 3px #000; letter-spacing:.5px;
+      background:rgba(40,28,4,.45); border:1px solid rgba(255,215,0,.35);
+      border-radius:8px; padding:18px 26px; }
+    #lock-overlay .goal b { color:#FFD700; }
+    #lock-overlay .controls-grid { margin-top:24px;
+      display:grid; grid-template-columns:auto auto; gap:8px 24px;
+      align-items:center; font-size:16px; line-height:1.4;
+      max-width:580px; }
+    #lock-overlay .controls-grid .k { color:#FFD700; font-weight:bold;
+      letter-spacing:2px; text-align:right; white-space:nowrap; }
+    #lock-overlay .controls-grid .d { color:#e8e8e8; text-align:left; }
+    #lock-overlay .esc-tip { margin-top:22px; font-size:15px; color:#ff9a44;
+      letter-spacing:1px; font-weight:bold;
+      text-shadow:0 0 10px rgba(255,140,40,.55); }
 
     /* Full-screen map overlay (M key). The map fills as much of the
        viewport as possible while staying square; the legend rides
@@ -289,6 +310,14 @@
     #map-can-static, #map-can-dyn { position:absolute; top:0; left:0;
       width:100%; height:100%; }
     #map-close-hint { font-size:11px; opacity:.35; margin-top:10px; }
+    #map-instructions { position:absolute; bottom:14px; left:50%;
+      transform:translateX(-50%); background:rgba(20,8,8,.92);
+      border:1px solid rgba(255,80,80,.55); border-radius:6px;
+      padding:10px 22px; font-size:14px; color:#ffd0d0;
+      letter-spacing:1px; pointer-events:none;
+      box-shadow:0 0 18px rgba(255,40,40,.35); z-index:10; }
+    #map-instructions .key { color:#FFEC60; font-weight:bold; }
+    #map-instructions .red { color:#ff5566; font-weight:bold; }
 
     /* Side-panel legend listing landmark colors and station markers */
     #map-legend { width:170px; height:min(98vh, calc(100vw - 200px));
@@ -456,16 +485,21 @@
     /* Generic tip popup. Three themes: default (b/w menu style),
        theme-mythic (orange), theme-legendary (gold). */
     #generic-tip { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      display:none; background:rgba(8,8,16,.92);
-      border:2px solid rgba(255,255,255,.55); border-radius:10px;
-      padding:24px 36px; max-width:480px; text-align:center;
-      box-shadow:0 0 30px rgba(255,255,255,.18); z-index:170; }
+      display:none; background:rgba(8,8,16,.94);
+      border:2px solid rgba(255,255,255,.65); border-radius:12px;
+      padding:32px 48px; max-width:620px; max-height:80vh; overflow-y:auto;
+      text-align:center;
+      box-shadow:0 0 44px rgba(255,255,255,.22); z-index:170; }
     #generic-tip.active { display:block; }
-    #generic-tip h3 { font-size:18px; letter-spacing:4px; color:#ffffff;
-      margin-bottom:14px; text-shadow:0 0 8px rgba(255,255,255,.3); }
-    #generic-tip p { font-size:13px; line-height:1.7; color:#e8e8e8;
-      margin-bottom:14px; }
-    #generic-tip .lh-cta { font-size:11px; opacity:.55; letter-spacing:2px; }
+    #generic-tip h3 { font-size:26px; letter-spacing:5px; color:#ffffff;
+      margin-bottom:18px; text-shadow:0 0 10px rgba(255,255,255,.4); }
+    #generic-tip p { font-size:17px; line-height:1.55; color:#f0f0f0;
+      margin-bottom:18px; }
+    #generic-tip .lh-cta { font-size:14px; color:#FFD700; font-weight:bold;
+      letter-spacing:2px; text-shadow:0 0 6px rgba(255,215,0,.5); }
+    #generic-tip .lh-cta .key { color:#FFEC60; }
+    #generic-tip .locked-sword { color:#ff4444; font-weight:bold;
+      text-shadow:0 0 8px rgba(255,80,80,.6); }
     /* Mythic-fight theme — orange */
     #generic-tip.theme-mythic { border-color:rgba(255,140,40,.75);
       box-shadow:0 0 40px rgba(255,140,40,.35); }
@@ -917,18 +951,18 @@
   <!-- Legendary 3-meeting hint (shown after first legendary encounter) -->
   <div id="legendary-hint">
     <h3>LEGENDARY ENCOUNTER</h3>
-    <p>Legendaries don't trust easily. You'll have to find AND defeat this one
-       <b>three times</b> across the city before they show you their feet.<br/><br/>
-       They move between fights — keep your eyes open.<br/>
-       Their HP and damage are <b>1.5×</b> a mythic. Bring Sword and Armor.</p>
-    <div class="lh-cta">[E] Got it</div>
+    <p>Legendaries don't trust easily. You must find and defeat this one
+       <b>three times</b> across the city before they hand over their feet.<br/><br/>
+       They relocate between fights — keep your eyes open.<br/>
+       Their HP and damage dwarf a mythic. Use your <b>Sword</b> — and grab <b>Armor</b> too if you haven't.</p>
+    <div class="lh-cta">Press <span style="color:#FFEC60">[SPACE]</span> to continue</div>
   </div>
 
   <!-- Generic tip popup (used for booster purchase tips + fight tutorials) -->
   <div id="generic-tip">
     <h3 id="tip-title">TIP</h3>
     <p id="tip-body"></p>
-    <div class="lh-cta">[E] Got it</div>
+    <div class="lh-cta">Press <span class="key">[SPACE]</span> to continue</div>
   </div>
 
   <!-- Battle countdown overlay (3-2-1-FIGHT) -->
@@ -952,23 +986,34 @@
       <div id="map-legend"></div>
     </div>
     <span id="map-close-hint">[M] or [ESC] — close map</span>
+    <div id="map-instructions">
+      <span class="key">[LEFT CLICK]</span> any city spot to drop a
+      <span class="red">RED BEACON</span>.
+      Click it again to remove it. The beacon shines through buildings.
+    </div>
   </div>
 
   <!-- Click-to-play -->
   <div id="lock-overlay">
     <h1>FeetDex: NYC</h1>
-    <p>Click to explore</p>
-    <div style="margin-top:18px;font-size:13px;max-width:460px;text-align:center;
-      line-height:1.6;color:#ffe080;text-shadow:1px 1px 3px #000;letter-spacing:1px;">
-      <b>OBJECTIVE</b><br/>
-      Roam the streets of New York City and collect all 18 unique pairs of feet.
-      Talk to strangers. Beat mythic challengers. Earn legendary trust.
+    <p>Click to play</p>
+    <div class="goal">
+      Talk to NYC's strangest characters to win their feet. Earn <b>gold</b> from quick chats,
+      buy <b>tools</b> at Morton's Shop, then take down <b>mythic</b> and <b>legendary</b> bosses
+      to complete your FeetDex &mdash; all <b>18 feet</b>.
     </div>
-    <div class="controls">
-      WASD — Move &nbsp;|&nbsp; Shift — Sprint &nbsp;|&nbsp; Space — Jump<br/>
-      Mouse — Look &nbsp;|&nbsp; E — Interact &nbsp;|&nbsp; F — FeetDex &nbsp;|&nbsp; M — Map &nbsp;|&nbsp; ESC — Pause<br/>
-      [LMB] Attack in combat
+    <div class="controls-grid">
+      <div class="k">WASD / &uarr;&darr;&larr;&rarr;</div><div class="d">Move</div>
+      <div class="k">MOUSE</div><div class="d">Look around</div>
+      <div class="k">LEFT CLICK</div><div class="d">Attack in combat &middot; place beacon on map</div>
+      <div class="k">SHIFT</div><div class="d">Sprint (after buying Sprint Feet)</div>
+      <div class="k">E</div><div class="d">Interact &mdash; talk, enter, ride subway</div>
+      <div class="k">SPACE</div><div class="d">Continue dialogue / dismiss popups</div>
+      <div class="k">M</div><div class="d">Open the map</div>
+      <div class="k">F</div><div class="d">Open your FeetDex (collection)</div>
+      <div class="k">C</div><div class="d">Hold for compass (after buying it)</div>
     </div>
+    <div class="esc-tip">Press [ESC] at any time to pause and see these controls again.</div>
   </div>
 
   <!-- Dialogue panel -->
@@ -979,7 +1024,7 @@
       <span id="dialogue-encounter"></span>
     </div>
     <div id="dialogue-text"></div>
-    <div id="dialogue-hint">[E] Continue</div>
+    <div id="dialogue-hint"><span style="color:#FFEC60;font-weight:bold">[SPACE]</span> Continue</div>
   </div>
 
   <!-- Discovery overlay -->
@@ -1014,24 +1059,26 @@
   <div id="pause-menu">
     <h2>PAUSED</h2>
     <div id="pause-count"></div>
-    <div id="pause-objective" style="font-size:12px;color:#ffe080;letter-spacing:1px;
-      text-align:center;max-width:380px;line-height:1.6;margin-bottom:18px;">
-      <b>OBJECTIVE</b> — Collect all 18 unique pairs of feet across NYC.
+    <div id="pause-objective" style="font-size:15px;color:#ffe080;letter-spacing:1px;
+      text-align:center;max-width:520px;line-height:1.55;margin-bottom:18px;">
+      <b>OBJECTIVE</b> — Talk to NYC characters to win their feet. Earn gold, buy tools at Morton's,
+      then defeat <b>mythic</b> and <b>legendary</b> bosses to complete all 18 feet.
     </div>
-    <div id="pause-controls" style="font-size:12px;color:#cfcfcf;letter-spacing:1px;
-      max-width:380px;line-height:1.9;margin-bottom:18px;
-      border:1px solid rgba(255,255,255,.18);padding:12px 18px;border-radius:6px;">
-      <div style="text-align:center;font-size:11px;opacity:.55;margin-bottom:8px;">CONTROLS</div>
-      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 14px;">
-        <span style="opacity:.6;">WASD</span><span>Move</span>
-        <span style="opacity:.6;">Shift</span><span>Sprint</span>
-        <span style="opacity:.6;">Space</span><span>Jump</span>
-        <span style="opacity:.6;">Mouse</span><span>Look around</span>
-        <span style="opacity:.6;">E</span><span>Talk / Enter / Continue</span>
-        <span style="opacity:.6;">F</span><span>Open FeetDex</span>
-        <span style="opacity:.6;">M</span><span>Open Map</span>
-        <span style="opacity:.6;">LMB</span><span>Punch (in combat)</span>
-        <span style="opacity:.6;">ESC</span><span>Pause / Cancel</span>
+    <div id="pause-controls" style="font-size:15px;color:#cfcfcf;letter-spacing:1px;
+      max-width:520px;line-height:1.6;margin-bottom:18px;
+      border:1px solid rgba(255,255,255,.22);padding:16px 22px;border-radius:8px;">
+      <div style="text-align:center;font-size:13px;opacity:.7;margin-bottom:10px;letter-spacing:3px;">CONTROLS</div>
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:8px 20px;">
+        <span style="color:#FFD700;font-weight:bold;">WASD / &uarr;&darr;&larr;&rarr;</span><span>Move</span>
+        <span style="color:#FFD700;font-weight:bold;">MOUSE</span><span>Look around</span>
+        <span style="color:#FFD700;font-weight:bold;">LEFT CLICK</span><span>Attack / place beacon on map</span>
+        <span style="color:#FFD700;font-weight:bold;">SHIFT</span><span>Sprint</span>
+        <span style="color:#FFD700;font-weight:bold;">E</span><span>Interact — talk, enter, ride subway</span>
+        <span style="color:#FFD700;font-weight:bold;">SPACE</span><span>Continue dialogue / dismiss popups</span>
+        <span style="color:#FFD700;font-weight:bold;">M</span><span>Open the map</span>
+        <span style="color:#FFD700;font-weight:bold;">F</span><span>Open FeetDex</span>
+        <span style="color:#FFD700;font-weight:bold;">C</span><span>Hold for compass</span>
+        <span style="color:#FFD700;font-weight:bold;">ESC</span><span>Pause / Cancel</span>
       </div>
     </div>
     <button class="pause-btn" id="pause-resume">Resume</button>
@@ -1889,19 +1936,19 @@ const MISSION_POOL = [
 // most affordable unowned tool.
 const BOOSTER_DEFS = [
   { id:'sprint_feet',    name:'Sprint Feet',    price:20,
-    desc:'Unlocks sprint when holding Shift.' },
+    desc:'Hold SHIFT to sprint.' },
   { id:'radar',          name:'Radar',          price:50,
-    desc:'Common, rare, and epic characters show on minimap and map.' },
-  { id:'compass',        name:'Compass',        price:80,
+    desc:'Common, rare, and epic characters show as red dots on the map and minimap.' },
+  { id:'compass',        name:'Compass',        price:50,
     desc:'Hold [C] for a 3D arrow that points to the nearest mythic or legendary.' },
-  { id:'armor',          name:'Armor',          price:100,
-    desc:'Doubles HP and reduces damage taken in combat.' },
-  { id:'metrocard',      name:'MetroCard',      price:100,
-    desc:'Walk to a subway station and press [E] to ride.' },
-  { id:'lightsaber',     name:'Lightsaber',     price:100,
-    desc:'Cuts hard against bosses: 4× damage and 3× attack speed vs. mythics and legendaries.' },
-  { id:'ancient_tracker',name:'Ancient Tracker',price:500,
-    desc:'A guiding star points to The Ancient One.' },
+  { id:'metrocard',      name:'MetroCard',      price:50,
+    desc:'At any subway entrance, press [E] then click a blue dot on the map to ride.' },
+  { id:'armor',          name:'Armor',          price:80,
+    desc:'Doubles your HP and softens hits from mythics and legendaries.' },
+  { id:'lightsaber',     name:'Lightsaber (Sword)', price:80,
+    desc:'REQUIRED to fight mythics and legendaries. 4× damage, 3× speed vs. bosses.' },
+  { id:'ancient_tracker',name:'Ancient Tracker',price:300,
+    desc:'A gold ★ in the sky leads you to The Ancient One.' },
 ];
 
 const FEET_CATALOG = [
@@ -3092,10 +3139,11 @@ class Player {
     const right = new THREE.Vector3( Math.cos(this.yaw), 0, -Math.sin(this.yaw));
 
     let mx = 0, mz = 0;
-    if (this.input.isDown('KeyW')) { mx += fwd.x;   mz += fwd.z; }
-    if (this.input.isDown('KeyS')) { mx -= fwd.x;   mz -= fwd.z; }
-    if (this.input.isDown('KeyA')) { mx -= right.x; mz -= right.z; }
-    if (this.input.isDown('KeyD')) { mx += right.x; mz += right.z; }
+    // Arrow keys mirror WASD so keyboard-only / non-gamer players can still move.
+    if (this.input.isDown('KeyW') || this.input.isDown('ArrowUp'))    { mx += fwd.x;   mz += fwd.z; }
+    if (this.input.isDown('KeyS') || this.input.isDown('ArrowDown'))  { mx -= fwd.x;   mz -= fwd.z; }
+    if (this.input.isDown('KeyA') || this.input.isDown('ArrowLeft'))  { mx -= right.x; mz -= right.z; }
+    if (this.input.isDown('KeyD') || this.input.isDown('ArrowRight')) { mx += right.x; mz += right.z; }
 
     const len = Math.sqrt(mx * mx + mz * mz);
     if (len > 0) { mx /= len; mz /= len; }
@@ -3107,10 +3155,8 @@ class Player {
     this.velocity.x = mx * speed;
     this.velocity.z = mz * speed;
 
-    if (this.input.isDown('Space') && this.onGround) {
-      this.velocity.y = JUMP_VEL;
-      this.onGround = false;
-    }
+    // Space is reserved for advancing dialogue/tips — no jump binding,
+    // otherwise pressing past a popup would launch the player.
 
     // Gravity uses onGround from the START of this frame (before ground test below)
     if (!this.onGround) this.velocity.y -= GRAVITY * dt;
@@ -4776,8 +4822,10 @@ function showHUDMessage(text, durationMs = 2500) {
 // +25% bump (HP 200→250) so they feel tanky, but DMG, attack speed,
 // and chase speed reverted to their pre-bump values — bosses now lean
 // on durability rather than oppressive offense.
-const _NPC_HP     = { common: 30, rare: 50, epic: 70, mythic: 100, legendary: 250, secret: 300 };
-const _NPC_DMG    = { common: 8,  rare: 12, epic: 16, mythic: 25,  legendary: 37,  secret: 50  };
+// Epic stats are exactly half of mythic so they read as "training-wheel
+// bosses" — beatable with bare fists, but they still teach the combat loop.
+const _NPC_HP     = { common: 30, rare: 50, epic: 50, mythic: 100, legendary: 250, secret: 300 };
+const _NPC_DMG    = { common: 8,  rare: 12, epic: 12, mythic: 25,  legendary: 37,  secret: 50  };
 const PLAYER_DMG  = 10;
 const PLAYER_MAX  = 100;
 const HIT_CD      = 500;   // ms between player attacks
@@ -4825,6 +4873,7 @@ class CombatEncounter {
     const speedMult = npc.rarity === 'secret'    ? 1.65 * 1.25 * 0.65
                      : npc.rarity === 'legendary' ? 1.65 * 1.25
                      : npc.rarity === 'mythic'    ? 1.65
+                     : npc.rarity === 'epic'      ? 0.825   // half of mythic
                      : 1;
     this._atkCd  = NPC_ATK_CD / speedMult;
     this._windup = NPC_WINDUP / speedMult;
@@ -4839,6 +4888,7 @@ class CombatEncounter {
     // back to its prior 1.5× (≈12.15 m/s) — the +25% bump removed.
     this._chaseSpeed    = npc.rarity === 'secret'    ? 8.1 * 2.0
                         : npc.rarity === 'legendary' ? 8.1 * 1.5
+                        : npc.rarity === 'epic'      ? 8.1 * 0.5   // half mobility
                         : 8.1;
     this._origGroupY    = npc.group.position.y;
     this._origGroupRotX = npc.group.rotation.x;
@@ -5551,10 +5601,10 @@ const EPIC_SCRIPTS = {
     "Size 15. People always gotta look. Go ahead. I've made peace with the attention.",
   ],
   epic_sonion: [
-    "AH! Finally — a fellow scholar of the sole! You walked through that door with PURPOSE in your stride and frankly, the gait alone tells me everything. Welcome, pilgrim, to the discipline.",
-    "Feet, you see, are the most underappreciated masterpiece on the human body. The arch is architecture. The toe is sculpture. The heel — oh, the HEEL is a love letter from gravity to the ground. Most people stand on miracles all day and never look down.",
-    "You must look down. Then you must look at OTHER people's feet. Eighteen pairs walk these streets, each one a dialect of the same beautiful language, and the world cannot remain unfooted while you have eyes. Go. Hunt. Catalog. Become.",
-    "And mine, naturally, are first. Take a look — I've been told they emit a gentle hum at dawn, though I'm contractually forbidden from confirming. Take them. Wear them. Walk into your future the way every great hero has: footed.",
+    "AH! Finally — a fellow scholar of the sole! You walked through that door with PURPOSE in your stride. The gait alone tells me everything.",
+    "Feet are the most underappreciated masterpiece on the human body. Arch is architecture. Toe is sculpture. Heel — oh, the HEEL is a love letter from gravity to the ground.",
+    "Eighteen pairs walk these streets. To collect mine, you must EARN them. Consider this your training: a small boss fight, just enough to teach you how to move and swing before the real bosses come.",
+    "Ready your fists. <b>WASD/arrows</b> to move, <b>LEFT CLICK</b> to swing — spam it. <b>STEP AWAY</b> when my arms wind up. Prove yourself, pilgrim.",
   ],
   epic_sydney: [
     "Hi! I'm just a regular person. Just a totally normal person walking around New York. Definitely not anyone you'd recognize. Please don't photograph me.",
@@ -6186,13 +6236,25 @@ class UI {
     return document.getElementById('compass-picker')?.classList.contains('active') ?? false;
   }
 
-  setInteractHint(text) {
-    this._el.interact.textContent = text;
-    this._el.interact.style.opacity = '1';
+  // Renders a chip like `<span class="hint-key">[E]</span> Talk to Sonion`.
+  // Either pass a single combined string (legacy) or call with (keyLabel, action).
+  setInteractHint(textOrKey, action) {
+    const el = this._el.interact;
+    if (action !== undefined) {
+      el.innerHTML = `<span class="hint-key">[${textOrKey}]</span>${action}`;
+    } else {
+      // Legacy single-string form: try to extract a bracketed key so it
+      // still gets the yellow highlight automatically.
+      const s = String(textOrKey);
+      const m = s.match(/^\s*\[([^\]]+)\]\s*(.*)$/);
+      if (m) el.innerHTML = `<span class="hint-key">[${m[1]}]</span> ${m[2]}`;
+      else   el.textContent = s;
+    }
+    el.style.opacity = '1';
   }
 
   clearInteractHint() {
-    this._el.interact.textContent = '[E] Interact';
+    this._el.interact.innerHTML = '<span class="hint-key">[E]</span> Interact';
     this._el.interact.style.opacity = '0.7';
   }
 
@@ -6255,19 +6317,22 @@ class UI {
       const isLast = (this._dlgIdx === this._dlgLines.length - 1);
       if (isLast) {
         const r = this._dlgNPC.rarity;
-        if      (r === 'mythic' || r === 'secret') this._el.dlgHint.textContent = '[E] Accept Challenge';
+        const keyPill = '<span style="color:#FFEC60;font-weight:bold">[SPACE]</span>';
+        if      (r === 'epic' || r === 'mythic' || r === 'secret')
+                                    this._el.dlgHint.innerHTML = `${keyPill} Accept Challenge`;
         else if (r === 'none' || r === 'legendary')
-                                    this._el.dlgHint.textContent = '[E] Close';
+                                    this._el.dlgHint.innerHTML = `${keyPill} Close`;
       }
       return 'next';
     }
 
-    // Past the last line — resolve outcome
-    const r = this._dlgNPC?.rarity;  // capture before closeDialogue nulls _dlgNPC
+    // Past the last line — resolve outcome. Epics are now boss-tier
+    // (training fights) and route through 'challenge' alongside mythics/secrets.
+    const r = this._dlgNPC?.rarity;
     this.closeDialogue();
-    if (r === 'mythic' || r === 'secret')           return 'challenge';
-    if (['common','rare','epic'].includes(r))       return 'discover';
-    if (r === 'legendary')                          return 'legendary_done';
+    if (r === 'epic' || r === 'mythic' || r === 'secret') return 'challenge';
+    if (['common','rare'].includes(r))                    return 'discover';
+    if (r === 'legendary')                                return 'legendary_done';
     return 'done';
   }
 
@@ -11384,8 +11449,12 @@ console.log('%c[FeetDex] BUILD 2026-05-08a — github pages deploy',
 const canvas = document.getElementById('canvas');
 
 // ── Three.js core ─────────────────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+// Cap pixel ratio at 1.5: on Retina Macs devicePixelRatio is 2-3, and the
+// resulting fragment-shader cost was the dominant cause of the "feels laggy
+// on Mac" reports. 1.5 keeps text and edges crisp while cutting fragment
+// work by roughly half versus 2.0 / two-thirds versus 3.0.
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 
 const scene  = new THREE.Scene();
@@ -11424,6 +11493,13 @@ let _activeNPC        = null;  // set when interaction begins, used through dial
 let _mapOpen          = false;
 let _subwayMarkersBlink = false;  // flashes subway dots when player E-rode in
 
+// Map-placed waypoint beacon. Left-click on the map drops a red light pillar
+// at that world position; clicking near it on the map (or pressing E next to
+// it in the world) removes it. The pillar uses depthTest:false so it phases
+// through buildings — it's a *light*, not a physical thing.
+let _beacon = null;          // { wx, wz, mesh, pulseT }
+let _beaconPulseT = 0;
+
 // Expose state, camera, and feetdex (booster set) for cross-module access
 window.gameCamera = camera;
 window.gameScene  = scene;
@@ -11456,8 +11532,10 @@ document.addEventListener('pointerlockchange', () => {
       // Defer slightly so the lock-overlay fade doesn't visually race with it
       setTimeout(() => {
         ui.showTip('OBJECTIVE',
-          "Collect all <b style=\"color:#FFD700\">18 feet</b> by talking to <b>characters</b> " +
-          "and beating the <b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b> you find along the way."
+          "Collect all <b style=\"color:#FFD700\">18 feet</b> in your FeetDex.<br/><br/>" +
+          "Press <b>[E]</b> to talk to <b>characters</b>. Some give their feet for a quick chat — " +
+          "<b style=\"color:#ff7733\">mythics</b> and <b style=\"color:#ffd700\">legendaries</b> make you fight for them. " +
+          "Buy the <b>Sword</b> at Morton's Shop before tangling with bosses."
         );
         // After OBJECTIVE is dismissed, show the Feet God's first directive.
         _afterTipCallback = () => {
@@ -11535,10 +11613,37 @@ const HAND_TARGETS = {
   // buy-sprint step uses the shop card pulse highlight — no hand needed.
 };
 
+// Special-case overrides: when these UI states are active during the
+// tutorial, redirect the hand to point at the corresponding HUD element
+// regardless of the active step. Order = priority.
+const HAND_OVERRIDES = [
+  { active: () => document.getElementById('generic-tip')?.classList.contains('active'),
+    selector: '#generic-tip' },
+  { active: () => document.getElementById('feetgod-overlay')?.classList.contains('active'),
+    selector: '#feetgod-text' },
+];
+
 const _handProjVec = new THREE.Vector3();
 
 function _updateHandPointer() {
   if (!tutorial.active) { ui.hideHand(); return; }
+
+  // Override: if a tutorial tip / Feet God overlay is showing, point at IT
+  // instead of the step's normal target — the player needs to read the popup
+  // before they care about the next step's anchor.
+  for (const ov of HAND_OVERRIDES) {
+    if (!ov.active()) continue;
+    const el = document.querySelector(ov.selector);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top < 90) {
+      ui.setHandScreenPos(r.left + r.width / 2, r.bottom + 6, 'below');
+    } else {
+      ui.setHandScreenPos(r.left + r.width / 2, r.top - 6, 'above');
+    }
+    return;
+  }
+
   const stepId = TUTORIAL_STEPS[tutorial.stepIdx]?.id;
   const target = HAND_TARGETS[stepId];
   if (!target) { ui.hideHand(); return; }
@@ -11669,29 +11774,13 @@ document.getElementById('fdex-close-btn').addEventListener('click', () => {
 });
 
 // ── Key handlers ──────────────────────────────────────────────────────────────
+// Key split:
+//   E     — INTERACT only. Opens dialogue, enters doors, rides subway.
+//           Also toggles open menus (shop/fleet/map) closed.
+//   SPACE — Advances/dismisses dialogue, tips, discovery overlays.
+// This keeps "start a thing" and "skip past a thing" on different fingers so
+// players don't accidentally start a new interaction while skipping text.
 function _handleE() {
-  // If the legendary hint is up, the first E press just dismisses it.
-  if (_dismissLegendaryHint()) return;
-
-  // Feet God dialogue — first E skips typewriter, second E closes + runs cb.
-  if (ui.isFeetGodDialogueOpen) {
-    const r = ui.advanceFeetGodDialogue();
-    if (r === 'done') {
-      const cb = _afterTipCallback; _afterTipCallback = null;
-      if (cb) cb();
-    }
-    return;
-  }
-
-  // Generic tip overlay (booster how-to, fight tutorial). Dismiss + run
-  // any chained callback (e.g., the countdown into a fight).
-  if (ui.isTipOpen) {
-    ui.hideTip();
-    const cb = _afterTipCallback; _afterTipCallback = null;
-    if (cb) cb();
-    return;
-  }
-
   // Shop overlay: E closes it
   if (state === 'shop') { _closeShop(); _activeNPC = null; return; }
   if (state === 'fleet') { _closeFleet(); _activeNPC = null; return; }
@@ -11790,6 +11879,20 @@ function _handleE() {
           _openFleet();
           return;
         }
+        // Mythic / legendary gate — refuse the encounter entirely until the
+        // player owns the Lightsaber. Shown BEFORE the NPC's dialogue so
+        // the player learns the rule before reading lore they can't act on.
+        if ((targetNpc.rarity === 'mythic' || targetNpc.rarity === 'legendary')
+            && !targetNpc.feetCollected
+            && !feetdex.hasBooster('lightsaber')) {
+          Audio.interact();
+          ui.showTip('NOT YET WORTHY',
+            '<span class="locked-sword">You do not deserve to fight me until you unlock the SWORD.</span><br/><br/>' +
+            'Buy the <b>Lightsaber</b> at Morton\'s Shop, then return.',
+            targetNpc.rarity
+          );
+          return;
+        }
         _activeNPC = targetNpc;
         if (_activeNPC.rarity === 'legendary') Audio.legendaryFanfare();
         else Audio.interact();
@@ -11823,52 +11926,73 @@ function _handleE() {
       break;
     }
 
-    case 'dialogue': {
-      const result = ui.advanceDialogue();
-      _handleDialogueResult(result);
-      break;
-    }
+  }
+}
 
-    case 'discovery': {
-      const entry = ui.confirmDiscovery();
-      const wasSonion = _activeNPC?.feetId === 'epic_sonion';
-      if (entry) {
-        const result = feetdex.collect(entry.id);
-        if (result.isNew) {
-          if (_activeNPC) _activeNPC.feetCollected = true;
-          ui.updateCollection(feetdex.count, feetdex.total);
-          ui.updateGold(feetdex.gold, _nextBoosterTarget());
-          if (result.goldAwarded > 0) {
-            Audio.goldKaching();
-            ui.showGoldToast(result.goldAwarded);
-          }
-          // Mission triggers on character discovery.
-          _onCharacterCollected(entry.id);
-          if (feetdex.isComplete) {
-            state = 'playing';
-            setTimeout(() => ui.showWinScreen(feetdex), 300);
-            return;
-          }
+// SPACE handler — advances or dismisses anything that's currently asking the
+// player to read text. Order matters: most-overlay-y wins. Returns silently
+// if nothing is open.
+function _handleSpace() {
+  if (_dismissLegendaryHint()) return;
+
+  if (ui.isFeetGodDialogueOpen) {
+    const r = ui.advanceFeetGodDialogue();
+    if (r === 'done') {
+      const cb = _afterTipCallback; _afterTipCallback = null;
+      if (cb) cb();
+    }
+    return;
+  }
+
+  if (ui.isTipOpen) {
+    ui.hideTip();
+    const cb = _afterTipCallback; _afterTipCallback = null;
+    if (cb) cb();
+    return;
+  }
+
+  if (state === 'dialogue') {
+    const result = ui.advanceDialogue();
+    _handleDialogueResult(result);
+    return;
+  }
+
+  if (state === 'discovery') {
+    const entry = ui.confirmDiscovery();
+    const wasSonion = _activeNPC?.feetId === 'epic_sonion';
+    if (entry) {
+      const result = feetdex.collect(entry.id);
+      if (result.isNew) {
+        if (_activeNPC) _activeNPC.feetCollected = true;
+        ui.updateCollection(feetdex.count, feetdex.total);
+        ui.updateGold(feetdex.gold, _nextBoosterTarget());
+        if (result.goldAwarded > 0) {
+          Audio.goldKaching();
+          ui.showGoldToast(result.goldAwarded);
+        }
+        _onCharacterCollected(entry.id);
+        if (feetdex.isComplete) {
+          state = 'playing';
+          setTimeout(() => ui.showWinScreen(feetdex), 300);
+          return;
         }
       }
-      state = 'playing';
-      _activeNPC = null;
-      requestLock();
-      // Tutorial: first foot collected (Sonion). Enable the foot pointer
-      // and prompt the player toward Morton's Shop via the map.
-      if (wasSonion && tutorial.isStep('find-sonion')) {
-        tutorial.advance('find-sonion');
-        ui.updateGold(feetdex.gold, _nextBoosterTarget());
-        setTimeout(() => {
-          ui.openFeetGodDialogue(
-            "Feet pay you <b>gold</b> whenever you discover new feet. " +
-            "Your next tool available for purchase is marked in the <b>top right</b> so you know what to save toward — " +
-            "open the <b>[M]</b> map and head to <b>Morton's Shop</b>."
-          );
-        }, 600);
-      }
-      break;
     }
+    state = 'playing';
+    _activeNPC = null;
+    requestLock();
+    if (wasSonion && tutorial.isStep('find-sonion')) {
+      tutorial.advance('find-sonion');
+      ui.updateGold(feetdex.gold, _nextBoosterTarget());
+      setTimeout(() => {
+        ui.openFeetGodDialogue(
+          "Feet pay you <b>gold</b> whenever you discover new feet. " +
+          "Your next tool available for purchase is marked in the <b>top right</b> so you know what to save toward — " +
+          "open the <b>[M]</b> map and head to <b>Morton's Shop</b>."
+        );
+      }, 600);
+    }
+    return;
   }
 }
 
@@ -11917,9 +12041,27 @@ function _handleDialogueResult(result) {
       requestLock();
       return;
     }
-    // Mythic + secret (Ancient One) get real-time combat with the
-    // tutorial+countdown wrapper; everyone else gets the RPS minigame.
-    if (_activeNPC?.rarity === 'mythic' || _activeNPC?.rarity === 'secret') {
+    // Mythic & legendary are GATED behind owning the Lightsaber (sword).
+    // Without it, refuse the fight with a themed red message — the player
+    // is steered back to Morton's Shop instead of getting flattened.
+    const rar = _activeNPC?.rarity;
+    if ((rar === 'mythic' || rar === 'legendary') && !feetdex.hasBooster('lightsaber')) {
+      state = 'playing';
+      const npcRef = _activeNPC;
+      _activeNPC = null;
+      if (npcRef) { npcRef.isInDialogue = false; npcRef._dialogueEndTime = Date.now(); }
+      ui.showTip('NOT YET WORTHY',
+        '<span class="locked-sword">You do not deserve to fight me until you unlock the SWORD.</span><br/><br/>' +
+        'Buy the <b>Lightsaber</b> at Morton\'s Shop, then return.',
+        rar // theme: 'mythic' or 'legendary' (orange/gold border)
+      );
+      requestLock();
+      return;
+    }
+    // Epic + mythic + secret get real-time combat with the tutorial+countdown
+    // wrapper. Epics are the boss-training tier (half-mythic stats); the
+    // remaining commons/rares still go through the RPS minigame.
+    if (rar === 'epic' || rar === 'mythic' || rar === 'secret') {
       _startBattle(_activeNPC);
     } else {
       _openMinigame(_activeNPC);
@@ -11940,6 +12082,20 @@ function _handleDialogueResult(result) {
       return;
     }
 
+    // Legendary fights are also gated on the Lightsaber.
+    if (!feetdex.hasBooster('lightsaber')) {
+      state = 'playing';
+      const npcRef = _activeNPC;
+      _activeNPC = null;
+      if (npcRef) { npcRef.isInDialogue = false; npcRef._dialogueEndTime = Date.now(); }
+      ui.showTip('NOT YET WORTHY',
+        '<span class="locked-sword">You do not deserve to fight me until you unlock the SWORD.</span><br/><br/>' +
+        'Buy the <b>Lightsaber</b> at Morton\'s Shop, then return.',
+        'legendary'
+      );
+      requestLock();
+      return;
+    }
     // Straight to the fight tutorial — the 3-defeat rule lives inside the
     // fight tutorial copy, so there's no separate "you must find me 3 times"
     // popup chained before it.
@@ -12377,19 +12533,19 @@ function _onUnequipCosmetic() {
 // how to use it in the same breath.
 const BOOSTER_TIPS = {
   sprint_feet:    { title: 'SPRINT FEET',
-    body: 'Hold <b>SHIFT</b> to break into a sprint.' },
+    body: 'Hold <b>SHIFT</b> while moving to sprint.' },
   radar:          { title: 'RADAR',
-    body: 'Common, rare, and epic characters now show as colored dots on the map and minimap.' },
+    body: 'Press <b>[M]</b> to open the map. Uncollected common / rare / epic characters now blink as <b style="color:#ff5566">red dots</b> on both the map and the minimap.' },
   compass:        { title: 'COMPASS',
-    body: 'Hold <b>[C]</b> and a glowing arrow appears in front of you, pointing at the nearest <b>mythic</b> or <b>legendary</b>.' },
+    body: 'Hold <b>[C]</b> and a glowing arrow points to the nearest <b>mythic</b> or <b>legendary</b>.' },
   armor:          { title: 'ARMOR',
-    body: 'HP doubles and mythics and legendaries hit 30% softer.' },
-  lightsaber:     { title: 'LIGHTSABER',
-    body: '<b>LEFT CLICK</b> to swing. Cuts deep against bosses: <b>4× damage</b> and <b>3× attack speed</b> vs. <b>mythics</b> and <b>legendaries</b>. Standard punches against anyone else.' },
+    body: 'Your HP doubles. Mythics and legendaries hit ~30% softer.' },
+  lightsaber:     { title: 'LIGHTSABER (SWORD)',
+    body: '<b>LEFT CLICK</b> to swing. <b>Required</b> to challenge mythics and legendaries. <b>4× damage</b> and <b>3× attack speed</b> against them.' },
   metrocard:      { title: 'METROCARD',
-    body: 'Walk up to any <b>subway entrance</b> and press <b>[E]</b>, then click a <b style="color:#0066ff">blue dot</b> on the map to ride.' },
+    body: 'Walk up to any <b>subway entrance</b>, press <b>[E]</b>, then click a <b style="color:#0066ff">blue dot</b> on the map to ride there instantly.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
-    body: 'A gold <b>★</b> now marks The Ancient One in the sky — just walk toward it to find him.' },
+    body: 'A gold <b>★</b> in the sky now marks <b>The Ancient One</b>. Walk toward the star to find him.' },
 };
 let _shownTips = new Set();
 let _afterTipCallback = null;     // run after the tip is dismissed (countdown chains here)
@@ -12639,15 +12795,28 @@ function _closeMinigame() {
 // fights. Mirrored shape — same first sentence, second sentence specific.
 // theme drives the popup color (orange / gold).
 const FIGHT_TUTORIAL = {
+  epic: {
+    title: 'BOSS TRAINING',
+    theme: 'mythic',
+    body :
+      'This is a warm-up boss — your first real fight.<br/><br/>' +
+      '<b>WASD</b> or <b>ARROWS</b> to move. <b>LEFT CLICK</b> to swing — just SPAM it.<br/>' +
+      '<b>STEP AWAY</b> when their arms wind up to dodge.<br/><br/>' +
+      'Stronger bosses ahead need the <b>SWORD</b> and <b>ARMOR</b> from Morton\'s Shop — grab those before tangling with mythics.',
+  },
   mythic: {
     title: 'MYTHIC FIGHT',
     theme: 'mythic',
-    body : '<b>WASD</b> to move, <b>LEFT CLICK</b> to punch. Step away to dodge their swing.',
+    body :
+      '<b>WASD/ARROWS</b> to move, <b>LEFT CLICK</b> to swing.<br/>' +
+      'Mythics hit harder than epics. Keep moving — step away when arms wind up.',
   },
   legendary: {
     title: 'LEGENDARY FIGHT',
     theme: 'legendary',
-    body : '<b>WASD</b> to move, <b>LEFT CLICK</b> to swing. Legendaries hit harder — you must <b>find them again and defeat them 3 times total</b> before they hand over their feet.',
+    body :
+      '<b>WASD/ARROWS</b> to move, <b>LEFT CLICK</b> to swing.<br/>' +
+      'Legendaries hit hard — you must <b>find them again and defeat them 3 times total</b> before they hand over their feet.',
   },
   secret: {
     title: '⚔ THE ANCIENT ONE ⚔',
@@ -12659,6 +12828,7 @@ const FIGHT_TUTORIAL = {
       'Strike fast. Circle wide. <b>STEP AWAY when the leg lifts</b> — that is your only window.',
   },
 };
+let _firstEpicFought      = false;
 let _firstMythicFought    = false;
 let _firstLegendaryFought = false;
 
@@ -12670,8 +12840,10 @@ function _startBattle(npc) {
   const tutorialKey = npc.rarity === 'legendary' ? 'legendary'
                     : npc.rarity === 'secret'    ? 'secret'
                     : npc.rarity === 'mythic'    ? 'mythic'
+                    : npc.rarity === 'epic'      ? 'epic'
                     : null;
   const showTutorial =
+    (tutorialKey === 'epic'      && !_firstEpicFought)      ||
     (tutorialKey === 'mythic'    && !_firstMythicFought)    ||
     (tutorialKey === 'legendary' && !_firstLegendaryFought) ||
     (tutorialKey === 'secret');                              // always shown
@@ -12686,11 +12858,12 @@ function _startBattle(npc) {
   };
 
   if (showTutorial && tutorialKey) {
+    if (tutorialKey === 'epic')      _firstEpicFought      = true;
     if (tutorialKey === 'mythic')    _firstMythicFought    = true;
     if (tutorialKey === 'legendary') _firstLegendaryFought = true;
     const t = FIGHT_TUTORIAL[tutorialKey];
     ui.showTip(t.title, t.body, t.theme);
-    state = 'pre-combat';                   // E dismissal handled by the
+    state = 'pre-combat';                   // SPACE dismissal handled by the
     _afterTipCallback = proceed;            // generic-tip dismiss path
   } else {
     proceed();
@@ -13434,18 +13607,68 @@ function _drawDynamicMap() {
     dynCtx.stroke();
     dynCtx.restore();
   }
+
+  // Player-placed beacon — pulsing red X with halo, drawn on top of everything
+  // else so it's the most prominent marker on the map.
+  if (_beacon) {
+    const [bx, bz] = _wm(_beacon.wx, _beacon.wz);
+    const pulse = 0.7 + Math.sin(performance.now() * 0.006) * 0.3;
+    dynCtx.save();
+    dynCtx.shadowColor = '#ff2244';
+    dynCtx.shadowBlur  = 14 * pulse;
+    dynCtx.fillStyle   = '#ff2244';
+    dynCtx.beginPath();
+    dynCtx.arc(bx, bz, 11, 0, Math.PI * 2);
+    dynCtx.fill();
+    dynCtx.shadowBlur  = 0;
+    dynCtx.strokeStyle = '#ffffff';
+    dynCtx.lineWidth   = 2.5;
+    dynCtx.beginPath();
+    dynCtx.moveTo(bx - 6, bz - 6); dynCtx.lineTo(bx + 6, bz + 6);
+    dynCtx.moveTo(bx - 6, bz + 6); dynCtx.lineTo(bx + 6, bz - 6);
+    dynCtx.stroke();
+    dynCtx.restore();
+  }
 }
 
 // MetroCard click-to-teleport. Click in the M-key map bounds is converted to
 // canvas coords and tested against the persisted station hit-regions.
 const _mapDynCanvas = document.getElementById('map-can-dyn');
+// Inverse of _wm(): map pixel → world coord.
+function _mapPxToWorld(cx, cy) {
+  const wx = cx / MAP_SCALE - MAP_WORLD;
+  const wz = cy / MAP_SCALE - MAP_WORLD;
+  return [wx, wz];
+}
 if (_mapDynCanvas) {
   _mapDynCanvas.addEventListener('click', (e) => {
     if (!_mapOpen) return;
-    if (!feetdex.hasBooster('metrocard')) return;
     const rect = _mapDynCanvas.getBoundingClientRect();
     const cx = ((e.clientX - rect.left) / rect.width)  * MAP_SIZE;
     const cy = ((e.clientY - rect.top)  / rect.height) * MAP_SIZE;
+
+    // Beacon — placed/removed BEFORE the subway resolution so a click near
+    // the existing beacon clears it rather than triggering a subway ride
+    // when the dots are close. If the player owns MetroCard AND clicks
+    // within tolerance of a station, the subway ride wins (the station hit
+    // test runs below).
+    const BEACON_TOLERANCE_PX = 28;
+    if (_beacon) {
+      const [bx, bz] = _wm(_beacon.wx, _beacon.wz);
+      const bd2 = (cx - bx) * (cx - bx) + (cy - bz) * (cy - bz);
+      if (bd2 < BEACON_TOLERANCE_PX * BEACON_TOLERANCE_PX) {
+        _removeBeacon();
+        return;
+      }
+    }
+
+    // Subway teleport requires the MetroCard. Without it, treat the click
+    // purely as a beacon-placement.
+    if (!feetdex.hasBooster('metrocard')) {
+      const [wx, wz] = _mapPxToWorld(cx, cy);
+      _placeBeacon(wx, wz);
+      return;
+    }
 
     // Click resolution policy: ALWAYS resolve to the nearest station whose
     // dot center is within CLICK_TOLERANCE_PX of the cursor. The earlier
@@ -13466,7 +13689,14 @@ if (_mapDynCanvas) {
       const d2 = dx * dx + dy * dy;
       if (d2 < bestDist2) { bestDist2 = d2; best = hit; }
     }
-    if (!best || bestDist2 > CLICK_TOLERANCE_PX * CLICK_TOLERANCE_PX) return;
+    // No station near the click — drop a beacon at the clicked world coord
+    // instead. The MetroCard owner still gets the "click far from any station
+    // to set a waypoint" behavior.
+    if (!best || bestDist2 > CLICK_TOLERANCE_PX * CLICK_TOLERANCE_PX) {
+      const [wx, wz] = _mapPxToWorld(cx, cy);
+      _placeBeacon(wx, wz);
+      return;
+    }
 
     // If the closest station IS where the player is currently standing,
     // resolve to the SECOND-closest within tolerance instead — the user
@@ -14037,6 +14267,77 @@ function _updateHint() {
   ui.clearInteractHint();
 }
 
+// ── Map beacon (left-click waypoint) ─────────────────────────────────────────
+// Pure-light pillar with depthTest:false so it visibly punches through every
+// wall, NPC, and building in the city — the player can spot it from anywhere
+// and walk toward it. No physics, no collision. One beacon at a time.
+function _buildBeaconMesh() {
+  const g = new THREE.Group();
+  const H = 240;                        // total pillar height — taller than any building
+  // Tall thin core pillar (bright red)
+  const core = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.45, 0.45, H, 10),
+    new THREE.MeshBasicMaterial({
+      color: 0xff1a30, transparent: true, opacity: 0.85,
+      depthTest: false, depthWrite: false,
+    }),
+  );
+  core.position.y = H / 2;
+  core.renderOrder = 999;
+  g.add(core);
+  // Fatter glow halo around the core
+  const glow = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.4, 1.4, H, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0xff5566, transparent: true, opacity: 0.30,
+      depthTest: false, depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  glow.position.y = H / 2;
+  glow.renderOrder = 998;
+  g.add(glow);
+  // Ground disc — a wide flat circle so the player can see "this is the spot"
+  const disc = new THREE.Mesh(
+    new THREE.CircleGeometry(1.8, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xff2244, transparent: true, opacity: 0.55,
+      depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+    }),
+  );
+  disc.rotation.x = -Math.PI / 2;
+  disc.position.y = 0.05;
+  disc.renderOrder = 997;
+  g.add(disc);
+  return g;
+}
+function _placeBeacon(wx, wz) {
+  if (!_beacon) {
+    _beacon = { wx, wz, mesh: _buildBeaconMesh() };
+    scene.add(_beacon.mesh);
+  } else {
+    _beacon.wx = wx;
+    _beacon.wz = wz;
+  }
+  _beacon.mesh.position.set(wx, 0, wz);
+}
+function _removeBeacon() {
+  if (!_beacon) return;
+  scene.remove(_beacon.mesh);
+  _beacon.mesh.traverse(o => {
+    if (o.isMesh) { o.geometry?.dispose?.(); o.material?.dispose?.(); }
+  });
+  _beacon = null;
+}
+function _animateBeacon(dt) {
+  if (!_beacon) return;
+  _beaconPulseT += dt;
+  const pulse = 0.7 + Math.sin(_beaconPulseT * 4) * 0.3;
+  // Pulse the core opacity (first child)
+  const core = _beacon.mesh.children[0];
+  if (core?.material) core.material.opacity = 0.65 + pulse * 0.25;
+}
+
 // ── Game loop ─────────────────────────────────────────────────────────────────
 const clock = new THREE.Clock();
 let _npcFrame = 0;
@@ -14058,6 +14359,7 @@ function gameLoop() {
   interaction.update(dt);
 
   if (input.justPressed('KeyE'))   _handleE();
+  if (input.justPressed('Space'))  _handleSpace();
   if (input.justPressed('KeyF'))   _handleF();
   if (input.justPressed('KeyM'))   _handleM();
   if (input.justPressed('KeyC'))   _handleC();
@@ -14074,9 +14376,12 @@ function gameLoop() {
   _updateHint();
   _updateTrackerCompass();
   _updateCompassPointer(dt);
+  _animateBeacon(dt);
   _updateTutorial();
   _drawMinimap(elapsed);
-  if (_mapOpen) _drawDynamicMap();
+  // Throttle the full-screen map redraw to ~30 Hz — it's the second-most
+  // expensive per-frame draw and nothing on it needs 60 Hz precision.
+  if (_mapOpen && (_npcFrame === 0)) _drawDynamicMap();
 
   renderer.render(scene, camera);
   input.endFrame();
