@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T060429';
+  var BAKED = '20260513T061125';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -7663,46 +7663,61 @@ function buildGenericBuildings(scene, blocks, solidObjects) {
     const eid = `generic_${enterables.length}`;
     const typeName = ENTERABLE_NAMES[enterables.length];
 
-    // Pick a face that's BOTH close to a street and oriented toward the
-    // city center so the door is visible from the avenues players actually
-    // walk down. Earlier this only minimised street distance — buildings on
-    // the outer edges ended up with doors pointing OUT toward the river,
-    // which the player rarely walks past.
+    // Build a door on EVERY face of the building so the player can enter
+    // from whichever street they're walking on. Each face gets its own
+    // mesh + cityReturnPos + exitYaw — entering via the south door pops
+    // you back out the south door, north → north, etc.
     //
-    // Score: streetDist - 6 * (dot of face normal with the vector pointing
-    // toward (0,0)). Lower wins. The 6× weight lets centerward alignment
-    // override a few metres of extra street distance without overpowering
-    // it entirely when a face truly is the only sidewalk-adjacent option.
-    const cVec = [-b.cx, -b.cz];
-    const cMag = Math.hypot(cVec[0], cVec[1]) || 1;
-    const cnx = cVec[0] / cMag, cnz = cVec[1] / cMag;
+    // BUT: skip a face whose city-return position would land the player
+    // wedged into a neighbouring building. Buildings in the city grid
+    // sometimes butt up tight to each other, and a door between two
+    // adjacent buildings would spawn the player exiting INSIDE the
+    // neighbour's collider — exactly the "stuck after exit" bug the
+    // user reported at Fleet Feet. If no face is clear (extremely rare,
+    // would mean the building has neighbours on all four sides), fall
+    // back to whichever side has the most clear room so there's at
+    // least one usable door.
+    const _faceIsClear = (cx, cz) => {
+      const CLEAR = 1.6;  // metres of clearance required around the spawn point
+      for (const o of bldData) {
+        if (o === b) continue;
+        const minX = o.cx - o.w / 2 - CLEAR;
+        const maxX = o.cx + o.w / 2 + CLEAR;
+        const minZ = o.cz - o.d / 2 - CLEAR;
+        const maxZ = o.cz + o.d / 2 + CLEAR;
+        if (cx > minX && cx < maxX && cz > minZ && cz < maxZ) return false;
+      }
+      return true;
+    };
     const faceCandidates = [
-      { dx: 0,          dz:  b.d/2+0.15, rotY: 0,            nx: 0,  nz: 1,  streetDist: _nearestStreet(b.cz + b.d/2, CROSS_STREETS) },
-      { dx: 0,          dz: -b.d/2-0.15, rotY: Math.PI,      nx: 0,  nz: -1, streetDist: _nearestStreet(b.cz - b.d/2, CROSS_STREETS) },
-      { dx:  b.w/2+0.15, dz: 0,          rotY:  Math.PI/2,   nx: 1,  nz: 0,  streetDist: _nearestStreet(b.cx + b.w/2, AVENUES) },
-      { dx: -b.w/2-0.15, dz: 0,          rotY: -Math.PI/2,   nx: -1, nz: 0,  streetDist: _nearestStreet(b.cx - b.w/2, AVENUES) },
+      { dx: 0,           dz:  b.d/2+0.15, rotY: 0,            retOff: [0, 2],  exitYaw: Math.PI },
+      { dx: 0,           dz: -b.d/2-0.15, rotY: Math.PI,      retOff: [0,-2],  exitYaw: 0 },
+      { dx:  b.w/2+0.15, dz: 0,           rotY:  Math.PI/2,   retOff: [2, 0],  exitYaw: -Math.PI/2 },
+      { dx: -b.w/2-0.15, dz: 0,           rotY: -Math.PI/2,   retOff: [-2, 0], exitYaw:  Math.PI/2 },
     ];
-    for (const c of faceCandidates) {
-      const dot = c.nx * cnx + c.nz * cnz;  // +1 toward center, -1 away
-      c.score = c.streetDist - 6 * dot;
+    const clearFaces = faceCandidates.filter(f =>
+      _faceIsClear(b.cx + f.dx + f.retOff[0], b.cz + f.dz + f.retOff[1])
+    );
+    const useFaces = clearFaces.length > 0 ? clearFaces : faceCandidates.slice(0, 1);
+    const doors = [];
+    for (const face of useFaces) {
+      const doorPos = new THREE.Vector3(b.cx + face.dx, 1.4, b.cz + face.dz);
+      const eDoor = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.8, 0.2), eDoorMat);
+      eDoor.position.copy(doorPos);
+      eDoor.rotation.y = face.rotY;
+      scene.add(eDoor);
+      const cityReturnPos = new THREE.Vector3(doorPos.x + face.retOff[0], 0, doorPos.z + face.retOff[1]);
+      doors.push({ doorPos, cityReturnPos, exitYaw: face.exitYaw });
     }
-    const best = faceCandidates.reduce((a, c) => c.score < a.score ? c : a);
-
-    const doorPos = new THREE.Vector3(b.cx + best.dx, 1.4, b.cz + best.dz);
-    const eDoor = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.8, 0.2), eDoorMat);
-    eDoor.position.copy(doorPos);
-    eDoor.rotation.y = best.rotY;
-    scene.add(eDoor);
-
-    // City-side return position (2 units out from door face)
-    const retDir = [0, Math.PI, Math.PI/2, -Math.PI/2].indexOf(best.rotY);
-    const retOffsets = [[0,2],[0,-2],[2,0],[-2,0]];
-    const exitYaws   = [Math.PI, 0, -Math.PI/2, Math.PI/2];
-    const [rdx, rdz] = retOffsets[retDir] ?? [0, 2];
-    const cityReturnPos = new THREE.Vector3(doorPos.x + rdx, 0, doorPos.z + rdz);
-    const exitYaw = exitYaws[retDir] ?? Math.PI;
-
-    enterables.push({ id: eid, name: typeName, cx: b.cx, cz: b.cz, w: b.w, d: b.d, doorPos, cityReturnPos, exitYaw });
+    // Primary door (= first entry in the list) supplies the interior's
+    // DEFAULT cityReturnPos. Per-door positions are used at runtime to
+    // pop the player out of the same door they entered.
+    const primary = doors[0];
+    enterables.push({
+      id: eid, name: typeName, cx: b.cx, cz: b.cz, w: b.w, d: b.d,
+      doorPos: primary.doorPos, cityReturnPos: primary.cityReturnPos, exitYaw: primary.exitYaw,
+      doors,
+    });
   });
 
   return { colliders, enterables };
@@ -11738,16 +11753,31 @@ class World {
     const boundaryColliders = buildCityBoundary(scene, SO);
     for (const c of boundaryColliders) this.colliders.push(c);
 
-    // Enterable landmark doors + generic building doors
+    // Enterable landmark doors + generic building doors. Generic
+    // enterables register ALL four of their face doors so the player
+    // can enter from whichever street they're approaching from. Each
+    // entry carries the cityReturnPos for THAT specific door so the
+    // exit pops them back to the matching outside face.
     this.landmarkDoors = buildLandmarkDoors(scene);
     for (const e of enterables) {
-      this.landmarkDoors.push({ id: e.id, name: e.name, pos: e.doorPos });
+      for (const d of e.doors) {
+        this.landmarkDoors.push({
+          id: e.id, name: e.name, pos: d.doorPos,
+          cityReturnPos: d.cityReturnPos, exitYaw: d.exitYaw,
+        });
+      }
     }
 
-    // Building labels for minimap/map — all enterable buildings with their door position
-    this.buildingLabels = this.landmarkDoors.map(d => ({
-      name: d.name, wx: d.pos.x, wz: d.pos.z,
-    }));
+    // Building labels for minimap/map — one entry per BUILDING (not per
+    // door), keyed off the primary face. Otherwise every enterable would
+    // show up four times on the minimap.
+    this.buildingLabels = [];
+    const _bldSeen = new Set();
+    for (const d of this.landmarkDoors) {
+      if (_bldSeen.has(d.id)) continue;
+      _bldSeen.add(d.id);
+      this.buildingLabels.push({ name: d.name, wx: d.pos.x, wz: d.pos.z });
+    }
 
     // Interior rooms (landmark + generic)
     this.interiors = buildInteriors(scene);
@@ -11825,9 +11855,20 @@ class World {
   //   action 'near-exit':  player is within 3 units of an interior exit door
 
   checkDoorProximity(playerPos) {
+    // Pick the CLOSEST door across all entries so a multi-door building
+    // (every generic enterable has 4 face doors) consistently reports
+    // the face the player is actually standing at — not just whichever
+    // door appears first in the list.
+    let best = null, bestDist = 3;
     for (const door of this.landmarkDoors) {
-      if (playerPos.distanceTo(door.pos) < 3)
-        return { action: 'near-entry', id: door.id, name: door.name, pos: door.pos };
+      const d = playerPos.distanceTo(door.pos);
+      if (d < bestDist) { bestDist = d; best = door; }
+    }
+    if (best) {
+      return {
+        action: 'near-entry', id: best.id, name: best.name, pos: best.pos,
+        cityReturnPos: best.cityReturnPos, exitYaw: best.exitYaw,
+      };
     }
     for (const [id, interior] of Object.entries(this.interiors)) {
       if (playerPos.distanceTo(interior.exitDoorWorldPos) < 3)
@@ -12507,7 +12548,7 @@ function _handleE() {
         return;
       }
       if (top.kind === 'door') {
-        _enterLandmark(top.door.id, top.door.name);
+        _enterLandmark(top.door.id, top.door.name, top.door);
         return;
       }
       if (top.kind === 'subway' && feetdex.hasBooster('metrocard')) {
@@ -13349,13 +13390,19 @@ function _fadeTransition(halfDuration, midCallback) {
   });
 }
 
-function _enterLandmark(id, name) {
+function _enterLandmark(id, name, door = null) {
   if (state === 'transitioning') return;
   state = 'transitioning';
   Audio.interact();
   _fadeTransition(350, () => {
     const interior = world.getInterior(id);
     if (!interior) { state = 'playing'; return; }
+    // Per-door return: if the player entered through a specific face of
+    // a multi-door enterable, remember THAT face so exiting pops them
+    // back to the same side. Landmarks supply a single door, so this is
+    // effectively a no-op for them.
+    if (door?.cityReturnPos) interior.cityReturnPos = door.cityReturnPos;
+    if (door?.exitYaw !== undefined) interior.exitYaw = door.exitYaw;
     player.position.copy(interior.playerSpawn);
     if (interior.entryYaw !== undefined) player.yaw = interior.entryYaw;
     player.pitch = 0;
@@ -14933,6 +14980,19 @@ function _cursorAimedNPC() {
   return best;
 }
 
+// Display-name overrides for buildings whose stored name is an internal
+// keyword (used by the world's case statements) different from the brand
+// the player should see. Without this the [E] Enter hint would say
+// "Enter Bodega" / "Enter Shop" instead of "Enter Fleet Feet" /
+// "Enter Morton's Shop".
+const _BUILDING_DISPLAY_NAME = {
+  'Bodega': 'Fleet Feet',
+  'Shop':   "Morton's Shop",
+};
+function _doorDisplayName(name) {
+  return _BUILDING_DISPLAY_NAME[name] ?? name;
+}
+
 function _updateHint() {
   if (state !== 'playing' && state !== 'interior') {
     ui.clearInteractHint();
@@ -14952,7 +15012,7 @@ function _updateHint() {
   }
   const door = world.checkDoorProximity(player.position);
   if (door) {
-    ui.setInteractHint(door.action === 'near-entry' ? `[E] Enter ${door.name}` : '[E] Exit building');
+    ui.setInteractHint(door.action === 'near-entry' ? `[E] Enter ${_doorDisplayName(door.name)}` : '[E] Exit building');
     return;
   }
   // Subway station — E opens the map and lets the player pick a destination
@@ -15081,14 +15141,22 @@ function gameLoop() {
 
   interaction.update(dt);
 
-  if (input.justPressed('KeyE'))   _handleE();
-  // SPACE = jump, always. Works during dialogue / popups too — jumping
-  // shouldn't pause for an open menu.
-  if (input.justPressed('Space'))  player.jump?.();
-  if (input.justPressed('KeyF'))   _handleF();
-  if (input.justPressed('KeyM'))   _handleM();
-  if (input.justPressed('KeyC'))   _handleC();
-  if (input.justPressed('Escape')) _handleESC();
+  // Gate game inputs behind pointer-lock so the start/lock overlay
+  // genuinely freezes the game: no E to talk, no M to map, no F or C,
+  // no ESC menu. Clicking anywhere on the overlay re-locks the cursor
+  // and inputs come back online. Without this gate the player could
+  // mash keys at the title screen and trigger dialogue/map/etc. behind
+  // the curtain. ESC remains routable when NOT locked only for the
+  // explicit non-gameplay close paths (map already early-returns).
+  if (locked) {
+    if (input.justPressed('KeyE'))   _handleE();
+    // SPACE = jump, always-while-locked. Skipped if the overlay is up.
+    if (input.justPressed('Space'))  player.jump?.();
+    if (input.justPressed('KeyF'))   _handleF();
+    if (input.justPressed('KeyM'))   _handleM();
+    if (input.justPressed('KeyC'))   _handleC();
+    if (input.justPressed('Escape')) _handleESC();
+  }
 
   // Show the lightsaber any time the lightsaber booster is owned and
   // the player is in actively-played states. 'pre-combat' is included
