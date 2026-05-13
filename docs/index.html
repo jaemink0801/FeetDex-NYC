@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T064250';
+  var BAKED = '20260513T234218';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1054,6 +1054,82 @@
       30%  { transform:scale(1.06); }
       100% { transform:scale(1); }
     }
+
+    /* ── Time-attack row (sits at the top of the missions corner) ─────── */
+    /* Hidden when there's no active/pending find mission AND no cooldown
+       AND no more find missions left to draw — main.js toggles ta-hidden. */
+    .ta-row { background:rgba(40,10,10,.88); border:2px solid rgba(255,80,80,.5);
+      border-radius:6px; padding:10px 12px; margin-bottom:10px;
+      box-shadow:0 2px 10px rgba(0,0,0,.45); transition:border-color .25s; }
+    .ta-row.ta-hidden { display:none; }
+    .ta-row .ta-header { display:flex; justify-content:space-between;
+      align-items:center; font-size:13px; letter-spacing:2.5px;
+      font-weight:bold; }
+    .ta-row .ta-title { color:#ff8080; text-shadow:0 0 6px rgba(255,80,80,.6); }
+    .ta-row .ta-time  { color:#ffd9d9; font-variant-numeric:tabular-nums;
+      font-size:18px; letter-spacing:1px; }
+    .ta-row .ta-bar   { height:5px; background:rgba(0,0,0,.55); border-radius:3px;
+      margin:8px 0 7px; overflow:hidden; }
+    .ta-row .ta-bar-fill { height:100%; background:linear-gradient(90deg,#ff3030,#ffb030);
+      width:100%; transition:width .15s linear, background-color .25s; }
+    .ta-row .ta-label { font-size:13px; line-height:1.3; color:#ffe6e6; }
+    /* Active find mission — pulses red so the player can't miss it */
+    .ta-row.ta-active { border-color:#ff3030;
+      animation:ta-pulse .9s ease-in-out infinite; }
+    .ta-row.ta-active.ta-final5 { animation-duration:.4s; }
+    .ta-row.ta-active .ta-time { color:#ffe040; }
+    .ta-row.ta-active.ta-final5 .ta-time { color:#ff5555; }
+    @keyframes ta-pulse {
+      0%,100% { box-shadow:0 0 8px rgba(255,40,40,.30); border-color:#ff6060; }
+      50%     { box-shadow:0 0 20px rgba(255,40,40,.70); border-color:#ff3030; }
+    }
+    /* Idle (no mission, no cooldown) — dim it down */
+    .ta-row.ta-idle { opacity:.55; border-color:rgba(120,120,120,.4);
+      background:rgba(20,20,20,.7); }
+    .ta-row.ta-idle .ta-title { color:#aaa; text-shadow:none; }
+    .ta-row.ta-idle .ta-time { color:#888; }
+    .ta-row.ta-idle .ta-bar-fill { background:#666; }
+    /* Cooldown — neutral amber, not pulsing */
+    .ta-row.ta-cooldown { border-color:rgba(255,180,80,.5);
+      background:rgba(40,28,8,.85); }
+    .ta-row.ta-cooldown .ta-title { color:#ffc070; text-shadow:0 0 6px rgba(255,180,80,.4); }
+    .ta-row.ta-cooldown .ta-time { color:#ffd890; }
+    .ta-row.ta-cooldown .ta-bar-fill { background:linear-gradient(90deg,#ffb030,#ffd070); }
+
+    /* ── Time-attack popup ────────────────────────────────────────────── */
+    #time-attack-popup { position:fixed; inset:0; display:none;
+      background:rgba(0,0,0,.65); z-index:200;
+      align-items:center; justify-content:center;
+      animation:tap-fade .25s ease-out; }
+    #time-attack-popup.show { display:flex; }
+    @keyframes tap-fade { from { opacity:0; } to { opacity:1; } }
+    .tap-card { background:linear-gradient(180deg,#3a0a0a,#1a0606);
+      border:3px solid #ff3030; border-radius:14px;
+      box-shadow:0 0 40px rgba(255,40,40,.55), 0 10px 28px rgba(0,0,0,.7);
+      padding:28px 38px; max-width:520px; text-align:center;
+      color:#ffe6e6; font-family:"Press Start 2P","Courier New",monospace;
+      animation:tap-pop .45s cubic-bezier(.2,1.5,.4,1); }
+    @keyframes tap-pop {
+      0%   { transform:scale(.7); opacity:0; }
+      60%  { transform:scale(1.05); opacity:1; }
+      100% { transform:scale(1); }
+    }
+    .tap-title { font-size:24px; color:#ff5050; letter-spacing:4px;
+      text-shadow:0 0 14px rgba(255,40,40,.7); margin-bottom:6px; }
+    .tap-sub   { font-size:11px; color:#ffd0d0; letter-spacing:3px;
+      margin-bottom:18px; opacity:.85; }
+    .tap-body  { font-size:14px; line-height:1.55; color:#fff;
+      margin-bottom:22px; }
+    .tap-body b { color:#ffd040; }
+    .tap-ok    { background:linear-gradient(180deg,#ff5030,#c01818);
+      border:2px solid #ffd0a0; border-radius:8px;
+      color:#fff; font-family:inherit; font-size:13px; letter-spacing:2px;
+      padding:12px 22px; cursor:pointer;
+      box-shadow:0 4px 14px rgba(255,40,40,.45);
+      transition:transform .12s, box-shadow .15s; }
+    .tap-ok:hover { transform:translateY(-1px);
+      box-shadow:0 6px 18px rgba(255,80,40,.6); }
+    .tap-ok:active { transform:translateY(1px); }
   </style>
 </head>
 <body>
@@ -1116,7 +1192,29 @@
   <!-- Mission corner panel -->
   <div id="missions-corner">
     <h4>MISSIONS</h4>
+    <!-- Time-attack: live timer OR cooldown countdown. Always rendered, even
+         when no find mission is queued, so the player learns the rhythm. -->
+    <div id="time-attack-row" class="ta-row ta-idle">
+      <div class="ta-header">
+        <span class="ta-title">TIME ATTACK</span>
+        <span class="ta-time" id="ta-time">—</span>
+      </div>
+      <div class="ta-bar"><div class="ta-bar-fill" id="ta-bar-fill"></div></div>
+      <div class="ta-label" id="ta-label">No mission queued.</div>
+    </div>
     <div id="mission-rows"></div>
+  </div>
+
+  <!-- Time-attack mission popup. Modal: blocks input until the player clicks
+       OK. Shown only when the player is in a free state (no dialogue, boss,
+       shop, minigame, etc.) — main.js defers showing it otherwise. -->
+  <div id="time-attack-popup">
+    <div class="tap-card">
+      <div class="tap-title">⏱ TIME ATTACK!</div>
+      <div class="tap-sub">A hidden character has appeared.</div>
+      <div class="tap-body" id="tap-body">Find the character before time runs out to discover hidden characters!</div>
+      <button id="tap-ok" class="tap-ok">START — 40 SECONDS</button>
+    </div>
   </div>
 
   <!-- Tutorial complete celebration -->
@@ -2192,6 +2290,28 @@ const COSMETIC_SHOE_COLORS = {
 // Talk missions reward exactly 20g. The named NPC is placed in npc.js and has
 // a fixed dialogue script in ui.js (MISSION_NPC_SCRIPTS).
 const MISSIONS_ACTIVE_MAX = 3;
+
+// ── Time-attack tuning ───────────────────────────────────────────────────────
+// All find-character missions are time-attack. Each one gives the player 40s
+// to reach the character; otherwise the mission expires, the character
+// despawns, and that character is locked out for the remainder of the run
+// (until a future "time machine" tool restores it). After completion OR
+// expiry, the next find mission queues 90s later.
+const TIME_ATTACK_MS  = 40_000;
+const FIND_COOLDOWN_MS = 90_000;
+
+// Mission name shown in the popup — derived from feetId because we deliberately
+// keep the in-world mission label vague ("a wandering figure waits in Grand
+// Central Terminal").
+const TIME_ATTACK_NAMES = {
+  common_samurai:  'Ronin',
+  common_50shades: 'Grey',
+  common_gymrat:   'Dex',
+  rare_gramma:     'Gramma Tilda',
+  rare_colonel:    'The Colonel',
+  epic_lebron:     'LeBron James',
+};
+
 const MISSION_POOL = [
   // ── BOOTSTRAP (always the very first mission) ──────────────────────────
   // Sends the player to meet Vance at Fleet Feet. He runs a short
@@ -2203,22 +2323,25 @@ const MISSION_POOL = [
     reward: 50, special: true },
 
   // ── FIND-CHARACTER (target = feetId; reveal omits the name) ────────────
-  { id: 'find_grand_central', type: 'find', target: 'common_samurai',
+  // All find missions are TIME-ATTACK: 40s to reach the character. Pop up
+  // one at a time on a 90s cooldown. The character only exists in the world
+  // while their mission's timer is live.
+  { id: 'find_grand_central', type: 'find', timeAttack: true, target: 'common_samurai',
     label: 'A wandering figure waits inside Grand Central Terminal.',
     reward: 'mystery' },
-  { id: 'find_1wtc',          type: 'find', target: 'common_50shades',
+  { id: 'find_1wtc',          type: 'find', timeAttack: true, target: 'common_50shades',
     label: 'Someone in a sharp suit paces the One World Trade lobby.',
     reward: 'mystery' },
-  { id: 'find_gym',           type: 'find', target: 'common_gymrat',
+  { id: 'find_gym',           type: 'find', timeAttack: true, target: 'common_gymrat',
     label: 'Someone is putting in serious work at the gym.',
     reward: 'mystery' },
-  { id: 'find_pharmacy',      type: 'find', target: 'rare_gramma',
+  { id: 'find_pharmacy',      type: 'find', timeAttack: true, target: 'rare_gramma',
     label: 'A familiar face works the counter at the pharmacy.',
     reward: 'mystery' },
-  { id: 'find_kfc',           type: 'find', target: 'rare_colonel',
+  { id: 'find_kfc',           type: 'find', timeAttack: true, target: 'rare_colonel',
     label: 'An icon awaits at the chicken joint.',
     reward: 'mystery' },
-  { id: 'find_hotel',         type: 'find', target: 'epic_lebron',
+  { id: 'find_hotel',         type: 'find', timeAttack: true, target: 'epic_lebron',
     label: 'A hoops legend has checked into a midtown hotel.',
     reward: 'mystery' },
 
@@ -2314,59 +2437,171 @@ class FeetDex {
     this.total = FEET_CATALOG.length; // 18
 
     // Mission state — corner-of-screen rotating slate.
-    this.activeMissions    = [];        // array of mission objects (size ≤ 3)
-    this.completedMissions = new Set(); // mission ids
+    // activeMissions holds TALK missions (incl. the visit_fleetfeet bootstrap).
+    // Find/time-attack missions live in their own single-slot state below so
+    // we can drive their timer + cooldown independently from the talk slate.
+    this.activeMissions    = [];        // talk-mission slate (size ≤ 3)
+    this.completedMissions = new Set(); // mission ids (talk + find)
+
+    // ── Time-attack find missions ────────────────────────────────────────
+    // findActive:   mission running RIGHT NOW. findEndAt is performance.now()
+    //               + TIME_ATTACK_MS when the popup is dismissed.
+    // findPending:  drawn but waiting for the player to dismiss the popup —
+    //               the NPC has not yet spawned, the 40s timer hasn't started.
+    // findCooldownUntil: timestamp; until this passes, no new find may queue.
+    //                   0 means "ready to draw immediately".
+    // missedFinds:  ids of find missions whose timers expired this run.
+    //               Locked out until a future "time machine" tool restores
+    //               them (the tool will simply delete from this set).
+    this.findActive         = null;
+    this.findEndAt          = 0;
+    this.findPending        = null;
+    this.findCooldownUntil  = 0;
+    this.missedFinds        = new Set();
   }
 
   // ── Missions ───────────────────────────────────────────────────────────────
 
-  // Select up to MISSIONS_ACTIVE_MAX fresh missions, skipping any whose
-  // target is already collected (find) or already completed (any type).
+  // Populate the talk-mission slate and queue the first find mission as
+  // PENDING (so main.js can pop the modal as soon as the player is free).
   initMissions() {
     this.activeMissions = [];
     for (let i = 0; i < MISSIONS_ACTIVE_MAX; i++) {
-      const m = this._drawNextMission();
+      const m = this._drawNextTalkMission();
       if (m) this.activeMissions.push(m);
     }
+    // Queue the first time-attack mission immediately — no initial cooldown.
+    this._tryDrawFindPending();
   }
 
-  _drawNextMission() {
+  // Pick the next TALK mission for the slate (visit_fleetfeet bootstrap
+  // first, then any other talk mission not already taken).
+  _drawNextTalkMission() {
     const taken = new Set([...this.completedMissions, ...this.activeMissions.map(m => m.id)]);
-    // Bootstrap rule: the very first mission the player ever sees is
-    // always 'visit_fleetfeet' — meet Vance, hear the budgeting basics
-    // for cosmetic spend. After it's been drawn (active or completed)
-    // the rest of the pool draws normally.
     if (!taken.has('visit_fleetfeet')) {
       const m = MISSION_POOL.find(x => x.id === 'visit_fleetfeet');
       if (m) return m;
     }
     const available = MISSION_POOL.filter(m => {
-      if (taken.has(m.id)) return false;
+      if (m.type !== 'talk') return false;
       if (m.id === 'visit_fleetfeet') return false;       // bootstrap-only
-      if (m.type === 'find' && this.has(m.target)) return false;
+      if (taken.has(m.id)) return false;
       return true;
     });
     if (available.length === 0) return null;
     return available[Math.floor(Math.random() * available.length)];
   }
 
-  // Caller passes (type, feetId). If a matching active mission exists,
-  // returns { mission, goldAwarded }; otherwise returns null.
-  resolveMission(type, feetId) {
+  // Pick the next find mission to queue as PENDING. Skips completed,
+  // already-collected, AND missed (failed) targets — those are locked out
+  // until the time-machine tool restores them.
+  _drawNextFindMission() {
+    const taken = new Set([...this.completedMissions, ...this.missedFinds]);
+    const available = MISSION_POOL.filter(m => {
+      if (m.type !== 'find') return false;
+      if (taken.has(m.id)) return false;
+      if (this.has(m.target)) return false;
+      return true;
+    });
+    if (available.length === 0) return null;
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
+  // Try to set findPending if there isn't already an active or pending find
+  // mission and the cooldown has elapsed. Returns the pending mission or null.
+  _tryDrawFindPending(now = performance.now()) {
+    if (this.findActive || this.findPending) return null;
+    if (now < this.findCooldownUntil)        return null;
+    const next = this._drawNextFindMission();
+    if (!next) return null;
+    this.findPending = next;
+    return next;
+  }
+
+  // Called by the popup OK click — promote pending → active and start the 40s
+  // timer NOW. Caller is responsible for spawning the NPC.
+  startPendingFind(now = performance.now()) {
+    if (!this.findPending) return null;
+    const m = this.findPending;
+    this.findPending = null;
+    this.findActive  = m;
+    this.findEndAt   = now + TIME_ATTACK_MS;
+    return m;
+  }
+
+  // Per-frame tick. `playerFree` is true when the player is in 'playing' /
+  // 'interior' state — only then does the 40s timer count down. While the
+  // player is in dialogue / discovery / combat / shop / etc. the timer
+  // FREEZES so they can't lose the mission to a UI they're already engaged
+  // with. We do this by sliding findEndAt forward by dt while paused.
+  //
+  // Returns one of:
+  //   { kind: 'idle' }                          nothing happened
+  //   { kind: 'expired', mission }              find mission ran out of time
+  //   { kind: 'queued',  mission }              new find drawn as pending
+  tickMissions(now = performance.now(), playerFree = true, dtMs = 0) {
+    if (this.findActive && !playerFree) {
+      // Pause: roll the deadline forward so the displayed timeLeft is stable.
+      this.findEndAt += dtMs;
+    }
+    if (this.findActive && now >= this.findEndAt) {
+      const m = this.findActive;
+      this.missedFinds.add(m.id);
+      this.findActive = null;
+      this.findEndAt  = 0;
+      this.findCooldownUntil = now + FIND_COOLDOWN_MS;
+      return { kind: 'expired', mission: m };
+    }
+    const queued = this._tryDrawFindPending(now);
+    if (queued) return { kind: 'queued', mission: queued };
+    return { kind: 'idle' };
+  }
+
+  findTimeLeftMs(now = performance.now()) {
+    if (!this.findActive) return 0;
+    return Math.max(0, this.findEndAt - now);
+  }
+
+  findCooldownLeftMs(now = performance.now()) {
+    if (this.findActive || this.findPending) return 0;
+    return Math.max(0, this.findCooldownUntil - now);
+  }
+
+  // Hook for a future "time machine" tool — clears the missed set so locked
+  // characters can be queued for time-attack again.
+  restoreMissedFinds() {
+    this.missedFinds.clear();
+  }
+
+  // Caller passes (type, feetId). Resolves either a talk mission from the
+  // slate or the active find mission. Returns { mission, goldAwarded } or
+  // null if no matching mission was active.
+  resolveMission(type, feetId, now = performance.now()) {
+    if (type === 'find') {
+      if (!this.findActive || this.findActive.target !== feetId) return null;
+      const mission = this.findActive;
+      this.completedMissions.add(mission.id);
+      const goldAwarded = (mission.reward === 'mystery')
+        ? (20 + Math.floor(Math.random() * 21))
+        : Number(mission.reward) || 0;
+      this.gold        += goldAwarded;
+      this.totalEarned += goldAwarded;
+      this.findActive = null;
+      this.findEndAt  = 0;
+      this.findCooldownUntil = now + FIND_COOLDOWN_MS;
+      return { mission, goldAwarded };
+    }
+
     const idx = this.activeMissions.findIndex(m => m.type === type && m.target === feetId);
     if (idx === -1) return null;
     const mission = this.activeMissions[idx];
     this.completedMissions.add(mission.id);
-    // Reward: 30g for talk; randomized 20–40g for "?" find missions
-    // (raised alongside the talk-mission bump so all missions feel
-    // proportionate).
     const goldAwarded = (mission.reward === 'mystery')
       ? (20 + Math.floor(Math.random() * 21))
       : Number(mission.reward) || 0;
     this.gold       += goldAwarded;
     this.totalEarned += goldAwarded;
-    // Replace the slot with a fresh mission from the pool.
-    const next = this._drawNextMission();
+    const next = this._drawNextTalkMission();
     if (next) this.activeMissions[idx] = next;
     else      this.activeMissions.splice(idx, 1);
     return { mission, goldAwarded };
@@ -2441,6 +2676,11 @@ class FeetDex {
     this.totalSpentSkins = 0;
     this.activeMissions = [];
     this.completedMissions.clear();
+    this.findActive        = null;
+    this.findEndAt         = 0;
+    this.findPending       = null;
+    this.findCooldownUntil = 0;
+    this.missedFinds.clear();
     _safeClearStorage();
   }
 
@@ -3903,6 +4143,15 @@ const MISSION_NPC_IDS = new Set([
   'npc_hassan_diner', 'npc_mei_museum', 'npc_carter_gallery',
 ]);
 
+// Feet-ids gated by the time-attack mission system. These NPCs are NOT
+// spawned at world build time — they only exist while their 40s find
+// mission timer is live, then get disposed. main.js calls
+// npcMgr.spawnTimeAttackNpc / despawnTimeAttackNpc on mission edges.
+const TIME_ATTACK_FEET_IDS = new Set([
+  'common_samurai', 'common_50shades', 'common_gymrat',
+  'rare_gramma',    'rare_colonel',    'epic_lebron',
+]);
+
 // ── Shared AudioContext ────────────────────────────────────────────────────────
 
 let _ctx = null;
@@ -4748,7 +4997,12 @@ class NPCManager {
 
     // ── Special fixed-position NPCs — safety-check, except Rexey (tight alley)
     // and elevated spawns (bridge deck etc.) which have a fixed y > 0
+    // TIME-ATTACK targets are skipped here — they spawn only during their
+    // 40s find-mission window via spawnTimeAttackNpc(feetId).
+    this._scene     = scene;
+    this._colliders = colliders;
     for (const def of SPECIAL_DEFS) {
+      if (TIME_ATTACK_FEET_IDS.has(def.feetId)) continue;
       const sy = def.pos[1] ?? 0;
       let sx = def.pos[0], sz = def.pos[2];
       if (def.feetId !== 'secret_rexey' && sy === 0) {
@@ -4906,6 +5160,48 @@ class NPCManager {
     if (this._highlighted) this._highlighted.setHighlighted(false);
     if (npc)               npc.setHighlighted(true);
     this._highlighted = npc;
+  }
+
+  /** Spawn a time-attack-gated NPC at its SPECIAL_DEFS position. Returns
+   *  the NPC instance (or null if the feetId isn't one of the gated set,
+   *  or if it's somehow already spawned). main.js calls this when the
+   *  player dismisses the time-attack popup. */
+  spawnTimeAttackNpc(feetId) {
+    if (!TIME_ATTACK_FEET_IDS.has(feetId)) return null;
+    if (this.npcs.some(n => n.feetId === feetId)) return null;
+    const def = SPECIAL_DEFS.find(d => d.feetId === feetId);
+    if (!def) return null;
+    const sy = def.pos[1] ?? 0;
+    let sx = def.pos[0], sz = def.pos[2];
+    if (sy === 0) {
+      const safe = _safeSpawn(def.pos[0], def.pos[2], this._colliders, 1.0);
+      if (safe) { sx = safe[0]; sz = safe[1]; }
+    }
+    const npc = new NPC(
+      this._scene, new THREE.Vector3(sx, sy, sz),
+      def.rarity, def.name, null, def.feetId, def.minigame ?? null,
+      def.bodyScale ?? 1.0, def.isPenguin ?? false,
+    );
+    this.npcs.push(npc);
+    window.ALL_NPCS.push(npc);
+    return npc;
+  }
+
+  /** Despawn a time-attack-gated NPC (timer expired OR player collected
+   *  them). Disposes the Three.js group and prunes both lists. */
+  despawnTimeAttackNpc(feetId) {
+    if (!TIME_ATTACK_FEET_IDS.has(feetId)) return;
+    const idx = this.npcs.findIndex(n => n.feetId === feetId);
+    if (idx === -1) return;
+    const npc = this.npcs[idx];
+    if (this._highlighted === npc) {
+      npc.setHighlighted(false);
+      this._highlighted = null;
+    }
+    npc.dispose();
+    this.npcs.splice(idx, 1);
+    const gIdx = window.ALL_NPCS.indexOf(npc);
+    if (gIdx !== -1) window.ALL_NPCS.splice(gIdx, 1);
   }
 
   interactWithNearest() {
@@ -6323,9 +6619,17 @@ class UI {
     const wrap = document.getElementById('missions-corner');
     const rows = document.getElementById('mission-rows');
     if (!wrap || !rows) return;
-    if (!missions || missions.length === 0) { wrap.classList.remove('active'); return; }
+    // The time-attack row may be present even when there are no talk
+    // missions, so the corner stays visible if EITHER is showing.
+    const taRow = document.getElementById('time-attack-row');
+    const taVisible = taRow && !taRow.classList.contains('ta-hidden');
+    if ((!missions || missions.length === 0) && !taVisible) {
+      wrap.classList.remove('active');
+      rows.innerHTML = '';
+      return;
+    }
     wrap.classList.add('active');
-    rows.innerHTML = missions.map(m => {
+    rows.innerHTML = (missions || []).map(m => {
       const reward  = (m.reward === 'mystery') ? '?' : `${m.reward}⛂`;
       const cls     = 'mission-row' + (m.special ? ' mission-special' : '');
       return `<div class="${cls}" data-mid="${m.id}">` +
@@ -6334,6 +6638,78 @@ class UI {
              `  <span class="m-reward">${reward}</span>` +
              `</div>`;
     }).join('');
+  }
+
+  // Keep the missions corner active so a visible time-attack row isn't
+  // hidden by the mission rendering logic. Called whenever the time-attack
+  // visibility flips.
+  setMissionsCornerVisible(visible) {
+    const wrap = document.getElementById('missions-corner');
+    if (!wrap) return;
+    if (visible) wrap.classList.add('active');
+  }
+
+  // Time-attack row — driven from main.js each frame. Pass a status object
+  // describing the current find-mission state; we toggle classes + numbers
+  // without touching the rest of the missions corner. The row is HIDDEN
+  // when there's nothing to show (all finds resolved + no cooldown).
+  //
+  //   status = {
+  //     phase:    'active' | 'pending' | 'cooldown' | 'idle' | 'hidden',
+  //     timeMs:   ms remaining (active timer OR cooldown countdown),
+  //     totalMs:  TIME_ATTACK_MS or FIND_COOLDOWN_MS — drives the bar fill,
+  //     label:    description text (or empty),
+  //   }
+  updateTimeAttack(status) {
+    const row = document.getElementById('time-attack-row');
+    if (!row) return;
+    const timeEl  = document.getElementById('ta-time');
+    const fillEl  = document.getElementById('ta-bar-fill');
+    const labelEl = document.getElementById('ta-label');
+    row.classList.remove('ta-active', 'ta-cooldown', 'ta-idle', 'ta-hidden', 'ta-final5');
+    if (status.phase === 'hidden') {
+      row.classList.add('ta-hidden');
+      return;
+    }
+    if (status.phase === 'active')   row.classList.add('ta-active');
+    if (status.phase === 'cooldown') row.classList.add('ta-cooldown');
+    if (status.phase === 'pending')  row.classList.add('ta-cooldown'); // amber while modal queues
+    if (status.phase === 'idle')     row.classList.add('ta-idle');
+    if (status.phase === 'active' && status.timeMs <= 5000) row.classList.add('ta-final5');
+    const sec   = Math.max(0, Math.ceil(status.timeMs / 1000));
+    const mm    = Math.floor(sec / 60), ss = sec % 60;
+    if (timeEl) timeEl.textContent =
+      status.phase === 'pending' ? '—' :
+      (mm > 0 ? `${mm}:${String(ss).padStart(2,'0')}` : `0:${String(ss).padStart(2,'0')}`);
+    if (fillEl) {
+      const ratio = status.totalMs > 0 ? Math.max(0, Math.min(1, status.timeMs / status.totalMs)) : 0;
+      fillEl.style.width = `${ratio * 100}%`;
+    }
+    if (labelEl) labelEl.textContent = status.label || '';
+  }
+
+  // Modal popup announcing a fresh time-attack mission. onOk is invoked
+  // once the player clicks the start button — caller starts the timer
+  // and spawns the NPC. The popup blocks ESC etc. via main.js's state.
+  showTimeAttackPopup(name, onOk) {
+    const el   = document.getElementById('time-attack-popup');
+    const body = document.getElementById('tap-body');
+    const btn  = document.getElementById('tap-ok');
+    if (!el || !btn) { onOk?.(); return; }
+    if (body) body.innerHTML =
+      `Find <b>${name}</b> before time runs out to discover hidden characters!`;
+    el.classList.add('show');
+    const handler = () => {
+      btn.removeEventListener('click', handler);
+      el.classList.remove('show');
+      onOk?.();
+    };
+    btn.addEventListener('click', handler);
+  }
+
+  isTimeAttackPopupOpen() {
+    const el = document.getElementById('time-attack-popup');
+    return !!(el && el.classList.contains('show'));
   }
 
   // Mission completion: tick the box, run a quick check + slide-out
@@ -12080,8 +12456,10 @@ player.setFloorFn((x, z, cy) => world.getFloorY(x, z, cy));
 const interaction = new InteractionSystem(camera, scene, player);
 
 // ── State ─────────────────────────────────────────────────────────────────────
-// 'playing' | 'dialogue' | 'discovery' | 'feetdex' | 'paused' | 'interior' | 'minigame' | 'combat' | 'transitioning'
+// 'playing' | 'dialogue' | 'discovery' | 'feetdex' | 'paused' | 'interior' | 'minigame' | 'combat' | 'transitioning' | 'time-attack-popup'
 let state             = 'playing';
+let _stateBeforeTimeAttackPopup = null;
+let _timeAttackPopupShown = false;
 let currentInteriorId = null;
 let _nearestNPC       = null;  // updated each frame — proximity only
 let _activeNPC        = null;  // set when interaction begins, used through dialogue/discovery/minigame
@@ -12152,16 +12530,17 @@ document.addEventListener('pointerlockchange', () => {
     }
   } else if (!_mapOpen
              && state !== 'shop' && state !== 'fleet'
-             && state !== 'minigame' && state !== 'feetdex') {
+             && state !== 'minigame' && state !== 'feetdex'
+             && state !== 'time-attack-popup') {
     // Show the start/lock overlay any time pointer-lock exits and we're
     // not already inside a non-pointer-locked UI screen (shop, fleet,
-    // minigame, feetdex). The body.lock-overlay-up class on
-    // showLockOverlay hides every game-side widget (dialogue panel,
-    // Feet God overlay, tutorial hand, missions, HUD, etc.) so the
-    // player sees ONLY the start screen, not the tutorial state behind
-    // it. Pre-fix this branch was gated to 'playing' / 'interior' only,
-    // so ESC during a dialogue or tutorial popup left those overlays
-    // floating in front of the canvas.
+    // minigame, feetdex, time-attack-popup). The body.lock-overlay-up
+    // class on showLockOverlay hides every game-side widget (dialogue
+    // panel, Feet God overlay, tutorial hand, missions, HUD, etc.) so
+    // the player sees ONLY the start screen, not the tutorial state
+    // behind it. Pre-fix this branch was gated to 'playing' / 'interior'
+    // only, so ESC during a dialogue or tutorial popup left those
+    // overlays floating in front of the canvas.
     ui.showLockOverlay();
   }
 });
@@ -12372,10 +12751,149 @@ function _onNpcDialogueDone(npc) {
 // then re-renders so the replacement mission slides in.
 function _celebrateMission(result) {
   Audio.discover();
+  // Time-attack find missions don't have a DOM row in #mission-rows — they
+  // live in the #time-attack-row. Skip the markMissionComplete animation
+  // for them and just refresh the time-attack UI on the next frame.
+  if (result.mission?.timeAttack) {
+    // The character is collected — make sure the NPC is removed from the
+    // world (the player already saw them, but we don't want them lingering
+    // in the time-attack window after collection).
+    npcMgr.despawnTimeAttackNpc(result.mission.target);
+    ui.updateGold(feetdex.gold, _nextBoosterTarget());
+    if (result.goldAwarded > 0) ui.showGoldToast(result.goldAwarded);
+    return;
+  }
   ui.markMissionComplete(result.mission.id, () => {
     ui.renderMissions(feetdex.activeMissions);
     ui.updateGold(feetdex.gold, _nextBoosterTarget());
     if (result.goldAwarded > 0) ui.showGoldToast(result.goldAwarded);
+  });
+}
+
+// ── Time-attack mission tick ──────────────────────────────────────────────────
+//
+// Called every frame from gameLoop. Drives four things:
+//
+//   1. Expiry — when an active find mission's 40s timer hits zero, despawn
+//      the NPC, mark missed (locked until time-machine), start cooldown.
+//   2. Popup — when a find mission is PENDING and the player is in a free
+//      state (no dialogue / boss / shop / etc.), show the modal. Click OK
+//      to start the timer + spawn the NPC. While the modal is up, the game
+//      uses state='time-attack-popup' so other input is gated off.
+//   3. Time-attack row — pulses red with a live countdown when active,
+//      shows the 90s cooldown countdown between missions, hides itself
+//      when there are no more find missions left to draw.
+//   4. New-mission draw — feetdex.tickMissions internally tries to draw
+//      the next find mission whenever cooldown elapses and nothing's
+//      queued. We don't need to do anything here for that branch.
+function _isPlayerFree() {
+  if (state !== 'playing' && state !== 'interior') return false;
+  // Even within 'playing' / 'interior', any UI overlay that takes E-key
+  // focus (Feet God, generic tip, legendary hint) means the player is
+  // mid-popup. Wait for those to clear before stealing focus.
+  if (ui.isFeetGodDialogueOpen) return false;
+  if (ui.isTipOpen)             return false;
+  if (_mapOpen)                 return false;
+  // Tutorial-complete celebration banner: a 4.2s feet-rain + headline
+  // we don't want to interrupt with a popup.
+  const tcEl = document.getElementById('tutorial-complete');
+  if (tcEl && tcEl.classList.contains('active')) return false;
+  return true;
+}
+
+let _lastTimeAttackTick = performance.now();
+function _tickTimeAttack() {
+  if (!_missionsRevealed) return;
+
+  const now = performance.now();
+  const dtMs = now - _lastTimeAttackTick;
+  _lastTimeAttackTick = now;
+  const tick = feetdex.tickMissions(now, _isPlayerFree(), dtMs);
+
+  // Expiry: the timer just ran out on a find mission this frame.
+  if (tick.kind === 'expired') {
+    npcMgr.despawnTimeAttackNpc(tick.mission.target);
+    Audio.discover(); // generic sting — a "miss" cue would be nicer later
+    showHUDMessage(`Time's up — ${TIME_ATTACK_NAMES[tick.mission.target] || 'the character'} got away.`, 2400);
+  }
+  // Detect a JUST-finished active mission that wasn't an expiry (i.e. the
+  // player collected the target). The despawn already happened in
+  // _celebrateMission; nothing extra to do here.
+
+  // Popup gating — show only when the player is free AND no popup is up.
+  if (feetdex.findPending && !_timeAttackPopupShown && _isPlayerFree()) {
+    _showTimeAttackPopup(feetdex.findPending);
+  }
+
+  // Drive the row each frame.
+  _renderTimeAttackRow();
+}
+
+function _showTimeAttackPopup(mission) {
+  _timeAttackPopupShown = true;
+  _stateBeforeTimeAttackPopup = state;
+  state = 'time-attack-popup';
+  // Release pointer lock so the cursor can click the OK button.
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+
+  const targetName = TIME_ATTACK_NAMES[mission.target] || 'the character';
+  ui.showTimeAttackPopup(targetName, () => {
+    _timeAttackPopupShown = false;
+    // Start the 40s timer and spawn the NPC into the world.
+    const m = feetdex.startPendingFind();
+    if (m) npcMgr.spawnTimeAttackNpc(m.target);
+    // Restore state. If the player was in an interior, stay there.
+    state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
+    _stateBeforeTimeAttackPopup = null;
+    requestLock();
+    _renderTimeAttackRow();
+  });
+}
+
+function _renderTimeAttackRow() {
+  if (!_missionsRevealed) {
+    ui.updateTimeAttack({ phase: 'hidden', timeMs: 0, totalMs: 1, label: '' });
+    return;
+  }
+  if (feetdex.findActive) {
+    const left = feetdex.findTimeLeftMs();
+    ui.updateTimeAttack({
+      phase: 'active',
+      timeMs: left,
+      totalMs: TIME_ATTACK_MS,
+      label: feetdex.findActive.label || '',
+    });
+    return;
+  }
+  if (feetdex.findPending) {
+    ui.updateTimeAttack({
+      phase: 'pending',
+      timeMs: 0,
+      totalMs: TIME_ATTACK_MS,
+      label: 'New mission incoming…',
+    });
+    return;
+  }
+  const cd = feetdex.findCooldownLeftMs();
+  // Anything more to draw? If not, hide the row entirely.
+  const hasNext = !!feetdex._drawNextFindMission();
+  if (cd > 0 && hasNext) {
+    ui.updateTimeAttack({
+      phase: 'cooldown',
+      timeMs: cd,
+      totalMs: FIND_COOLDOWN_MS,
+      label: 'Next time-attack mission incoming…',
+    });
+    return;
+  }
+  if (!hasNext) {
+    ui.updateTimeAttack({ phase: 'hidden', timeMs: 0, totalMs: 1, label: '' });
+    return;
+  }
+  // Cooldown elapsed but no pending yet (this frame) — show idle one tick.
+  ui.updateTimeAttack({
+    phase: 'idle', timeMs: 0, totalMs: 1,
+    label: 'Awaiting next mission…',
   });
 }
 
@@ -12393,6 +12911,13 @@ ui.onOpenFeetDex = () => {
 };
 
 ui.onResetProgress = () => {
+  // Tear down any in-flight time-attack NPC before feetdex.reset() forgets
+  // its target. Otherwise the spawned NPC would persist in the world.
+  if (feetdex.findActive) {
+    npcMgr.despawnTimeAttackNpc(feetdex.findActive.target);
+  }
+  _timeAttackPopupShown = false;
+  _stateBeforeTimeAttackPopup = null;
   feetdex.reset();
   ui.updateCollection(0, feetdex.total);
   ui.updateGold(feetdex.gold, _nextBoosterTarget());
@@ -14017,7 +14542,6 @@ const _MAP_LMS = [
   { wx:-60, wz:-80, hw:10, hd:32, color:'#FF6347', label:'Brooklyn Bridge' },  // tomato
   { wx: 75, wz:-30, hw:11, hd: 6, color:'#FF1493', label:'Grand Central' },    // deep pink
   { wx:-25, wz:-110, hw:10, hd:10, color:'#00FA9A', label:'Columbus Circle' }, // mint
-  { wx:  0, wz:-165, hw:22, hd:20, color:'#A0522D', label:'Lower Manhattan' }, // sienna brown
 ];
 
 // Linear features (rendered as thin lines — fences along rivers)
@@ -14268,7 +14792,7 @@ function _drawStaticMap() {
 
   // Only HERO shops get labels printed on the map — everything else
   // (Empire State, Chrysler, Grand Central, 1WTC, Times Square, Central
-  // Park, Brooklyn Bridge, Lower Manhattan, Columbus Circle) lives in the
+  // Park, Brooklyn Bridge, Columbus Circle) lives in the
   // side legend keyed by color.
   for (const lm of _byImportance) {
     if (!_isHero(lm)) continue;
@@ -15403,6 +15927,7 @@ function gameLoop() {
   _updateCompassPointer(dt);
   _animateBeacon(dt);
   _updateTutorial();
+  _tickTimeAttack();
   _drawMinimap(elapsed);
   // Throttle the full-screen map redraw to ~30 Hz — it's the second-most
   // expensive per-frame draw and nothing on it needs 60 Hz precision.
