@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T034444';
+  var BAKED = '20260513T034715';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -317,14 +317,17 @@
       filter:drop-shadow(0 0 22px rgba(255,215,0,.65));
       animation:vol-foot-pulse 2.4s ease-in-out infinite;
       overflow:visible; }
+    /* All foot shapes share a flat dark-amber fill (no individual strokes).
+       A single union outline is painted around the merged silhouette via
+       an SVG filter (`#foot-outline` defined inline in the SVG) using
+       feMorphology, so where the sole, heel, and toes overlap there are
+       no internal lines — just one continuous gold border. */
     #lock-overlay .vol-foot-frame .vol-foot-svg path,
     #lock-overlay .vol-foot-frame .vol-foot-svg rect,
     #lock-overlay .vol-foot-frame .vol-foot-svg ellipse,
     #lock-overlay .vol-foot-frame .vol-foot-svg circle {
-      fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:3;
-      stroke-linejoin:round; stroke-linecap:round; }
-    /* Toes use a brighter yellow fill so they read as glowing pads — the
-       parent SVG's drop-shadow handles the actual halo. */
+      fill:rgba(60,40,4,.85); stroke:none; }
+    /* Toes pop with a brighter translucent yellow against the body. */
     #lock-overlay .vol-foot-frame .vol-foot-svg circle {
       fill:rgba(255,215,0,.65); }
     @keyframes vol-foot-pulse {
@@ -1118,13 +1121,27 @@
                the outer ball, around the heel, and back up the arch. No
                overlapping internal lines because it's ONE continuous path. -->
           <svg class="vol-foot-svg" viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
-            <rect x="16" y="30" width="68" height="65" rx="18"/>
-            <ellipse cx="50" cy="92" rx="34" ry="20"/>
-            <circle cx="22" cy="28" r="11"/>
-            <circle cx="37" cy="20" r="13"/>
-            <circle cx="53" cy="17" r="12"/>
-            <circle cx="68" cy="21" r="10"/>
-            <circle cx="79" cy="30" r="9"/>
+            <defs>
+              <!-- Union outline: dilate the group's silhouette, fill the
+                   dilated band with gold, then paint the original shapes
+                   back on top. Result is one clean outer border with no
+                   internal lines where shapes overlap. -->
+              <filter id="foot-outline" x="-10%" y="-10%" width="120%" height="120%">
+                <feMorphology in="SourceAlpha" operator="dilate" radius="1.6" result="thick"/>
+                <feFlood flood-color="#FFD700" result="gold"/>
+                <feComposite in="gold" in2="thick" operator="in" result="outline"/>
+                <feComposite in="SourceGraphic" in2="outline" operator="over"/>
+              </filter>
+            </defs>
+            <g filter="url(#foot-outline)">
+              <rect x="16" y="30" width="68" height="65" rx="18"/>
+              <ellipse cx="50" cy="92" rx="34" ry="20"/>
+              <circle cx="22" cy="28" r="11"/>
+              <circle cx="37" cy="20" r="13"/>
+              <circle cx="53" cy="17" r="12"/>
+              <circle cx="68" cy="21" r="10"/>
+              <circle cx="79" cy="30" r="9"/>
+            </g>
           </svg>
           <div class="vol-content">
             <div class="volume-tip">TURN UP VOLUME<br/>FOR FULL EXPERIENCE!</div>
