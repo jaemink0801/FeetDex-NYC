@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T055729';
+  var BAKED = '20260513T060353';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -99,9 +99,14 @@
     #gold-toast.fly { opacity:1; transform:translate(-50%, -160%); }
 
     /* Morton's Shop overlay */
+    /* Flex column. Header (title + sub + gold) and footer (morton-line +
+       close-hint) stay pinned; the card grid in the middle gets all the
+       overflow and scrolls itself when there are more boosters than fit
+       on a small viewport. Bottom remark is therefore always readable
+       without the player scrolling. */
     #morton-shop { position:fixed; inset:0; background:rgba(20,12,4,.96);
-      display:none; flex-direction:column; align-items:center; justify-content:center;
-      z-index:175; padding:32px 24px; }
+      display:none; flex-direction:column; align-items:center; justify-content:flex-start;
+      z-index:175; padding:24px 24px 100px; }
     #morton-shop.active { display:flex; }
     #morton-shop h2 { font-size:34px; letter-spacing:5px;
       color:#FFD27A; text-shadow:0 0 14px rgba(255,180,80,.4);
@@ -110,8 +115,13 @@
       margin-bottom:6px; color:#cdb285; }
     #morton-shop .ms-gold { font-size:22px; color:#FFD700; font-weight:bold;
       letter-spacing:2px; margin-bottom:24px; }
+    /* Card grid is the only scroll surface in the modal. Caps to the
+       remaining vertical space minus header + Morton's remark + the
+       close hint. The padding-bottom on the modal already reserves
+       room for the absolute-positioned remark + hint. */
     #ms-cards { display:flex; gap:20px; flex-wrap:wrap; justify-content:center;
-      max-width:1300px; }
+      max-width:1300px; flex:1 1 auto; overflow-y:auto;
+      align-content:flex-start; padding:4px 4px 12px; }
     .ms-card { width:230px; background:rgba(40,28,16,.9);
       border:2px solid rgba(160,120,60,.5); border-radius:8px;
       padding:18px 14px; display:flex; flex-direction:column; align-items:center;
@@ -142,16 +152,26 @@
       cursor:default; }
     .ms-buy.cant { background:rgba(80,40,40,.6); border-color:rgba(160,80,80,.55);
       color:#cca; cursor:default; }
-    #ms-morton-line { font-size:22px; color:#e5cfa3; font-style:italic;
-      margin-top:28px; max-width:900px; text-align:center; min-height:60px;
-      line-height:1.5; padding:0 16px; }
+    /* Pinned to the bottom of the modal so it's always visible regardless
+       of how many cards are in the grid above. Sits ABOVE the close-hint
+       (which is in the bottom-right). max-height + overflow-y means a
+       long Morton remark scrolls inside its own box, not the whole
+       modal — the player never has to chase his words off-screen. */
+    #ms-morton-line { position:absolute; bottom:18px; left:50%;
+      transform:translateX(-50%);
+      font-size:22px; color:#e5cfa3; font-style:italic;
+      max-width:min(900px, calc(100vw - 280px));
+      text-align:center; line-height:1.45; padding:0 12px;
+      max-height:140px; overflow-y:auto; }
     #ms-close-hint { position:absolute; bottom:24px; right:32px; font-size:18px;
       opacity:.75; letter-spacing:3px; color:#FFD27A; font-weight:bold; }
 
-    /* Fleet Feet (cosmetic shop) overlay */
+    /* Fleet Feet (cosmetic shop) overlay — same pinned-header / pinned-
+       footer pattern as Morton's. The card grid scrolls inside itself
+       so Vance's bottom remark + the close hint never slide off screen. */
     #fleet-feet { position:fixed; inset:0; background:rgba(12,12,12,.96);
       display:none; flex-direction:column; align-items:center; justify-content:flex-start;
-      z-index:175; padding:32px 24px; overflow-y:auto; }
+      z-index:175; padding:24px 24px 100px; }
     #fleet-feet.active { display:flex; }
     #fleet-feet h2 { font-size:38px; letter-spacing:6px;
       color:#ffffff; text-shadow:0 0 14px rgba(255,102,51,.5);
@@ -161,7 +181,9 @@
     #fleet-feet .ff-gold { font-size:22px; color:#FFD700; font-weight:bold;
       letter-spacing:2px; margin-bottom:20px; }
     #ff-cards { display:grid; grid-template-columns:repeat(auto-fill,200px);
-      gap:18px; max-width:1300px; justify-content:center; padding-bottom:20px; }
+      gap:18px; max-width:1300px; justify-content:center;
+      flex:1 1 auto; overflow-y:auto; padding:4px 4px 12px;
+      align-content:flex-start; }
     .ff-card { width:200px; background:rgba(28,28,32,.92);
       border:2px solid rgba(255,102,51,.45); border-radius:8px;
       padding:14px 10px; display:flex; flex-direction:column; align-items:center;
@@ -193,9 +215,14 @@
     .ff-btn.equipped:hover { background:rgba(60,160,110,.9); }
     .ff-btn.cant { background:rgba(60,60,70,.6);
       border-color:rgba(120,120,140,.5); color:#aaa; cursor:default; }
-    #ff-vance-line { font-size:22px; color:#ffb088; font-style:italic;
-      margin-top:18px; max-width:900px; text-align:center; min-height:60px;
-      line-height:1.5; padding:0 16px; }
+    /* Same fixed-bottom treatment as Morton — Vance's remark hugs the
+       footer with its own scroll if a longer line shows up. */
+    #ff-vance-line { position:absolute; bottom:18px; left:50%;
+      transform:translateX(-50%);
+      font-size:22px; color:#ffb088; font-style:italic;
+      max-width:min(900px, calc(100vw - 280px));
+      text-align:center; line-height:1.45; padding:0 12px;
+      max-height:140px; overflow-y:auto; }
     #ff-close-hint { position:absolute; bottom:24px; right:32px; font-size:18px;
       opacity:.75; letter-spacing:3px; color:#ff9966; font-weight:bold; }
 
@@ -3113,20 +3140,15 @@ class Player {
   _animateLightsaber(dt) {
     if (!this._saber || !this._saber.visible) return;
     // Pose target — sheathed pose when carrying the hilt around the city,
-    // battle pose during the unsheathe + fight. The ignition animation
-    // smoothly interpolates rest pose alongside blade extension so the
-    // saber visually shifts from "tip up, held close" to "ready stance"
-    // as the blade ignites.
-    const sP = this._saberSheathPose, bP = this._saberBattlePose;
-    const ip = this._saberSheathed ? 0 : this._saberIgniteT;
-    const lerp = (a, b) => a + (b - a) * ip;
-    const rest = {
-      rx: lerp(sP.rx, bP.rx),
-      ry: lerp(sP.ry, bP.ry),
-      rz: lerp(sP.rz, bP.rz),
-      py: lerp(sP.py, bP.py),
-      pz: lerp(sP.pz, bP.pz),
-    };
+    // battle pose any time the saber is ignited. Previously this LERPED
+    // from sheath → battle while the blade was growing, which made the
+    // whole saber rotate and translate at the same time as the extension.
+    // That motion masked the actual unsheathe — the blade looked like it
+    // was swinging into place rather than telescoping out. Now: hard snap
+    // to battle pose the instant igniteLightsaber() is called, so the
+    // ONLY visual change during 3-2-1 is the blade growing in a straight
+    // line out of the hilt tip.
+    const rest = this._saberSheathed ? this._saberSheathPose : this._saberBattlePose;
     if (this._saberSwingT > 0) {
       // Slower decay (was 3.6) — total swing runtime ~0.4 s instead of
       // ~0.28 s. The strike is now unmistakable instead of a one-frame
@@ -3134,18 +3156,24 @@ class Player {
       this._saberSwingT = Math.max(0, this._saberSwingT - dt * 2.5);
       const phase = 1 - this._saberSwingT;        // 0..1 forward
       const arc   = Math.sin(phase * Math.PI);    // 0 → 1 → 0  (peaks mid-swing)
-      const chop  = -Math.cos(phase * Math.PI);   // -1 → +1   (windup → follow-through)
+      // chop drives the vertical arc. Now goes +1 → -1 so the blade STARTS
+      // pointing UP (windup, rotation.x positive ⇒ tip toward sky) and
+      // ENDS pointing DOWN (strike, rotation.x negative ⇒ tip through the
+      // opponent). Previously it ran -1 → +1, which inverted the motion.
+      const chop  =  Math.cos(phase * Math.PI);   // +1 → -1  (high windup → low strike)
 
-      // VERTICAL UP→DOWN CHOP — pure rotation.x. Windup tilts the blade
-      // back/up; strike snaps the hilt tip (and the blade attached to it)
-      // forward and down through the target's centerline. Wider amplitude
-      // (1.55 rad ≈ 88°) sells the arc; a subtle wrist twist via z keeps
-      // it from looking like a flat hinge.
-      this._saber.rotation.x = rest.rx + chop * 1.55;          // big up→down chop
+      // HIGH→LOW CHOP — pure rotation.x. Tip raised above head at start,
+      // drops through the centerline by the end. Wider amplitude (1.55 rad
+      // ≈ 88°) sells the arc; a subtle wrist twist via z keeps it from
+      // looking like a flat hinge.
+      this._saber.rotation.x = rest.rx + chop * 1.55;          // big high→low chop
       this._saber.rotation.z = rest.rz + arc * 0.22;           // wrist twist
       this._saber.rotation.y = rest.ry;                         // no horizontal sweep
       this._saber.position.z = rest.pz - arc * 0.34;           // forward thrust
-      this._saber.position.y = rest.py + chop * -0.30;         // up then down
+      // High at windup (chop +1 ⇒ +0.30), low at follow-through (chop -1 ⇒
+      // -0.30). Sign flipped from previous version which produced a
+      // low→high lift.
+      this._saber.position.y = rest.py + chop * 0.30;
 
       // FLASH — emissive intensity peaks at mid-swing and the wide trail
       // mesh briefly blooms, leaving an obvious cyan slash arc.
@@ -3634,15 +3662,33 @@ const APPEARANCE_CONFIGS = {
     extras: [
       { type: 'box', s: [0.46, 0.06, 0.30], color: 0xd62828, pos: [0, 1.22, 0.04] }, // red carpet sash
     ] },
-  // Clav — dark frame-mog. Layered chestnut hair (top volume + side flares
-  // + back flow) so he reads as a boss with main-character energy, not as a
-  // generic citizen.
+  // Clav — rich dark-brown side-swept hair built from overlapping spheres
+  // to suggest a layered "main-character" cut: high crown, a clear front
+  // sweep falling toward the brow, fuller volume on one side, tapered
+  // temples, and a back hair piece. Reads less like four mushroom-tops
+  // stuck to his head and more like a cohesive hairstyle on a man.
   mythic_clav:      { shirt: 0x0d0d0d, pants: 0x333333, shoes: 0x0d0d0d, skin: 0xffcc99,
     extras: [
-      { type: 'sphere', r: 0.22, color: 0x6B4423, pos: [ 0.00, 1.78,  0.00] }, // top volume
-      { type: 'sphere', r: 0.16, color: 0x6B4423, pos: [-0.18, 1.62, -0.04] }, // left side flare
-      { type: 'sphere', r: 0.16, color: 0x6B4423, pos: [ 0.18, 1.62, -0.04] }, // right side flare
-      { type: 'sphere', r: 0.14, color: 0x6B4423, pos: [ 0.00, 1.55, -0.18] }, // back flow
+      // Crown — two overlapping spheres to fake a flatter dome instead of
+      // a single mushroom cap. The slightly forward second sphere builds
+      // the front lift.
+      { type: 'sphere', r: 0.25, color: 0x3a2310, pos: [ 0.00, 1.82,  -0.02] },
+      { type: 'sphere', r: 0.22, color: 0x3a2310, pos: [ 0.02, 1.85,   0.04] },
+      // Side-swept front bang — drops toward the right brow, the signature
+      // "luscious" detail.
+      { type: 'sphere', r: 0.14, color: 0x3a2310, pos: [ 0.10, 1.66,   0.18] },
+      { type: 'sphere', r: 0.10, color: 0x3a2310, pos: [ 0.16, 1.58,   0.20] },
+      // Volume side — the swept side is thicker. Two spheres stack to give
+      // the impression of layered hair falling toward the temple.
+      { type: 'sphere', r: 0.13, color: 0x3a2310, pos: [-0.20, 1.66,   0.02] },
+      { type: 'sphere', r: 0.10, color: 0x3a2310, pos: [-0.22, 1.54,   0.04] },
+      // Short side (opposite the sweep) — tucked tighter to the head.
+      { type: 'sphere', r: 0.10, color: 0x3a2310, pos: [ 0.22, 1.60,  -0.02] },
+      // Nape / back hair — gently rounded out behind the head.
+      { type: 'sphere', r: 0.13, color: 0x3a2310, pos: [ 0.00, 1.58,  -0.18] },
+      // Subtle highlight strand on top of the bang — slightly lighter
+      // chestnut to catch the eye, like styled hair under stage lights.
+      { type: 'sphere', r: 0.07, color: 0x6b4423, pos: [ 0.12, 1.74,   0.16] },
     ] },
   mythic_patapim:   { shirt: 0xffeb3b, pants: 0xff6b9d, shoes: 0xff69b4, skin: 0xffcc99 },
   mythic_messi:     { shirt: 0x75aadb, pants: 0xffffff, shoes: 0xffd700, skin: 0xcc9966 },
@@ -7600,14 +7646,30 @@ function buildGenericBuildings(scene, blocks, solidObjects) {
     const eid = `generic_${enterables.length}`;
     const typeName = ENTERABLE_NAMES[enterables.length];
 
-    // Pick the face whose outer edge is closest to a street
+    // Pick a face that's BOTH close to a street and oriented toward the
+    // city center so the door is visible from the avenues players actually
+    // walk down. Earlier this only minimised street distance — buildings on
+    // the outer edges ended up with doors pointing OUT toward the river,
+    // which the player rarely walks past.
+    //
+    // Score: streetDist - 6 * (dot of face normal with the vector pointing
+    // toward (0,0)). Lower wins. The 6× weight lets centerward alignment
+    // override a few metres of extra street distance without overpowering
+    // it entirely when a face truly is the only sidewalk-adjacent option.
+    const cVec = [-b.cx, -b.cz];
+    const cMag = Math.hypot(cVec[0], cVec[1]) || 1;
+    const cnx = cVec[0] / cMag, cnz = cVec[1] / cMag;
     const faceCandidates = [
-      { dx: 0,          dz:  b.d/2+0.15, rotY: 0,            streetDist: _nearestStreet(b.cz + b.d/2, CROSS_STREETS) },
-      { dx: 0,          dz: -b.d/2-0.15, rotY: Math.PI,      streetDist: _nearestStreet(b.cz - b.d/2, CROSS_STREETS) },
-      { dx:  b.w/2+0.15, dz: 0,          rotY:  Math.PI/2,   streetDist: _nearestStreet(b.cx + b.w/2, AVENUES) },
-      { dx: -b.w/2-0.15, dz: 0,          rotY: -Math.PI/2,   streetDist: _nearestStreet(b.cx - b.w/2, AVENUES) },
+      { dx: 0,          dz:  b.d/2+0.15, rotY: 0,            nx: 0,  nz: 1,  streetDist: _nearestStreet(b.cz + b.d/2, CROSS_STREETS) },
+      { dx: 0,          dz: -b.d/2-0.15, rotY: Math.PI,      nx: 0,  nz: -1, streetDist: _nearestStreet(b.cz - b.d/2, CROSS_STREETS) },
+      { dx:  b.w/2+0.15, dz: 0,          rotY:  Math.PI/2,   nx: 1,  nz: 0,  streetDist: _nearestStreet(b.cx + b.w/2, AVENUES) },
+      { dx: -b.w/2-0.15, dz: 0,          rotY: -Math.PI/2,   nx: -1, nz: 0,  streetDist: _nearestStreet(b.cx - b.w/2, AVENUES) },
     ];
-    const best = faceCandidates.reduce((a, c) => c.streetDist < a.streetDist ? c : a);
+    for (const c of faceCandidates) {
+      const dot = c.nx * cnx + c.nz * cnz;  // +1 toward center, -1 away
+      c.score = c.streetDist - 6 * dot;
+    }
+    const best = faceCandidates.reduce((a, c) => c.score < a.score ? c : a);
 
     const doorPos = new THREE.Vector3(b.cx + best.dx, 1.4, b.cz + best.dz);
     const eDoor = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.8, 0.2), eDoorMat);
