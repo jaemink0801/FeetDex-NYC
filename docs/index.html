@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T060353';
+  var BAKED = '20260513T060429';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -6928,12 +6928,16 @@ class UI {
   // remark, with a per-shopkeeper voice blip every few characters so it
   // reads like they're speaking instead of pasting text. Calling it again
   // mid-animation cancels the previous run and starts the new line — used
-  // by setShopLine on every purchase.
+  // by setShopLine on every purchase. The full text + target element are
+  // cached so `skipShopLine()` can paint the rest in one shot when the
+  // player presses [E] mid-type.
   _typeShopLine(who, text) {
     const elId = who === 'morton' ? 'ms-morton-line' : 'ff-vance-line';
     const el = document.getElementById(elId);
     if (!el) return;
     if (this._shopTimer) { clearInterval(this._shopTimer); this._shopTimer = null; }
+    this._shopLineEl   = el;
+    this._shopLineText = text ?? '';
     el.textContent = '';
     if (!text) return;
     const blip = who === 'morton' ? Audio.mortonBlip : Audio.vanceBlip;
@@ -6952,6 +6956,19 @@ class UI {
     // 28 ms/char ≈ 35 char/s — fast enough to read along but slow enough
     // to feel like a speaker pacing a sentence.
     this._shopTimer = setInterval(step, 28);
+  }
+
+  /** True while the Morton/Vance line is still being typed out. */
+  get isShopLineTyping() { return !!this._shopTimer; }
+
+  /** Paint the rest of the current shop line instantly. Used so pressing
+   *  [E] mid-type skips to the end of the remark — the SECOND [E] then
+   *  closes the shop, matching how dialogue advance works elsewhere. */
+  skipShopLine() {
+    if (!this._shopTimer) return;
+    clearInterval(this._shopTimer);
+    this._shopTimer = null;
+    if (this._shopLineEl) this._shopLineEl.textContent = this._shopLineText ?? '';
   }
 
   // ── Private: typewriter ───────────────────────────────────────────────────
@@ -12286,9 +12303,17 @@ function _handleE() {
     return;
   }
 
-  // Shop overlay: E closes it
-  if (state === 'shop') { _closeShop(); _activeNPC = null; return; }
-  if (state === 'fleet') { _closeFleet(); _activeNPC = null; return; }
+  // Shop overlay: first [E] skips the shopkeeper line if it's still
+  // typing; second [E] (after the line is done) leaves the shop.
+  // Mirrors how NPC dialogue advances elsewhere.
+  if (state === 'shop') {
+    if (ui.isShopLineTyping) { ui.skipShopLine(); return; }
+    _closeShop(); _activeNPC = null; return;
+  }
+  if (state === 'fleet') {
+    if (ui.isShopLineTyping) { ui.skipShopLine(); return; }
+    _closeFleet(); _activeNPC = null; return;
+  }
 
   // Subway map: E acts as a "put it away" toggle, mirroring how E
   // OPENED it from a station. Players naturally try the same key to
