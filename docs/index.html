@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T062825';
+  var BAKED = '20260513T063039';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -13361,6 +13361,14 @@ function _flushTutorialFinale() {
           "Optional <b>missions</b> will appear in the corner — extra gold if you want it, skip if you don't."
         );
         _afterTipCallback = () => {
+          // Hide the tutorial-checklist BEFORE missions appear. Both
+          // anchor to the same top-left slot at the same z-index, and
+          // showing them simultaneously was the "tutorial box appears
+          // to move up / overlaps the missions box" complaint. The
+          // remaining "Look down at your feet" + celebration popups
+          // don't need tutorial.active to keep playing — they chain
+          // through _afterTipCallback.
+          tutorial.finish();
           _revealMissions();
           ui.openFeetGodDialogue(
             "Look down at your feet, mortal — you walk <b>barefoot</b>. " +
@@ -13368,7 +13376,6 @@ function _flushTutorialFinale() {
             "Dessert after dinner, though — only worth it once your tools are covered."
           );
           _afterTipCallback = () => {
-            tutorial.finish();
             ui.showTutorialComplete();
             Audio.gameWin();
           };
