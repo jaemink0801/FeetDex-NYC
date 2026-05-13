@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T062605';
+  var BAKED = '20260513T062710';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -13443,12 +13443,18 @@ function _handleF() {
 
 function _handleESC() {
   if (_mapOpen) { _closeMap(); return; }
-  // ESC during gameplay is now a no-op for the GAME — the browser still
-  // exits pointer-lock by itself, which surfaces the start/lock overlay.
-  // A single click anywhere on that overlay re-enters the game (see the
-  // lock-overlay click handler above). The previous pause menu was an
-  // extra layer the user found redundant on top of pointer-lock release.
+  // Two cases share state 'playing' / 'interior':
+  //   1. In the game (pointer locked into the canvas) — ESC exits
+  //      pointer-lock at the browser level, which surfaces the start
+  //      menu. We don't do anything extra here.
+  //   2. ON the start/lock overlay (pointer NOT locked) — ESC should
+  //      RESUME the game, mirroring the click-to-resume handler on the
+  //      overlay. Chrome enforces a ~1.25 s cooldown after a manual
+  //      pointer-lock exit, so an immediate ESC-after-ESC may fail
+  //      silently; that's a browser-level constraint, the request is
+  //      still made.
   if (state === 'playing' || state === 'interior') {
+    if (document.pointerLockElement !== canvas) requestLock();
     return;
   }
   // 'paused' shouldn't be reachable anymore, but keep a graceful exit for
