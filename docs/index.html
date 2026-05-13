@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T021358';
+  var BAKED = '20260513T022034';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -346,7 +346,11 @@
       text-transform:uppercase; letter-spacing:1px; font-weight:bold; }
     #dialogue-encounter { font-size:11px; opacity:.4; margin-left:auto; }
     #dialogue-text { flex:1; font-size:14px; line-height:1.7; }
-    #dialogue-hint { text-align:right; font-size:11px; opacity:.45; margin-top:6px; }
+    #dialogue-hint { text-align:right; font-size:18px; font-weight:bold;
+      letter-spacing:2px; margin-top:8px; color:#FFD700;
+      text-shadow:0 0 8px rgba(255,215,0,.55), 1px 1px 3px #000; }
+    #dialogue-hint .key { color:#FFEC60; font-weight:900;
+      text-shadow:0 0 10px rgba(255,236,96,.85); }
 
     /* Discovery overlay */
     #discovery-overlay { position:fixed; inset:0; background:#000;
@@ -733,8 +737,11 @@
       text-shadow:0 0 6px rgba(255,215,0,.4), 1px 1px 2px #000;
       min-height:1.6em; }
     #feetgod-text b { color:#FFFFFF; text-shadow:0 0 8px rgba(255,255,255,.5); }
-    #feetgod-hint { margin-top:16px; font-size:11px; letter-spacing:4px;
-      color:rgba(255,215,0,.7); text-align:right; }
+    #feetgod-hint { margin-top:20px; font-size:20px; font-weight:bold;
+      letter-spacing:4px; color:#FFD700; text-align:right;
+      text-shadow:0 0 12px rgba(255,215,0,.7), 2px 2px 3px #000; }
+    #feetgod-hint .key { color:#FFEC60; font-weight:900;
+      text-shadow:0 0 14px rgba(255,236,96,.95); }
 
     /* Feet rain — celebratory effect for tutorial complete & missions.
        Each drop is a div containing an inline SVG foot silhouette. */
@@ -875,7 +882,7 @@
     <div id="feetgod-panel">
       <div id="feetgod-name">THE FEET GOD</div>
       <div id="feetgod-text"></div>
-      <div id="feetgod-hint">[E] CONTINUE</div>
+      <div id="feetgod-hint"><span class="key">[SPACE]</span> CONTINUE</div>
     </div>
   </div>
 
@@ -1024,7 +1031,7 @@
       <span id="dialogue-encounter"></span>
     </div>
     <div id="dialogue-text"></div>
-    <div id="dialogue-hint"><span style="color:#FFEC60;font-weight:bold">[SPACE]</span> Continue</div>
+    <div id="dialogue-hint"><span class="key">[SPACE]</span> Continue</div>
   </div>
 
   <!-- Discovery overlay -->
@@ -4454,28 +4461,39 @@ class NPCManager {
   update(elapsedTime, playerPos) {
     let closest     = null;
     let closestDist = Infinity;
-    const inRange   = [];
+    const inRange   = [];           // proximity set — drives the highlight ring
+    const inCursorRange = [];       // cursor-pickable set — wider reach so the
+                                    // player can engage anyone they can SEE in
+                                    // front of them, not just whoever they're
+                                    // standing on.
+
+    // Wider cursor range — about 9 m of reach, lined up with the in-front
+    // dot-cone test in main.js. Shopkeepers stay extra-reachable since the
+    // counter blocks the player from physically getting close.
+    const CURSOR_RANGE_DEFAULT = 9.0;
+    const CURSOR_RANGE_SHOP    = 7.0;
 
     for (const npc of this.npcs) {
       const d = playerPos.distanceTo(npc.group.position);
       if (d < 60 || npc.rarity === 'legendary') npc.update(elapsedTime);
-      // Per-NPC interaction range. Shopkeepers can be reached from across
-      // their counter (the counter solid blocks the player from getting any
-      // closer than ~2u, so a tighter limit would lock them out).
-      const range = (npc.feetId === 'shopkeeper_morton' ||
-                     npc.feetId === 'shopkeeper_fleetfeet') ? 4.5 : 2.5;
-      if (d < range) {
+      const isShop = npc.feetId === 'shopkeeper_morton' ||
+                     npc.feetId === 'shopkeeper_fleetfeet';
+      const proxRange   = isShop ? 4.5 : 2.5;
+      const cursorRange = isShop ? CURSOR_RANGE_SHOP : CURSOR_RANGE_DEFAULT;
+      if (d < proxRange) {
         inRange.push(npc);
         if (d < closestDist) { closestDist = d; closest = npc; }
       }
+      if (d < cursorRange) {
+        inCursorRange.push(npc);
+      }
     }
 
-    // Stash the full in-range set so the cursor-aim interaction picker
-    // (in main.js) can iterate over EVERY reachable NPC instead of being
-    // forced to use `closest`. Without this, aiming at a farther but
-    // visible NPC while a different one stood closer made E pick the
-    // wrong target.
-    this.inRange = inRange;
+    // inRange = proximity (highlight, "[E] Talk to X" hint).
+    // inCursorRange = cursor-aim picker (main.js iterates this so aiming at
+    // a farther but visible NPC actually picks them).
+    this.inRange       = inRange;
+    this.inCursorRange = inCursorRange;
 
     if (this._highlighted !== closest) {
       if (this._highlighted) this._highlighted.setHighlighted(false);
@@ -6278,7 +6296,7 @@ class UI {
     _setBadge(this._el.dlgBadge, npc.rarity);
     this._el.dlgEncounter.textContent = npc.rarity === 'legendary'
       ? (['1st meeting', '2nd meeting', '3rd meeting'][legendaryCount] ?? '') : '';
-    this._el.dlgHint.textContent    = '[E] Continue';
+    this._el.dlgHint.innerHTML      = '<span class="key">[SPACE]</span> Continue';
 
     // Voice class — animates name label for mythic/legendary/secret
     if (this._voiceClassActive) this._el.dialoguePanel.classList.remove(this._voiceClassActive);
@@ -6317,11 +6335,10 @@ class UI {
       const isLast = (this._dlgIdx === this._dlgLines.length - 1);
       if (isLast) {
         const r = this._dlgNPC.rarity;
-        const keyPill = '<span style="color:#FFEC60;font-weight:bold">[SPACE]</span>';
         if      (r === 'epic' || r === 'mythic' || r === 'secret')
-                                    this._el.dlgHint.innerHTML = `${keyPill} Accept Challenge`;
+                                    this._el.dlgHint.innerHTML = '<span class="key">[SPACE]</span> Accept Challenge';
         else if (r === 'none' || r === 'legendary')
-                                    this._el.dlgHint.innerHTML = `${keyPill} Close`;
+                                    this._el.dlgHint.innerHTML = '<span class="key">[SPACE]</span> Close';
       }
       return 'next';
     }
@@ -11834,7 +11851,11 @@ function _handleE() {
         return;
       }
 
-      const inRangeNpcs = npcMgr.inRange ?? (_nearestNPC ? [_nearestNPC] : []);
+      // Cursor picker uses the WIDER inCursorRange list (≈9 m) so the player
+      // can interact with anything visibly under the crosshair, not just
+      // whoever they're physically standing next to. Fall back to the tight
+      // inRange / nearest if cursor-range hasn't been populated yet.
+      const inRangeNpcs = npcMgr.inCursorRange ?? npcMgr.inRange ?? (_nearestNPC ? [_nearestNPC] : []);
       const aimed   = [];
       const overlap = [];
       const _consider = (cand, m) => {
@@ -14245,13 +14266,37 @@ function _nearestSubway() {
   return best;
 }
 
+// Pick whoever the cursor is currently aimed at among the wider cursor-range
+// NPC set. Mirrors the priority logic in _handleE so the hint always reflects
+// what pressing E would actually trigger — not whoever happens to be closest.
+const _HINT_TMP_FWD = new THREE.Vector3();
+function _cursorAimedNPC() {
+  const candidates = npcMgr.inCursorRange ?? npcMgr.inRange ?? [];
+  if (!candidates.length) return null;
+  camera.getWorldDirection(_HINT_TMP_FWD);
+  const AIM_COS = 0.5;            // matches the 60° cone in _handleE
+  let best = null, bestDot = AIM_COS;
+  for (const npc of candidates) {
+    const dx = npc.group.position.x - player.position.x;
+    const dz = npc.group.position.z - player.position.z;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.05) continue;
+    const dot = (dx / len) * _HINT_TMP_FWD.x + (dz / len) * _HINT_TMP_FWD.z;
+    if (dot > bestDot) { bestDot = dot; best = npc; }
+  }
+  // No aimed pick — fall back to the proximity nearest so the player still
+  // sees a hint when they're standing on someone but looking elsewhere.
+  return best ?? _nearestNPC ?? null;
+}
+
 function _updateHint() {
   if (state !== 'playing' && state !== 'interior') {
     ui.clearInteractHint();
     return;
   }
-  if (_nearestNPC) {
-    ui.setInteractHint(`[E] Talk to ${_nearestNPC.name}`);
+  const npc = _cursorAimedNPC();
+  if (npc) {
+    ui.setInteractHint(`[E] Talk to ${npc.name}`);
     return;
   }
   const door = world.checkDoorProximity(player.position);
