@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T062752';
+  var BAKED = '20260513T062825';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -14585,8 +14585,17 @@ function _closeMap(attemptLock = false) {
   clearInterval(_mapBlinkInterval);
   _mapBlinkInterval = null;
   if (state === 'playing' || state === 'interior') {
-    ui.showLockOverlay();   // always show — pointer lock re-acquired on next click
-    if (attemptLock) requestLock();
+    if (attemptLock) {
+      // M-key close → straight back into the game. Skip showing the
+      // lock-overlay entirely so there's no start-menu flash between
+      // map-hide and pointer-lock-acquire. If requestLock fails (e.g.
+      // Chrome's 1.25 s cooldown after a manual exit), the
+      // pointerlockchange handler will surface the lock overlay then.
+      requestLock();
+    } else {
+      // ESC-key close → user wants to be at the start menu.
+      ui.showLockOverlay();
+    }
   }
 }
 
