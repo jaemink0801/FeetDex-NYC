@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T053940';
+  var BAKED = '20260513T055153';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -810,8 +810,12 @@
       50%      { transform:translateX(-50%) translateY(8px); }
     }
 
-    #tutorial-checklist { position:fixed; top:50%; left:16px;
-      transform:translateY(-50%); width:320px; z-index:55; pointer-events:none;
+    /* Pinned to the LOWER-left so it doesn't collide with the missions
+       panel that lives at the top-left — earlier this was centered
+       vertically and the two boards would overlap once enough missions
+       accumulated. */
+    #tutorial-checklist { position:fixed; bottom:90px; left:16px;
+      width:320px; z-index:55; pointer-events:none;
       background:rgba(20,16,8,.85); border:2px solid rgba(255,215,0,.55);
       border-radius:8px; padding:16px 18px; font-size:16px; letter-spacing:1px;
       display:none; box-shadow:0 0 20px rgba(255,215,0,.25); }
@@ -3043,27 +3047,30 @@ class Player {
   }
 
   // Scale blade/halo/trail along their long axis so 0 = collapsed (just
-  // the hilt visible) and 1 = full length. The blade & halo geometries
-  // are oriented with their length along Z after rotation.x=π/2; we
-  // scale.z and shift their position so the base stays at the hilt tip.
-  // When length is 0 we hide them entirely — the cylinder's end caps
-  // otherwise render as a glowing emissive disk at the hilt tip.
+  // the hilt visible) and 1 = full length. The cylinder geometry stores
+  // length along its LOCAL Y axis; the meshes are then tilted with
+  // rotation.x = π/2 so that local Y ends up aligned with world Z.
+  // Scaling must therefore happen on scale.Y (length), NOT scale.Z
+  // (which scales the post-rotation radial axis and just squashes the
+  // cylinder elliptically — the bug that made the blade pop instantly
+  // to full length instead of telescoping out of the hilt). Position
+  // shifts so the base stays planted at the hilt's forward tip.
   _setSaberLength(t) {
     const k = Math.max(0, Math.min(1, t));
     const visible = k > 0.001;
     if (this._saberBlade) {
       this._saberBlade.visible = visible;
-      this._saberBlade.scale.z = visible ? k : 0.0001;
+      this._saberBlade.scale.y = visible ? k : 0.0001;
       this._saberBlade.position.z = -0.09 - 0.60 * k;     // base at hilt tip
     }
     if (this._saberHalo) {
       this._saberHalo.visible = visible;
-      this._saberHalo.scale.z = visible ? k : 0.0001;
+      this._saberHalo.scale.y = visible ? k : 0.0001;
       this._saberHalo.position.z = -0.09 - 0.60 * k;
     }
     if (this._saberTrail) {
       this._saberTrail.visible = visible;
-      this._saberTrail.scale.z = visible ? k : 0.0001;
+      this._saberTrail.scale.y = visible ? k : 0.0001;
       this._saberTrail.position.z = -0.09 - 0.625 * k;
     }
   }
@@ -3100,33 +3107,35 @@ class Player {
       pz: lerp(sP.pz, bP.pz),
     };
     if (this._saberSwingT > 0) {
-      // Slightly slower decay than before (was 4.5) so the diagonal arc
-      // is actually visible — players couldn't catch the previous swing.
-      this._saberSwingT = Math.max(0, this._saberSwingT - dt * 3.6);
+      // Slower decay (was 3.6) — total swing runtime ~0.4 s instead of
+      // ~0.28 s. The strike is now unmistakable instead of a one-frame
+      // blink at lower frame rates.
+      this._saberSwingT = Math.max(0, this._saberSwingT - dt * 2.5);
       const phase = 1 - this._saberSwingT;        // 0..1 forward
       const arc   = Math.sin(phase * Math.PI);    // 0 → 1 → 0  (peaks mid-swing)
       const chop  = -Math.cos(phase * Math.PI);   // -1 → +1   (windup → follow-through)
 
       // VERTICAL UP→DOWN CHOP — pure rotation.x. Windup tilts the blade
-      // back/up; strike snaps it forward and down through the camera.
-      // A subtle wrist-twist via rotation.z adds character without
-      // turning the motion into a horizontal wipe.
-      this._saber.rotation.x = rest.rx + chop * 1.30;          // big up→down chop
-      this._saber.rotation.z = rest.rz + arc * 0.18;           // small wrist twist
+      // back/up; strike snaps the hilt tip (and the blade attached to it)
+      // forward and down through the target's centerline. Wider amplitude
+      // (1.55 rad ≈ 88°) sells the arc; a subtle wrist twist via z keeps
+      // it from looking like a flat hinge.
+      this._saber.rotation.x = rest.rx + chop * 1.55;          // big up→down chop
+      this._saber.rotation.z = rest.rz + arc * 0.22;           // wrist twist
       this._saber.rotation.y = rest.ry;                         // no horizontal sweep
-      this._saber.position.z = rest.pz - arc * 0.28;           // forward thrust
-      this._saber.position.y = rest.py + chop * -0.22;         // up then down
+      this._saber.position.z = rest.pz - arc * 0.34;           // forward thrust
+      this._saber.position.y = rest.py + chop * -0.30;         // up then down
 
       // FLASH — emissive intensity peaks at mid-swing and the wide trail
       // mesh briefly blooms, leaving an obvious cyan slash arc.
       if (this._saberBladeMat) {
-        this._saberBladeMat.emissiveIntensity = 1.2 + arc * 3.0;
+        this._saberBladeMat.emissiveIntensity = 1.2 + arc * 3.6;
       }
       if (this._saberHaloMat) {
-        this._saberHaloMat.opacity = 0.25 + arc * 0.40;
+        this._saberHaloMat.opacity = 0.25 + arc * 0.55;
       }
       if (this._saberTrailMat) {
-        this._saberTrailMat.opacity = arc * 0.45;
+        this._saberTrailMat.opacity = arc * 0.65;
       }
     } else {
       // Idle — drift back to rest (and dim flash effects).
@@ -3677,12 +3686,17 @@ const SPECIAL_DEFS = [
   // One named character per accessible building. Each interior is at world
   // x=INTERIOR_BASE_X + (3 + interiorIdx) * 200 with z near 0:
   //   Cafe=2600, Diner=2800, Gym=3000, Office=3200, Shop=3400, Bar=3600,
-  //   Gallery=3800, Laundry=4000, Pharmacy=4200, Hotel=4400, KFC=4600,
-  //   Bodega=4800, Museum=5000, Barbershop=5200.
+  //   Gallery=3800, Laundry=4000, Pharmacy=4200, Bodega=4400, KFC=4600,
+  //   Hotel=4800, Museum=5000, Barbershop=5200.
+  // Fleet Feet (Bodega interior) and Hotel Lobby had their CITY positions
+  // swapped — the Bodega building is now at the slot the Hotel Lobby used
+  // to occupy and vice versa. The interior at x=4400 is now Fleet Feet;
+  // the interior at x=4800 is now Hotel Lobby. Vance/LeBron move with their
+  // respective rooms.
   // Dex — Gym
   { name: 'Dex',               pos: [3000, 0,   0], rarity: 'common', feetId: 'common_gymrat',     minigame: null,  bodyScale: 1.00 },
-  // LeBron James — Hotel Lobby (relocated from Gym to fix Dex overlap)
-  { name: 'LeBron James',      pos: [4400, 0,   0], rarity: 'epic',   feetId: 'epic_lebron',       minigame: null,  bodyScale: 1.05 },
+  // LeBron James — Hotel Lobby (now at interior x=4800 after the swap)
+  { name: 'LeBron James',      pos: [4800, 0,   0], rarity: 'epic',   feetId: 'epic_lebron',       minigame: null,  bodyScale: 1.05 },
   // Gramma Tilda — Pharmacy
   // Gramma stands BEHIND the pharmacy counter (counter at z=-8, depth 0.6
   // → north edge at z=-7.7). She lives at z=-7 to stay clear of both the
@@ -3713,10 +3727,10 @@ const SPECIAL_DEFS = [
   // → north edge at z=-3.75). Place him at z=-4.5 so he isn't sitting on
   // the counter's solid AABB and faces the player who enters from the south.
   { name: 'Morton',            pos: [3400, 0, -4.5], rarity: 'none',   feetId: 'shopkeeper_morton', minigame: null,  bodyScale: 1.05 },
-  // Vance — Fleet Feet (rebranded Bodega interior, index 11 → world x=4800).
-  // The cosmetic-shop counterpart to Morton. feetId 'shopkeeper_fleetfeet'
-  // is a sentinel main.js uses to open the Fleet Feet UI.
-  { name: 'Vance',             pos: [4800, 0, -4.5], rarity: 'none',   feetId: 'shopkeeper_fleetfeet', minigame: null, bodyScale: 1.00 },
+  // Vance — Fleet Feet (rebranded Bodega interior, now at index 9 → world x=4400
+  // after the Bodega/Hotel Lobby city-position swap). feetId
+  // 'shopkeeper_fleetfeet' is a sentinel main.js uses to open the Fleet Feet UI.
+  { name: 'Vance',             pos: [4400, 0, -4.5], rarity: 'none',   feetId: 'shopkeeper_fleetfeet', minigame: null, bodyScale: 1.00 },
   // Rex (?) — Brooklyn Bridge deck (sole named character on the bridge)
   { name: 'Rex (?)',           pos: [-60, 6, -80], rarity: 'rare',   feetId: 'rare_trex',         minigame: null,  bodyScale: 1.30 },
   // ESB lobby — Sonion Crine always here
@@ -4512,8 +4526,8 @@ class NPC {
 // ── Interior spawn zones (world-space bounding boxes for indoor areas) ────────
 
 // Interior room world-x values: ESB=2000, Chrysler=2200, Cafe=2600, Diner=2800, Gym=3000, Office=3200,
-// Shop=3400, Bar=3600, Gallery=3800, Laundry=4000, Pharmacy=4200, Hotel=4400, KFC=4600,
-// Bodega=4800, Museum=5000, Barbershop=5200
+// Shop=3400, Bar=3600, Gallery=3800, Laundry=4000, Pharmacy=4200, Bodega=4400, KFC=4600,
+// Hotel=4800, Museum=5000, Barbershop=5200 (Bodega/Hotel swapped vs. old layout).
 const INTERIOR_SPAWN_ZONES = [
   { label: 'esb_interior',        xMin:1992, xMax:2008, zMin: -8, zMax:  8, y: 0, skipCollision: true },
   { label: 'gc_interior',         xMin:1792, xMax:1808, zMin: -8, zMax:  8, y: 0, skipCollision: true },
@@ -5857,7 +5871,7 @@ const EPIC_SCRIPTS = {
   ],
   epic_sonion: [
     "AH! A fellow scholar of the sole! Welcome, pilgrim.",
-    "I'm an EPIC — the gentlest of the bosses. Bosses (epic, mythic, legendary) won't hand over their feet without a fight.",
+    "I'm an EPIC CLASS — the gentlest of the bosses. Bosses (epic, mythic, legendary) won't hand over their feet without a fight.",
     "Each tier hits harder than the last. Beat me here, then buy a sword at Morton's before the mythics and legendaries.",
     "Ready your fists. Show me how you move.",
   ],
@@ -7499,7 +7513,7 @@ function buildGenericBuildings(scene, blocks, solidObjects) {
 
   // Pick ~14 buildings evenly distributed across bldData to be enterable.
   const ENTERABLE_NAMES = ['Cafe','Diner','Gym','Office','Shop','Bar','Gallery','Laundry',
-                            'Pharmacy','Hotel Lobby','KFC','Bodega','Museum','Barbershop'];
+                            'Pharmacy','Bodega','KFC','Hotel Lobby','Museum','Barbershop'];
   const enterables = [];
   const step = Math.max(1, Math.floor(bldData.length / 12));
   const eDoorMat = new THREE.MeshStandardMaterial({
@@ -11809,12 +11823,11 @@ document.body.appendChild(fadeDiv);
 // ── Pointer lock ──────────────────────────────────────────────────────────────
 function requestLock() { canvas.requestPointerLock(); }
 
-// Click anywhere on the lock overlay locks the pointer — UNLESS the click
-// originated inside an interactive widget (the volume slider). Without this
-// check, every drag on the slider also triggered pointer-lock and the
-// slider became unusable.
-document.getElementById('lock-overlay').addEventListener('click', (e) => {
-  if (e.target.closest('.vol-content')) return;
+// Click anywhere on the lock overlay re-enters the game. Used to skip
+// clicks that originated inside the volume slider widget, but that
+// slider was removed — the overlay now just shows the "TURN UP VOLUME"
+// hint and the controls, so any click anywhere should request lock.
+document.getElementById('lock-overlay').addEventListener('click', () => {
   requestLock();
 });
 
@@ -12518,6 +12531,8 @@ const MORTON_LINES = [
   "My best customers? The patient ones. Patience earns interest in its own way.",
   "Every gold you don't spend is gold you still got for the next move.",
   "Tools compound the rest of your run. So do the mistakes — pick wisely.",
+  "Bosses pay heavier than common feet — way heavier. Stack for the Sword and you unlock the part of town where the gold lives.",
+  "Skip the cheap stuff if it stops you affording the Sword. Bosses pay heavier, and you can't fight 'em without it.",
 ];
 let _mortonVisits = 0;
 
@@ -12538,6 +12553,17 @@ function _mortonGreeting() {
   }
   if (gold === 0) {
     return "Hey, window-shopping's fine, but the coins are the whole conversation here. Come back when you got a few more.";
+  }
+  // Sword nudge — fires once the player has a few small tools but still
+  // can't afford the Lightsaber. Bosses (epic/mythic/legendary) pay
+  // multiples of what common feet drop, and the Sword is the gate to
+  // them. Pointing this out turns the "I'll just keep buying cheap
+  // things" trap into a clear save-up moment.
+  if (!feetdex.hasBooster('lightsaber') && gold < 80 && ownedN >= 2) {
+    return "Word of advice, kid — quit nickel-and-diming. The Sword is 80g and bosses pay heavier than common feet. Save up for the Sword and your gold pile grows a whole lot faster.";
+  }
+  if (!feetdex.hasBooster('lightsaber') && gold >= 60 && gold < 80) {
+    return "Twenty short of the Sword. Hold off on the small stuff a beat — bosses drop the real coin, and you can't fight 'em without that blade.";
   }
   if (ownedN === 0 && gold >= 50) {
     return "Hey now — you're sittin' on coin like a hen on an egg. Money in your pocket isn't earnin' you anything. Pick a tool, let it start paying you back.";
@@ -12676,6 +12702,8 @@ const VANCE_LINES = [
   "Three pairs in the rotation is plenty — past that, each new fit gives you less drip per dollar.",
   "Once your toolkit's stacked, surplus spending here is healthy. Treat yourself.",
   "If there's one specific pair in here you actually want, save toward THAT one — and put the gold you'd waste on cheap fits in between toward tools instead. Patience plus tools is how you get the best of both.",
+  "Real talk — the Sword over at Morton's unlocks the bosses, and bosses pay way more than commons. Save toward THAT before you splurge here.",
+  "Skin gold today, boss gold tomorrow. Hit the Sword first, you'll have twice as much to drip with after.",
 ];
 let _vanceVisits = 0;
 
@@ -12717,6 +12745,12 @@ function _vanceGreeting() {
 
   if (collectedN === 0) {
     return "Empty FeetDex, empty rack — can't buy what you ain't found yet, so go scoop up some pairs first.";
+  }
+  // Sword-priority nudge: if the player doesn't own the Lightsaber yet,
+  // remind them it's the gate to boss fights, which pay way more gold
+  // than commons. Skin spend now = slower path to boss income later.
+  if (!feetdex.hasBooster('lightsaber') && skinsSpent > 0) {
+    return `Heads up — every g you've dropped here (${skinsSpent}g total) is g not going toward the Sword at Morton's. Sword unlocks bosses, bosses pay heavier, then the drip's basically free. Just sayin'.`;
   }
   // Most-important rule: if there's an affordable tool sitting at Morton's,
   // call it out by name and price every visit. The user's skin gold COULD
@@ -13082,11 +13116,17 @@ function _handleF() {
 
 function _handleESC() {
   if (_mapOpen) { _closeMap(); return; }
+  // ESC during gameplay is now a no-op for the GAME — the browser still
+  // exits pointer-lock by itself, which surfaces the start/lock overlay.
+  // A single click anywhere on that overlay re-enters the game (see the
+  // lock-overlay click handler above). The previous pause menu was an
+  // extra layer the user found redundant on top of pointer-lock release.
   if (state === 'playing' || state === 'interior') {
-    Audio.uiClick();
-    ui.openPause(feetdex);
-    state = 'paused';
-  } else if (state === 'paused') {
+    return;
+  }
+  // 'paused' shouldn't be reachable anymore, but keep a graceful exit for
+  // any code path that still flips state there (legacy entry points).
+  if (state === 'paused') {
     Audio.uiClick();
     ui.closePause();
     state = (currentInteriorId ? 'interior' : 'playing');
@@ -13835,8 +13875,10 @@ function _drawStaticMap() {
     const [cx, cz] = _wm(lm.wx, lm.wz);
     // Morton's Shop label is force-anchored down-LEFT so it has breathing
     // room from nearby buildings. Fleet Feet stays straight below.
+    // Distance was 48 px — felt floaty and disconnected from the dot.
+    // Pulled to 28 px so the label hugs the marker.
     const offX = (lm.label === "Morton's Shop") ? -34 : 0;
-    _drawMapLabel(staticCtx, lm.label, cx + offX, cz + 48, '#FFD700', 18, placedLabels);
+    _drawMapLabel(staticCtx, lm.label, cx + offX, cz + 28, '#FFD700', 18, placedLabels);
   }
 
   // Enterable buildings — colored dot + name label drawn directly on the
