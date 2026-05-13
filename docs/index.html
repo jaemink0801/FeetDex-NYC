@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T022345';
+  var BAKED = '20260513T023007';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -11631,7 +11631,9 @@ function _updateTutorial() {
     if (dx * dx + dz * dz < 5 * 5) {
       tutorial.advance('walk-to-esb');
       ui.openFeetGodDialogue(
-        "Good. Now press <b>[E]</b> to step inside."
+        "Good. See the <b style=\"color:#ffd700\">yellow door</b>? " +
+        "Every accessible building has one — and they appear as <b style=\"color:#ffd700\">yellow shapes</b> on the map. " +
+        "Press <b>[E]</b> to step inside."
       );
     }
   }
@@ -12806,8 +12808,7 @@ function _enterLandmark(id, name) {
       tutorial.advance('enter-esb');
       setTimeout(() => {
         ui.openFeetGodDialogue(
-          "<b style=\"color:#ffd700\">Yellow</b> doors and yellow dots on the map open for you. " +
-          "Find the character inside, walk up, press <b>[E]</b>."
+          "Inside. Find the character ahead, walk up, press <b>[E]</b> to talk."
         );
       }, 450);
     }
