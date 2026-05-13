@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T033720';
+  var BAKED = '20260513T034107';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -317,8 +317,11 @@
       filter:drop-shadow(0 0 22px rgba(255,215,0,.65));
       animation:vol-foot-pulse 2.4s ease-in-out infinite;
       overflow:visible; }
-    #lock-overlay .vol-foot-frame .vol-foot-svg path {
-      fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:2.2;
+    #lock-overlay .vol-foot-frame .vol-foot-svg path,
+    #lock-overlay .vol-foot-frame .vol-foot-svg rect,
+    #lock-overlay .vol-foot-frame .vol-foot-svg ellipse,
+    #lock-overlay .vol-foot-frame .vol-foot-svg circle {
+      fill:rgba(60,40,4,.55); stroke:#FFD700; stroke-width:3;
       stroke-linejoin:round; stroke-linecap:round; }
     @keyframes vol-foot-pulse {
       0%,100% { filter:drop-shadow(0 0 16px rgba(255,215,0,.5));
@@ -1110,24 +1113,14 @@
                and highest, middle slightly elevated, others cascading), down
                the outer ball, around the heel, and back up the arch. No
                overlapping internal lines because it's ONE continuous path. -->
-          <svg class="vol-foot-svg" viewBox="0 0 100 140" preserveAspectRatio="xMidYMid meet">
-            <!-- Public-restroom-style footprint: one smooth sole blob with
-                 five separate toe dots floating above it. Toes don't touch
-                 the sole, so there are no internal lines anywhere — and the
-                 whole composition reads instantly as a footprint. -->
-            <path d="
-              M 50,40
-              C 30,40 14,52 14,80
-              C 14,114 28,134 50,134
-              C 72,134 86,114 86,80
-              C 86,52 70,40 50,40
-              Z
-            "/>
-            <circle cx="18" cy="32" r="6"/>
-            <circle cx="32" cy="22" r="7"/>
-            <circle cx="48" cy="16" r="8"/>
-            <circle cx="64" cy="20" r="8"/>
-            <circle cx="82" cy="28" r="10"/>
+          <svg class="vol-foot-svg" viewBox="0 0 100 120" preserveAspectRatio="xMidYMid meet">
+            <rect x="16" y="30" width="68" height="65" rx="18"/>
+            <ellipse cx="50" cy="92" rx="34" ry="20"/>
+            <circle cx="22" cy="28" r="11"/>
+            <circle cx="37" cy="20" r="13"/>
+            <circle cx="53" cy="17" r="12"/>
+            <circle cx="68" cy="21" r="10"/>
+            <circle cx="79" cy="30" r="9"/>
           </svg>
           <div class="vol-content">
             <div class="volume-tip">TURN UP VOLUME<br/>FOR FULL EXPERIENCE!</div>
@@ -12031,32 +12024,28 @@ function _handleE() {
     case 'interior': {
       // Cursor-aim interaction. Two passes, in priority order:
       //
-      //  PASS 1 — aimed: every in-range NPC / entry door / subway whose
-      //    direction from the player is within a 60° cone of the
-      //    camera's forward axis. Among these, the one most directly
-      //    under the cursor (highest aim dot) wins. THIS PASS ALWAYS
-      //    BEATS PASS 2 — a clearly-aimed farther target wins over a
-      //    much closer un-aimed one (the previous code forced close
-      //    targets to dot=1 and broke this).
-      //
-      //  PASS 2 — overlap fallback: only triggers if NOTHING was in the
-      //    cursor cone. Picks the closest target within 0.6 m (you're
-      //    essentially standing on it; cursor direction is meaningless).
-      //
+      // Strict cursor-aim using screen-space projection: the target must
+      // be visibly under the crosshair on screen, accounting for both yaw
+      // AND pitch. The old horizontal-cone test ignored pitch and was so
+      // wide (60° half-angle) that any character roughly in front of the
+      // player counted. This now projects the target's head position to
+      // normalized device coords (NDC) and checks distance from screen
+      // center. AIM_NDC = 0.18 means "within 18% of screen radius of the
+      // crosshair" — roughly the visual extent of an NPC at conversation
+      // range.
       // Exit doors are exempt and always succeed (you should always be
       // able to leave a building no matter which way you face).
-      const fwd = new THREE.Vector3();
-      camera.getWorldDirection(fwd);
-      const AIM_COS  = 0.5;          // cos(60°)
-      const NEAR_FB  = 0.6;          // metres — Pass 2 fallback radius
-      const _measure = (tx, tz) => {
+      const AIM_NDC = 0.18;
+      const _scrTmp = new THREE.Vector3();
+      const _measure = (tx, ty, tz) => {
         const dx = tx - player.position.x, dz = tz - player.position.z;
-        const len = Math.hypot(dx, dz);
-        // dist for Pass-2 ranking; dot=undefined when the target is
-        // essentially overlapping the player (direction has no meaning)
-        // so it can never win the aimed pass on bogus normalized math.
-        if (len < 0.05) return { dot: -1, dist: len };
-        return { dot: (dx / len) * fwd.x + (dz / len) * fwd.z, dist: len };
+        const dist = Math.hypot(dx, dz);
+        _scrTmp.set(tx, ty, tz);
+        _scrTmp.project(camera);
+        // Behind the camera — never picks.
+        if (_scrTmp.z > 1) return { aimed: false, dist, ndcR: 99 };
+        const ndcR = Math.hypot(_scrTmp.x, _scrTmp.y);
+        return { aimed: ndcR < AIM_NDC, dist, ndcR };
       };
 
       const proxDoor = world.checkDoorProximity(player.position);
@@ -12071,30 +12060,33 @@ function _handleE() {
       // inRange / nearest if cursor-range hasn't been populated yet.
       const inRangeNpcs = npcMgr.inCursorRange ?? npcMgr.inRange ?? (_nearestNPC ? [_nearestNPC] : []);
       // Cursor-aim is the ONLY way to interact. No overlap fallback — you
-      // must be looking at the target. (Doors/subway are also gated on the
-      // crosshair; they go through the same cone check below.)
+      // must actually be looking at the target on screen.
       const aimed = [];
       const _consider = (cand, m) => {
-        if (m.dot >= AIM_COS) aimed.push({ ...cand, dot: m.dot, dist: m.dist });
+        if (m.aimed) aimed.push({ ...cand, dist: m.dist, ndcR: m.ndcR });
       };
       for (const npc of inRangeNpcs) {
+        // Aim at NPC head height (~1.4 m above base) so the cursor needs
+        // to be on their upper body, not the patch of ground at their feet.
         _consider({ kind: 'npc', npc },
-                  _measure(npc.group.position.x, npc.group.position.z));
+                  _measure(npc.group.position.x, npc.group.position.y + 1.4, npc.group.position.z));
       }
       if (proxDoor && proxDoor.action === 'near-entry') {
         _consider({ kind: 'door', door: proxDoor },
-                  _measure(proxDoor.pos.x, proxDoor.pos.z));
+                  _measure(proxDoor.pos.x, proxDoor.pos.y + 1.2, proxDoor.pos.z));
       }
       const station = _nearestSubway();
       if (station) {
         _consider({ kind: 'subway', station },
-                  _measure(station.x, station.z));
+                  _measure(station.x, 0.5, station.z));
       }
 
       let top = null;
       if (aimed.length > 0) {
-        // Closest cursor-aimed wins; dot product is the tiebreaker.
-        aimed.sort((a, b) => (a.dist - b.dist) || (b.dot - a.dot));
+        // Among on-screen-aimed targets, pick the closest one. Screen-radius
+        // is a tiebreaker so two targets at near-identical distance resolve
+        // to whichever is more directly under the crosshair.
+        aimed.sort((a, b) => (a.dist - b.dist) || (a.ndcR - b.ndcR));
         top = aimed[0];
       }
       if (!top) break;
@@ -14461,18 +14453,24 @@ const _HINT_TMP_FWD = new THREE.Vector3();
 function _cursorAimedNPC() {
   const candidates = npcMgr.inCursorRange ?? npcMgr.inRange ?? [];
   if (!candidates.length) return null;
-  camera.getWorldDirection(_HINT_TMP_FWD);
-  const AIM_COS = 0.5;            // matches the 60° cone in _handleE
-  // Strict: must be in the cursor cone. No proximity fallback — the prompt
-  // only appears when the player is actually aiming at someone.
+  // Screen-space projection. The hint matches the strict aim used by
+  // _handleE: NPC must be within ~18% of screen radius of the crosshair.
+  const AIM_NDC = 0.18;
   let best = null, bestDist = Infinity;
   for (const npc of candidates) {
+    _HINT_TMP_FWD.set(
+      npc.group.position.x,
+      npc.group.position.y + 1.4,
+      npc.group.position.z,
+    );
+    _HINT_TMP_FWD.project(camera);
+    if (_HINT_TMP_FWD.z > 1) continue;          // behind camera
+    const ndcR = Math.hypot(_HINT_TMP_FWD.x, _HINT_TMP_FWD.y);
+    if (ndcR >= AIM_NDC) continue;              // not under crosshair
     const dx = npc.group.position.x - player.position.x;
     const dz = npc.group.position.z - player.position.z;
     const len = Math.hypot(dx, dz);
-    if (len < 0.05) continue;
-    const dot = (dx / len) * _HINT_TMP_FWD.x + (dz / len) * _HINT_TMP_FWD.z;
-    if (dot >= AIM_COS && len < bestDist) { bestDist = len; best = npc; }
+    if (len < bestDist) { bestDist = len; best = npc; }
   }
   return best;
 }
