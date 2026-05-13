@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T022034';
+  var BAKED = '20260513T022212';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -346,11 +346,11 @@
       text-transform:uppercase; letter-spacing:1px; font-weight:bold; }
     #dialogue-encounter { font-size:11px; opacity:.4; margin-left:auto; }
     #dialogue-text { flex:1; font-size:14px; line-height:1.7; }
-    #dialogue-hint { text-align:right; font-size:18px; font-weight:bold;
-      letter-spacing:2px; margin-top:8px; color:#FFD700;
-      text-shadow:0 0 8px rgba(255,215,0,.55), 1px 1px 3px #000; }
+    #dialogue-hint { text-align:right; font-size:20px; font-weight:bold;
+      letter-spacing:3px; margin-top:8px; color:#FFD700;
+      text-shadow:0 0 10px rgba(255,215,0,.6), 1px 1px 3px #000; }
     #dialogue-hint .key { color:#FFEC60; font-weight:900;
-      text-shadow:0 0 10px rgba(255,236,96,.85); }
+      text-shadow:0 0 12px rgba(255,236,96,.9); }
 
     /* Discovery overlay */
     #discovery-overlay { position:fixed; inset:0; background:#000;
@@ -484,7 +484,11 @@
       margin-bottom:14px; text-shadow:0 0 10px rgba(255,215,0,.6); }
     #legendary-hint p { font-size:13px; line-height:1.7; color:#e8e8e8;
       margin-bottom:14px; }
-    #legendary-hint .lh-cta { font-size:11px; opacity:.55; letter-spacing:2px; }
+    #legendary-hint .lh-cta { font-size:20px; font-weight:bold;
+      letter-spacing:3px; color:#FFD700;
+      text-shadow:0 0 10px rgba(255,215,0,.6), 1px 1px 3px #000; margin-top:14px; }
+    #legendary-hint .lh-cta .key { color:#FFEC60; font-weight:900;
+      text-shadow:0 0 12px rgba(255,236,96,.9); }
 
     /* Generic tip popup. Three themes: default (b/w menu style),
        theme-mythic (orange), theme-legendary (gold). */
@@ -499,9 +503,11 @@
       margin-bottom:18px; text-shadow:0 0 10px rgba(255,255,255,.4); }
     #generic-tip p { font-size:17px; line-height:1.55; color:#f0f0f0;
       margin-bottom:18px; }
-    #generic-tip .lh-cta { font-size:14px; color:#FFD700; font-weight:bold;
-      letter-spacing:2px; text-shadow:0 0 6px rgba(255,215,0,.5); }
-    #generic-tip .lh-cta .key { color:#FFEC60; }
+    #generic-tip .lh-cta { font-size:20px; color:#FFD700; font-weight:bold;
+      letter-spacing:3px; text-shadow:0 0 10px rgba(255,215,0,.6), 1px 1px 3px #000;
+      margin-top:6px; }
+    #generic-tip .lh-cta .key { color:#FFEC60; font-weight:900;
+      text-shadow:0 0 12px rgba(255,236,96,.9); }
     #generic-tip .locked-sword { color:#ff4444; font-weight:bold;
       text-shadow:0 0 8px rgba(255,80,80,.6); }
     /* Mythic-fight theme — orange */
@@ -737,11 +743,11 @@
       text-shadow:0 0 6px rgba(255,215,0,.4), 1px 1px 2px #000;
       min-height:1.6em; }
     #feetgod-text b { color:#FFFFFF; text-shadow:0 0 8px rgba(255,255,255,.5); }
-    #feetgod-hint { margin-top:20px; font-size:20px; font-weight:bold;
-      letter-spacing:4px; color:#FFD700; text-align:right;
-      text-shadow:0 0 12px rgba(255,215,0,.7), 2px 2px 3px #000; }
+    #feetgod-hint { margin-top:20px; font-size:24px; font-weight:bold;
+      letter-spacing:3px; color:#FFD700; text-align:right;
+      text-shadow:0 0 14px rgba(255,215,0,.8), 2px 2px 3px #000; }
     #feetgod-hint .key { color:#FFEC60; font-weight:900;
-      text-shadow:0 0 14px rgba(255,236,96,.95); }
+      text-shadow:0 0 16px rgba(255,236,96,1); }
 
     /* Feet rain — celebratory effect for tutorial complete & missions.
        Each drop is a div containing an inline SVG foot silhouette. */
@@ -962,7 +968,7 @@
        <b>three times</b> across the city before they hand over their feet.<br/><br/>
        They relocate between fights — keep your eyes open.<br/>
        Their HP and damage dwarf a mythic. Use your <b>Sword</b> — and grab <b>Armor</b> too if you haven't.</p>
-    <div class="lh-cta">Press <span style="color:#FFEC60">[SPACE]</span> to continue</div>
+    <div class="lh-cta">Press <span class="key">[SPACE]</span> to continue</div>
   </div>
 
   <!-- Generic tip popup (used for booster purchase tips + fight tutorials) -->
