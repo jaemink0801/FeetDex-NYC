@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T015608';
+  var BAKED = '20260513T021326';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -11627,6 +11627,10 @@ const _handProjVec = new THREE.Vector3();
 
 function _updateHandPointer() {
   if (!tutorial.active) { ui.hideHand(); return; }
+  // Don't poke the hand at the start menu — the player hasn't entered the
+  // game yet. The hand has higher z-index than the lock overlay, so without
+  // this gate it would float on top of the title screen.
+  if (!_firstStartShown) { ui.hideHand(); return; }
 
   // Override: if a tutorial tip / Feet God overlay is showing, point at IT
   // instead of the step's normal target — the player needs to read the popup
