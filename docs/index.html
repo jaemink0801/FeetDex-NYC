@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T063459';
+  var BAKED = '20260513T063624';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -102,11 +102,13 @@
     /* Flex column. Header (title + sub + gold) and footer (morton-line +
        close-hint) stay pinned; the card grid in the middle gets all the
        overflow and scrolls itself when there are more boosters than fit
-       on a small viewport. Bottom remark is therefore always readable
-       without the player scrolling. */
+       on a small viewport. The bottom padding equals the MAX height of
+       morton-line (max-height 140 + bottom offset 18 + ~24 breathing
+       room = 182 px) so the cards container never grows tall enough to
+       slide under the longest possible remark. */
     #morton-shop { position:fixed; inset:0; background:rgba(20,12,4,.96);
       display:none; flex-direction:column; align-items:center; justify-content:flex-start;
-      z-index:175; padding:24px 24px 100px; }
+      z-index:175; padding:24px 24px 182px; }
     #morton-shop.active { display:flex; }
     #morton-shop h2 { font-size:34px; letter-spacing:5px;
       color:#FFD27A; text-shadow:0 0 14px rgba(255,180,80,.4);
@@ -170,11 +172,13 @@
       opacity:.75; letter-spacing:3px; color:#FFD27A; font-weight:bold; }
 
     /* Fleet Feet (cosmetic shop) overlay — same pinned-header / pinned-
-       footer pattern as Morton's. The card grid scrolls inside itself
-       so Vance's bottom remark + the close hint never slide off screen. */
+       footer pattern as Morton's. Bottom padding sized to clear the
+       longest possible Vance remark (max-height 140 + bottom 18 + ~24
+       breathing room = 182 px), so the card grid never spills under
+       the dialogue. */
     #fleet-feet { position:fixed; inset:0; background:rgba(12,12,12,.96);
       display:none; flex-direction:column; align-items:center; justify-content:flex-start;
-      z-index:175; padding:24px 24px 100px; }
+      z-index:175; padding:24px 24px 182px; }
     #fleet-feet.active { display:flex; }
     #fleet-feet h2 { font-size:38px; letter-spacing:6px;
       color:#ffffff; text-shadow:0 0 14px rgba(255,102,51,.5);
