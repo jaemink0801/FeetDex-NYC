@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T045558';
+  var BAKED = '20260513T051557';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1092,9 +1092,8 @@
     </div>
     <span id="map-close-hint">[M] or [ESC] — close map</span>
     <div id="map-instructions">
-      <span class="key">[LEFT CLICK]</span> any city spot to drop a
-      <span class="red">MARKER</span>. Click it again to remove.<br/>
-      A red <span class="red">BEACON</span> in the world will guide you to your marker — it shines through buildings.
+      <span class="key">[LEFT CLICK]</span> the map to drop a
+      <span class="red">MARKER</span>. Click again to remove.
     </div>
   </div>
 
@@ -6923,50 +6922,26 @@ class UI {
       if (confirm('Reset all progress? This cannot be undone.')) this.onResetProgress?.();
     });
     this._el.volSlider.addEventListener('input', e => this.onVolume?.(parseFloat(e.target.value)));
-    // Lock-screen volume slider. Native slider drag was being blocked by
-    // the surrounding click-to-play overlay in some Chrome builds — even
-    // with pointer-events flags set, the gesture wasn't reaching the
-    // slider thumb. So drag is handled manually here: pointerdown captures
-    // the pointer, pointermove maps cursor X to a value, pointerup releases.
-    // This bypasses every native-input edge case.
+    // Lock-screen volume slider. Use the native range input — it handles
+    // click + drag correctly on every platform. The earlier manual pointer
+    // handler called preventDefault on pointerdown, which silently broke the
+    // thumb-grab on recent Chrome/Edge: the slider rendered but no longer
+    // responded to mouse input. Stopping pointerdown/click propagation is
+    // enough to keep the surrounding lock-overlay click handler from
+    // triggering pointer-lock when the user drags the slider.
     const lockVol = document.getElementById('lock-vol-slider');
     if (lockVol) {
       const pauseVol = this._el.volSlider;
-      // Standard input event (covers keyboard arrow keys on the focused slider).
       lockVol.addEventListener('input', e => {
         const v = parseFloat(e.target.value);
         this.onVolume?.(v);
         if (pauseVol) pauseVol.value = String(v);
       });
-      // Manual pointer-driven drag.
-      const apply = (clientX) => {
-        const rect = lockVol.getBoundingClientRect();
-        const t = Math.max(0, Math.min(1,
-          (clientX - rect.left) / Math.max(1, rect.width)));
-        lockVol.value = String(t);
-        this.onVolume?.(t);
-        if (pauseVol) pauseVol.value = String(t);
-      };
-      let dragging = false;
-      const onDown = (e) => {
-        dragging = true;
-        try { lockVol.setPointerCapture?.(e.pointerId); } catch (_) {}
-        apply(e.clientX);
-        e.preventDefault();
-        e.stopPropagation();
-      };
-      const onMove = (e) => { if (dragging) apply(e.clientX); };
-      const onUp   = (e) => {
-        if (!dragging) return;
-        dragging = false;
-        try { lockVol.releasePointerCapture?.(e.pointerId); } catch (_) {}
-      };
-      lockVol.addEventListener('pointerdown', onDown);
-      window.addEventListener('pointermove',  onMove);
-      window.addEventListener('pointerup',    onUp);
-      window.addEventListener('pointercancel', onUp);
-      // Block the trailing click from triggering pointer-lock.
-      lockVol.addEventListener('click', e => e.stopPropagation());
+      // Belt-and-suspenders alongside main.js's closest('.vol-content') check:
+      // stop the slider's pointer events from reaching the lock overlay so
+      // dragging never trips pointer-lock.
+      lockVol.addEventListener('pointerdown', e => e.stopPropagation());
+      lockVol.addEventListener('click',       e => e.stopPropagation());
     }
     this._el.fdexClose.addEventListener('click', () => this.closeFeetDex());
     this._el.winPlayAgain.addEventListener('click', () => {
@@ -12152,6 +12127,15 @@ function _handleE() {
         aimed.sort((a, b) => (a.dist - b.dist) || (a.ndcR - b.ndcR));
         top = aimed[0];
       }
+      // Door fallback: if nothing precise was aimed but the player is
+      // standing at an entry door (Empire State, Chrysler, WTC, Grand
+      // Central), treat that as the intent. Doors are big static targets
+      // and forcing precise crosshair aim when the player is on the
+      // threshold made the buildings feel un-enterable. Mirrors how
+      // 'near-exit' already enters without any aim check above.
+      if (!top && proxDoor && proxDoor.action === 'near-entry') {
+        top = { kind: 'door', door: proxDoor };
+      }
       if (!top) break;
 
       if (top.kind === 'npc') {
@@ -14566,9 +14550,10 @@ function _updateHint() {
 }
 
 // ── Map beacon (left-click waypoint) ─────────────────────────────────────────
-// Pure-light pillar with depthTest:false so it visibly punches through every
-// wall, NPC, and building in the city — the player can spot it from anywhere
-// and walk toward it. No physics, no collision. One beacon at a time.
+// Tall red light pillar. Depth-tested so buildings/NPCs occlude it normally —
+// the player has to be in line-of-sight to see the beam, which keeps the
+// minimap as the primary "where is my marker" affordance. No physics or
+// collision. One beacon at a time.
 function _buildBeaconMesh() {
   const g = new THREE.Group();
   const H = 240;                        // total pillar height — taller than any building
@@ -14577,35 +14562,32 @@ function _buildBeaconMesh() {
     new THREE.CylinderGeometry(0.45, 0.45, H, 10),
     new THREE.MeshBasicMaterial({
       color: 0xff1a30, transparent: true, opacity: 0.85,
-      depthTest: false, depthWrite: false,
+      depthWrite: false,
     }),
   );
   core.position.y = H / 2;
-  core.renderOrder = 999;
   g.add(core);
   // Fatter glow halo around the core
   const glow = new THREE.Mesh(
     new THREE.CylinderGeometry(1.4, 1.4, H, 12),
     new THREE.MeshBasicMaterial({
       color: 0xff5566, transparent: true, opacity: 0.30,
-      depthTest: false, depthWrite: false,
+      depthWrite: false,
       blending: THREE.AdditiveBlending,
     }),
   );
   glow.position.y = H / 2;
-  glow.renderOrder = 998;
   g.add(glow);
   // Ground disc — a wide flat circle so the player can see "this is the spot"
   const disc = new THREE.Mesh(
     new THREE.CircleGeometry(1.8, 24),
     new THREE.MeshBasicMaterial({
       color: 0xff2244, transparent: true, opacity: 0.55,
-      depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+      depthWrite: false, side: THREE.DoubleSide,
     }),
   );
   disc.rotation.x = -Math.PI / 2;
   disc.position.y = 0.05;
-  disc.renderOrder = 997;
   g.add(disc);
   return g;
 }
