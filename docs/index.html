@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T052644';
+  var BAKED = '20260513T053057';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1198,7 +1198,6 @@
           </svg>
           <div class="vol-content">
             <div class="volume-tip">TURN UP VOLUME<br/>FOR FULL EXPERIENCE!</div>
-            <input type="range" id="lock-vol-slider" min="0" max="1" step="0.05" value="0.5"/>
           </div>
         </div>
       </div>
@@ -5828,7 +5827,7 @@ const EPIC_SCRIPTS = {
   ],
   epic_sonion: [
     "AH! A fellow scholar of the sole! Welcome, pilgrim.",
-    "I'm an <b>EPIC</b> — the gentlest of the bosses. Bosses (epic, mythic, legendary) won't hand over their feet without a fight.",
+    "I'm an EPIC — the gentlest of the bosses. Bosses (epic, mythic, legendary) won't hand over their feet without a fight.",
     "Each tier hits harder than the last. Beat me here, then buy a sword at Morton's before the mythics and legendaries.",
     "Ready your fists. Show me how you move.",
   ],
@@ -6971,28 +6970,11 @@ class UI {
     this._el.pauseReset.addEventListener('click', () => {
       if (confirm('Reset all progress? This cannot be undone.')) this.onResetProgress?.();
     });
+    // Volume slider — the pause menu has the only interactive volume control;
+    // the start screen used to have a duplicate slider but it never worked
+    // reliably (manual pointer handler vs. native range conflict on Chrome)
+    // so it was removed in favor of the "TURN UP VOLUME" system-volume hint.
     this._el.volSlider.addEventListener('input', e => this.onVolume?.(parseFloat(e.target.value)));
-    // Lock-screen volume slider. Use the native range input — it handles
-    // click + drag correctly on every platform. The earlier manual pointer
-    // handler called preventDefault on pointerdown, which silently broke the
-    // thumb-grab on recent Chrome/Edge: the slider rendered but no longer
-    // responded to mouse input. Stopping pointerdown/click propagation is
-    // enough to keep the surrounding lock-overlay click handler from
-    // triggering pointer-lock when the user drags the slider.
-    const lockVol = document.getElementById('lock-vol-slider');
-    if (lockVol) {
-      const pauseVol = this._el.volSlider;
-      lockVol.addEventListener('input', e => {
-        const v = parseFloat(e.target.value);
-        this.onVolume?.(v);
-        if (pauseVol) pauseVol.value = String(v);
-      });
-      // Belt-and-suspenders alongside main.js's closest('.vol-content') check:
-      // stop the slider's pointer events from reaching the lock overlay so
-      // dragging never trips pointer-lock.
-      lockVol.addEventListener('pointerdown', e => e.stopPropagation());
-      lockVol.addEventListener('click',       e => e.stopPropagation());
-    }
     this._el.fdexClose.addEventListener('click', () => this.closeFeetDex());
     this._el.winPlayAgain.addEventListener('click', () => {
       this._el.winScreen.classList.remove('active');
@@ -11699,12 +11681,41 @@ console.log('%c[FeetDex] BUILD 2026-05-08a — github pages deploy',
 const canvas = document.getElementById('canvas');
 
 // ── Three.js core ─────────────────────────────────────────────────────────────
+// GPU sniff: read UNMASKED_RENDERER from a throwaway WebGL context to decide
+// whether to ask for MSAA. Antialiasing is the single biggest per-frame cost
+// on integrated GPUs (Intel Iris, base Apple M-series, mobile Mali/Adreno) —
+// turning it off there reclaims ~25-40% of GPU time. Strong dGPUs (NVIDIA,
+// Radeon, M-Pro/Max/Ultra) keep AA on so visuals don't regress for the
+// hardware that can afford it.
+function _gpuTier() {
+  try {
+    const probe = document.createElement('canvas');
+    const gl = probe.getContext('webgl2') || probe.getContext('webgl');
+    if (!gl) return 'weak';
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    if (!dbg) return 'unknown';
+    const r = (gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '').toLowerCase();
+    if (/swiftshader|llvmpipe|software/.test(r)) return 'weak';
+    // Apple M-Pro/Max/Ultra are dGPU-class; bare "Apple GPU" / "Apple M1/M2/M3"
+    // is the integrated base chip — strong enough but benefits from no-AA.
+    if (/apple m\d+\s*(pro|max|ultra)/.test(r)) return 'strong';
+    if (/intel|iris|\bhd graphics\b|uhd graphics|apple gpu|apple m\d+|mali|adreno|powervr/.test(r)) return 'weak';
+    return 'strong';
+  } catch (_) { return 'unknown'; }
+}
+const _GPU_TIER = _gpuTier();
+const _WANT_AA  = _GPU_TIER === 'strong' || _GPU_TIER === 'unknown';
+
 // Cap pixel ratio at 1.5: on Retina Macs devicePixelRatio is 2-3, and the
 // resulting fragment-shader cost was the dominant cause of the "feels laggy
 // on Mac" reports. 1.5 keeps text and edges crisp while cutting fragment
-// work by roughly half versus 2.0 / two-thirds versus 3.0.
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+// work by roughly half versus 2.0 / two-thirds versus 3.0. The adaptive DPR
+// logic in gameLoop drops this further to 1.0 when FPS sags.
+const _DPR_MAX = Math.min(devicePixelRatio, 1.5);
+const _DPR_MIN = 1.0;
+let   _dprCur  = _DPR_MAX;
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: _WANT_AA, powerPreference: 'high-performance' });
+renderer.setPixelRatio(_dprCur);
 renderer.setSize(innerWidth, innerHeight);
 
 const scene  = new THREE.Scene();
@@ -11915,24 +11926,34 @@ function _updateHandPointer() {
   // this gate it would float on top of the title screen.
   if (!_firstStartShown) { ui.hideHand(); return; }
 
-  // Override: if a tutorial tip / Feet God overlay is showing, point at IT
-  // instead of the step's normal target — the player needs to read the popup
-  // before they care about the next step's anchor.
-  for (const ov of HAND_OVERRIDES) {
-    if (!ov.active()) continue;
-    const el = document.querySelector(ov.selector);
-    if (!el) continue;
-    const r = el.getBoundingClientRect();
-    if (r.top < 90) {
-      ui.setHandScreenPos(r.left + r.width / 2, r.bottom + 6, 'below');
-    } else {
-      ui.setHandScreenPos(r.left + r.width / 2, r.top - 6, 'above');
-    }
-    return;
-  }
-
   const stepId = TUTORIAL_STEPS[tutorial.stepIdx]?.id;
   const target = HAND_TARGETS[stepId];
+
+  // Steps whose whole point is "look at THIS character/object" want the hand
+  // anchored to the world target even when a Feet God popup is also visible —
+  // otherwise the hand floats over the dialogue and the player never sees
+  // who they're being told to find. find-sonion is the canonical case.
+  const _stickToWorldTarget = stepId === 'find-sonion';
+
+  // Override: if a tutorial tip / Feet God overlay is showing, point at IT
+  // instead of the step's normal target — the player needs to read the popup
+  // before they care about the next step's anchor. Skipped for steps in the
+  // _stickToWorldTarget set above.
+  if (!_stickToWorldTarget) {
+    for (const ov of HAND_OVERRIDES) {
+      if (!ov.active()) continue;
+      const el = document.querySelector(ov.selector);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (r.top < 90) {
+        ui.setHandScreenPos(r.left + r.width / 2, r.bottom + 6, 'below');
+      } else {
+        ui.setHandScreenPos(r.left + r.width / 2, r.top - 6, 'above');
+      }
+      return;
+    }
+  }
+
   if (!target) { ui.hideHand(); return; }
 
   if (target.type === 'hud') {
@@ -14674,12 +14695,35 @@ function _animateBeacon(dt) {
 const clock = new THREE.Clock();
 let _npcFrame = 0;
 
+// Adaptive DPR: rolling 1-second FPS window. If FPS drops below 45 the
+// pixel ratio collapses to 1.0 (still cleaner than no scaling at all);
+// if it recovers above 55 sustainably, we step back to the full _DPR_MAX.
+// Hysteresis bands avoid flicker right around the threshold.
+let _fpsAccum = 0;
+let _fpsFrames = 0;
+function _adaptDpr(dt) {
+  _fpsAccum  += dt;
+  _fpsFrames += 1;
+  if (_fpsAccum < 1.0) return;
+  const fps = _fpsFrames / _fpsAccum;
+  _fpsAccum = 0;
+  _fpsFrames = 0;
+  if (fps < 45 && _dprCur > _DPR_MIN) {
+    _dprCur = _DPR_MIN;
+    renderer.setPixelRatio(_dprCur);
+  } else if (fps > 55 && _dprCur < _DPR_MAX) {
+    _dprCur = _DPR_MAX;
+    renderer.setPixelRatio(_dprCur);
+  }
+}
+
 function gameLoop() {
   requestAnimationFrame(gameLoop);
 
   const dt      = Math.min(clock.getDelta(), 0.1);
   const elapsed = clock.elapsedTime;
   const locked  = document.pointerLockElement === canvas;
+  _adaptDpr(dt);
 
   if (locked && (state === 'playing' || state === 'interior' || state === 'combat')) {
     player.update(dt, world.getSolids(currentInteriorId));
