@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T061252';
+  var BAKED = '20260513T061435';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -329,6 +329,26 @@
     #lock-overlay { position:fixed; inset:0; background:rgba(0,0,0,.85);
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       cursor:pointer; z-index:100; padding:32px; }
+    /* While the lock/start overlay is up, hide every game-side HUD widget
+       so the start screen stays clean. The tutorial hand had z-index 240
+       which previously punched through the overlay; the Feet God dialogue
+       and generic-tip modals at z=170 did the same. All hidden here. */
+    body.lock-overlay-up #tutorial-hand,
+    body.lock-overlay-up #tutorial-checklist,
+    body.lock-overlay-up #missions-corner,
+    body.lock-overlay-up #dialogue-panel,
+    body.lock-overlay-up #feetgod-overlay,
+    body.lock-overlay-up #generic-tip,
+    body.lock-overlay-up #legendary-hint,
+    body.lock-overlay-up #hud,
+    body.lock-overlay-up #hud-msg,
+    body.lock-overlay-up #countdown-overlay,
+    body.lock-overlay-up #combat-hud,
+    body.lock-overlay-up #combat-flash,
+    body.lock-overlay-up #battle-vignette,
+    body.lock-overlay-up #compass-pointer,
+    body.lock-overlay-up #tracker-compass,
+    body.lock-overlay-up #gold-toast { display:none !important; }
     #lock-overlay h1 { font-size:78px; letter-spacing:9px; margin-bottom:12px;
       text-shadow:0 0 24px rgba(255,215,0,.5); }
     #lock-overlay p  { font-size:18px; opacity:.75; letter-spacing:2px; }
@@ -6618,9 +6638,20 @@ class UI {
   }
 
   // ── Lock overlay ──────────────────────────────────────────────────────────
+  // When the lock/start overlay is up the user is OUT of the game — nothing
+  // game-side (tutorial hand, dialogue popups, missions, hint text, etc.)
+  // should bleed through on top of the start screen. A body class hides
+  // every game UI element via CSS (#lock-overlay-up { ... display:none }).
+  // The 3D scene keeps rendering in the background as a visual backdrop.
 
-  showLockOverlay() { this._el.lockOverlay.style.display = 'flex'; }
-  hideLockOverlay() { this._el.lockOverlay.style.display = 'none'; }
+  showLockOverlay() {
+    this._el.lockOverlay.style.display = 'flex';
+    document.body.classList.add('lock-overlay-up');
+  }
+  hideLockOverlay() {
+    this._el.lockOverlay.style.display = 'none';
+    document.body.classList.remove('lock-overlay-up');
+  }
 
   // ── Dialogue ──────────────────────────────────────────────────────────────
 
@@ -12897,6 +12928,11 @@ function _closeShop() {
   ui.closeShop();
   state = currentInteriorId ? 'interior' : 'playing';
   requestLock();
+  // Tutorial finale (Morton farewell → sprint how-to → missions intro →
+  // Fleet Feet intro → celebration) replays here, AFTER the player has
+  // voluntarily exited. It clears _pendingBoosterTips internally so we
+  // don't double-fire the sprint how-to via the booster-tip path.
+  _flushTutorialFinale();
   _flushPendingBoosterTips();
 }
 
@@ -13221,6 +13257,12 @@ function _showBoosterTip(id) {
   return true;
 }
 
+// Set when the tutorial's "buy your first tool" step gets satisfied
+// inside Morton's shop. Triggers the tutorial finale chain when (and
+// only when) the player voluntarily LEAVES the shop — so they can
+// finish reading Morton's remark and keep browsing if they want.
+let _pendingTutorialFinale = false;
+
 function _onBuyBooster(id) {
   const def = BOOSTER_DEFS.find(b => b.id === id);
   if (!def || feetdex.hasBooster(id)) return;
@@ -13230,51 +13272,15 @@ function _onBuyBooster(id) {
   ui.setShopLine(_mortonOnPurchase(id));
   Audio.uiClick();
 
-  // Tutorial finale: buying Sprint Feet during the tutorial suppresses the
-  // normal how-to tip and runs Morton's farewell + Tutorial Complete +
-  // (after the celebration fades) the optional-missions introduction.
+  // Tutorial finale: buying Sprint Feet during the tutorial advances the
+  // step right away, but we DON'T auto-close the shop or fire any tips —
+  // the player should be able to read Morton's reaction and keep buying
+  // if they want. The finale popups (Morton farewell → sprint how-to →
+  // missions intro → Fleet Feet intro → celebration) replay only after
+  // they leave on their own. See _flushTutorialFinale below.
   if (id === 'sprint_feet' && tutorial.isStep('buy-sprint')) {
     tutorial.advance('buy-sprint');
-    setTimeout(() => {
-      if (state === 'shop') _closeShop();
-      ui.showTip('MORTON',
-        "Alright kid — you're set. Good luck out there. Spend smart and the city's yours."
-      );
-      _afterTipCallback = () => {
-        // Tutorial order (everything below is still PART OF the tutorial —
-        // celebration only after the player has been told about all systems):
-        //   1. Sprint Feet how-to tip
-        //   2. Missions intro Feet God dialogue → reveal missions panel
-        //   3. Fleet Feet intro Feet God dialogue (skins + always-available)
-        //   4. Tutorial finishes → celebration
-        _showBoosterTip('sprint_feet');
-        _afterTipCallback = () => {
-          ui.openFeetGodDialogue(
-            "Optional <b>missions</b> will appear in the corner — extra gold if you want it, skip if you don't."
-          );
-          _afterTipCallback = () => {
-            _revealMissions();
-            // Fleet Feet intro — last lesson before the celebration. The
-            // "look down, you're barefoot" hint plants the visual hook so
-            // the player WANTS to visit Fleet Feet, which dovetails with
-            // the bootstrap visit-fleetfeet mission now sitting in their
-            // mission slate.
-            ui.openFeetGodDialogue(
-              "Look down at your feet, mortal — you walk <b>barefoot</b>. " +
-              "<b>Fleet Feet</b> turns every foot you've collected into a skin you can wear. " +
-              "Dessert after dinner, though — only worth it once your tools are covered."
-            );
-            _afterTipCallback = () => {
-              // NOW the tutorial is done. Celebrate.
-              tutorial.finish();
-              ui.showTutorialComplete();
-              Audio.gameWin();
-            };
-          };
-        };
-      };
-    }, 350);
-    return;
+    _pendingTutorialFinale = true;
   }
 
   // Queue the how-to tip for AFTER the player leaves the shop. The shop
@@ -13283,6 +13289,45 @@ function _onBuyBooster(id) {
   if (!_pendingBoosterTips.includes(id) && !_shownTips.has(id)) {
     _pendingBoosterTips.push(id);
   }
+}
+
+// Played on shop close when the buy-sprint step was satisfied this
+// session. Chains the same popups as before, just relocated from
+// purchase-time to exit-time. The booster how-to tip uses the queued
+// _pendingBoosterTips flush path so it doesn't double-show.
+function _flushTutorialFinale() {
+  if (!_pendingTutorialFinale) return;
+  _pendingTutorialFinale = false;
+  // Empty out the booster tip queue first — the tutorial chain WILL show
+  // the sprint how-to itself, and we don't want the close handler to
+  // fire its own copy in parallel.
+  _pendingBoosterTips.length = 0;
+  setTimeout(() => {
+    ui.showTip('MORTON',
+      "Alright kid — you're set. Good luck out there. Spend smart and the city's yours."
+    );
+    _afterTipCallback = () => {
+      _showBoosterTip('sprint_feet');
+      _afterTipCallback = () => {
+        ui.openFeetGodDialogue(
+          "Optional <b>missions</b> will appear in the corner — extra gold if you want it, skip if you don't."
+        );
+        _afterTipCallback = () => {
+          _revealMissions();
+          ui.openFeetGodDialogue(
+            "Look down at your feet, mortal — you walk <b>barefoot</b>. " +
+            "<b>Fleet Feet</b> turns every foot you've collected into a skin you can wear. " +
+            "Dessert after dinner, though — only worth it once your tools are covered."
+          );
+          _afterTipCallback = () => {
+            tutorial.finish();
+            ui.showTutorialComplete();
+            Audio.gameWin();
+          };
+        };
+      };
+    };
+  }, 350);
 }
 
 // Legendary 3-meeting hint — shown once, the first time the player finishes a
