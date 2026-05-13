@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T045308';
+  var BAKED = '20260513T045558';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -6923,19 +6923,49 @@ class UI {
       if (confirm('Reset all progress? This cannot be undone.')) this.onResetProgress?.();
     });
     this._el.volSlider.addEventListener('input', e => this.onVolume?.(parseFloat(e.target.value)));
-    // Lock-screen volume slider — same wiring, plus mirror its value into the
-    // pause-menu slider so they stay in sync if the user changes either one.
+    // Lock-screen volume slider. Native slider drag was being blocked by
+    // the surrounding click-to-play overlay in some Chrome builds — even
+    // with pointer-events flags set, the gesture wasn't reaching the
+    // slider thumb. So drag is handled manually here: pointerdown captures
+    // the pointer, pointermove maps cursor X to a value, pointerup releases.
+    // This bypasses every native-input edge case.
     const lockVol = document.getElementById('lock-vol-slider');
     if (lockVol) {
       const pauseVol = this._el.volSlider;
+      // Standard input event (covers keyboard arrow keys on the focused slider).
       lockVol.addEventListener('input', e => {
         const v = parseFloat(e.target.value);
         this.onVolume?.(v);
         if (pauseVol) pauseVol.value = String(v);
       });
-      // Stop click from bubbling to the lock-overlay's click-to-play.
-      // (Mousedown is NOT blocked — the browser needs it to start native
-      // slider-thumb drag; blocking it would defeat the slider.)
+      // Manual pointer-driven drag.
+      const apply = (clientX) => {
+        const rect = lockVol.getBoundingClientRect();
+        const t = Math.max(0, Math.min(1,
+          (clientX - rect.left) / Math.max(1, rect.width)));
+        lockVol.value = String(t);
+        this.onVolume?.(t);
+        if (pauseVol) pauseVol.value = String(t);
+      };
+      let dragging = false;
+      const onDown = (e) => {
+        dragging = true;
+        try { lockVol.setPointerCapture?.(e.pointerId); } catch (_) {}
+        apply(e.clientX);
+        e.preventDefault();
+        e.stopPropagation();
+      };
+      const onMove = (e) => { if (dragging) apply(e.clientX); };
+      const onUp   = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        try { lockVol.releasePointerCapture?.(e.pointerId); } catch (_) {}
+      };
+      lockVol.addEventListener('pointerdown', onDown);
+      window.addEventListener('pointermove',  onMove);
+      window.addEventListener('pointerup',    onUp);
+      window.addEventListener('pointercancel', onUp);
+      // Block the trailing click from triggering pointer-lock.
       lockVol.addEventListener('click', e => e.stopPropagation());
     }
     this._el.fdexClose.addEventListener('click', () => this.closeFeetDex());
