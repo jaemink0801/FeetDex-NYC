@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T062216';
+  var BAKED = '20260513T062414';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -12431,6 +12431,13 @@ function _handleE() {
 
     case 'playing':
     case 'interior': {
+      // Only run cursor-aim NPC/door picking when the player is actually
+      // IN the game (pointer locked into the canvas). If the start/lock
+      // overlay is up, state is still 'playing' from a top-level
+      // perspective; we don't want pressing E at the title to silently
+      // strike up a dialogue with whichever NPC happens to be near the
+      // crosshair-position.
+      if (document.pointerLockElement !== canvas) return;
       // Cursor-aim interaction. Two pickers:
       //
       //   _measure(x,y,z)   — point test, used for doors and subway stations
@@ -13418,6 +13425,9 @@ function _relocateLegendary(npc) {
 
 function _handleF() {
   if (state === 'playing' || state === 'interior') {
+    // Don't open FeetDex from the title screen — pointer-lock not engaged
+    // means we're sitting on the lock overlay, not actually in the game.
+    if (document.pointerLockElement !== canvas) return;
     Audio.uiClick();
     ui.openFeetDex(feetdex);
     state = 'feetdex';
@@ -15278,21 +15288,27 @@ function gameLoop() {
 
   interaction.update(dt);
 
-  // Gate gameplay inputs behind pointer-lock so the start/lock overlay
-  // genuinely freezes the game. ESC and M are EXEMPT because the player
-  // legitimately needs to close non-pointer-locked UIs from any state —
-  // M closes an open map (map opens with document.exitPointerLock(), so
-  // by the time the user hits M to close, `locked` is already false);
-  // ESC closes shop / fleet / minigame screens which are also unlocked.
-  // _handleM has its own guard (won't open the map unless pointer is
-  // actually locked into the game canvas), so an exempt M at the title
-  // screen does nothing.
+  // Gate inputs by purpose, not by `locked` blanket. Three buckets:
+  //   • ESC / M / E — always allowed. They each route to handlers with
+  //     state-aware branches that close maps / shops / dialogues / etc.
+  //     (which run UNLOCKED), so blanket-gating them was the bug that
+  //     trapped the player inside the map.
+  //   • F (FeetDex) — also UI, also always allowed; _handleF flips state
+  //     between 'playing' ⇄ 'feetdex' and runs requestLock on close.
+  //   • Space / C — purely gameplay (jump, compass-hold). Locked-only.
+  //
+  // The start-screen-can't-interact requirement is preserved because:
+  //   - _handleM short-circuits unless the pointer is actually locked into
+  //     the game canvas.
+  //   - _handleE's cursor-aim 'playing'/'interior' branch checks
+  //     pointerLockElement before doing NPC/door picking (added below).
+  //   - _handleESC and _handleF are state-aware and no-op from the title.
   if (input.justPressed('Escape')) _handleESC();
   if (input.justPressed('KeyM'))   _handleM();
+  if (input.justPressed('KeyE'))   _handleE();
+  if (input.justPressed('KeyF'))   _handleF();
   if (locked) {
-    if (input.justPressed('KeyE'))   _handleE();
     if (input.justPressed('Space'))  player.jump?.();
-    if (input.justPressed('KeyF'))   _handleF();
     if (input.justPressed('KeyC'))   _handleC();
   }
 
