@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T062414';
+  var BAKED = '20260513T062605';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -12412,10 +12412,12 @@ function _handleE() {
     _closeFleet(); _activeNPC = null; return;
   }
 
-  // Subway map: E acts as a "put it away" toggle, mirroring how E
-  // OPENED it from a station. Players naturally try the same key to
-  // dismiss it; without this they were stuck reaching for M/ESC.
-  if (_mapOpen) { _closeMap(true); return; }
+  // Subway map: E used to also close the map as a convenience toggle,
+  // but the user wants each key to have one clear job — M closes the
+  // map, ESC opens the start menu. E is reserved for "progress whatever
+  // interaction is going on" (dialogue, shop line, popup) and falls
+  // through to do nothing while the map is open.
+  if (_mapOpen) return;
 
   // Discovery overlay — the popup says "[E] Add to FeetDex"; close on E.
   if (state === 'discovery') { _confirmDiscovery(); return; }
