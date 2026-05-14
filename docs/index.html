@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T043224';
+  var BAKED = '20260514T043523';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2722,7 +2722,7 @@ const SHOEBOX_DEFS = [
   { id:'time_machine',  name:'Time Machine',  icon:'⏳',
     desc:'Retry a missed time-attack mission. Use it from Morton\'s repair station.' },
   { id:'karate_kick',   name:'Karate Kick',   icon:'🦵',
-    desc:'RIGHT-CLICK to kick nearby characters. Skips dialogue and instantly claims their feet.' },
+    desc:'LEFT-CLICK (outside boss fights) to kick nearby characters. Skips dialogue and instantly claims their feet.' },
 ];
 
 const SHOEBOX_TOOL_IDS = new Set(SHOEBOX_DEFS.map(d => d.id));
@@ -14949,7 +14949,7 @@ const BOOSTER_TIPS = {
   time_machine:   { title: 'TIME MACHINE',
     body: 'Head back to <b>Morton\'s Shop</b> and press <b>USE TIME MACHINE</b> at the repair station to retry any time-attack mission you missed.' },
   karate_kick:    { title: 'KARATE KICK',
-    body: '<b>RIGHT-CLICK</b> a nearby character to kick them. Skips dialogue and <b>instantly claims their feet</b>. Crowds and mission folks respawn after 30 seconds.' },
+    body: '<b>LEFT-CLICK</b> a nearby character (outside boss fights) to kick them. Skips dialogue and <b>instantly claims their feet</b>. Crowds and mission folks respawn after 30 seconds.' },
 };
 let _shownTips = new Set();
 let _afterTipCallback = null;     // run after the tip is dismissed (countdown chains here)
