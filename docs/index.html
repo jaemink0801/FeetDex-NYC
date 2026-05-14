@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T043553';
+  var BAKED = '20260514T043841';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -7190,33 +7190,74 @@ class UI {
     if (!el || !card || !btn) { onOk?.(); return; }
     if (iconEl) iconEl.textContent = def.icon || '🎁';
     if (nameEl) nameEl.textContent = def.name || 'Mystery Tool';
-    if (descEl) descEl.textContent = def.desc || '';
+    if (descEl) descEl.textContent = '';   // typewriter fills this in
     if (cntEl)  cntEl.textContent  = `${foundCount} / ${totalCount} hidden tools found`;
     if (footEl) footEl.textContent = isFirstOpen
       ? "Take it to MORTON'S SHOP to repair it before you can use it!"
       : "Take it to Morton's to repair.";
     card.classList.remove('sb-revealed');
     el.classList.add('show');
-    // Shake for ~900ms, then flip reveal.
-    setTimeout(() => card.classList.add('sb-revealed'), 950);
-    // Dismiss with the [E] key (matches the rest of the game's E-to-
-    // continue rhythm). Button click still works too, but no longer
-    // dismisses on backdrop-click since the player explicitly asked
-    // for keyboard parity with dialogues.
-    const handler = () => {
-      btn.removeEventListener('click', handler);
+
+    // Dialogue-style sequence:
+    //   1. Shake (~950 ms) — E ignored.
+    //   2. Reveal flip (~600 ms) — E ignored, animation must play out.
+    //   3. Description typewriter — first [E] snaps it to the end.
+    //   4. Idle — second [E] closes the popup.
+    let stage = 'shaking';    // 'shaking' | 'revealing' | 'typing' | 'idle'
+    let typeTimer = null;
+    const descFull = (def.desc || '').toString();
+
+    const cleanup = () => {
+      btn.removeEventListener('click', tryClose);
       document.removeEventListener('keydown', keyHandler, true);
+      if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
       el.classList.remove('show');
       card.classList.remove('sb-revealed');
       onOk?.();
     };
-    const keyHandler = (e) => {
-      if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
-        e.preventDefault(); handler();
-      }
+    const tryClose = () => {
+      // The button click takes effect ONLY once we're idle — same gate
+      // as the [E] key so the player can't bypass the reveal animation.
+      if (stage !== 'idle') return;
+      cleanup();
     };
-    btn.addEventListener('click', handler);
+    const keyHandler = (e) => {
+      if (e.key !== 'e' && e.key !== 'E' && e.key !== 'Enter') return;
+      e.preventDefault();
+      if (stage === 'shaking' || stage === 'revealing') return;   // input gated
+      if (stage === 'typing') {
+        // Snap typewriter to end. Do NOT close on this press.
+        if (typeTimer) { clearInterval(typeTimer); typeTimer = null; }
+        if (descEl) descEl.textContent = descFull;
+        stage = 'idle';
+        return;
+      }
+      if (stage === 'idle') cleanup();
+    };
+    btn.addEventListener('click', tryClose);
     document.addEventListener('keydown', keyHandler, true);
+
+    // Step 1 → 2: shake for 950 ms, then trigger the reveal flip CSS.
+    setTimeout(() => {
+      card.classList.add('sb-revealed');
+      stage = 'revealing';
+      // Step 2 → 3: after the reveal animation lands, start the typewriter.
+      setTimeout(() => {
+        stage = 'typing';
+        let i = 0;
+        const SPEED_MS = 28;
+        typeTimer = setInterval(() => {
+          if (i >= descFull.length) {
+            clearInterval(typeTimer); typeTimer = null;
+            stage = 'idle';
+            return;
+          }
+          i++;
+          if (descEl) descEl.textContent = descFull.slice(0, i);
+        }, SPEED_MS);
+      }, 850);   // reveal animation = 0.55 s + 0.25 s delay ≈ 0.8 s
+    }, 950);
+
     setTimeout(() => btn.focus(), 0);
   }
 
