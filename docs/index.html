@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T040542';
+  var BAKED = '20260514T040715';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -13107,6 +13107,11 @@ const ESB_DOOR = { x: 0, z: 8.2 };
 let _walkToEsbArmed = false;
 const _walkToEsbBaseline = new THREE.Vector3();
 const WALK_TO_ESB_DELTA = 0.8;     // metres of post-dismiss movement required
+// Set when the "Look down at your feet" dialogue is dismissed. Cleared the
+// moment the player tilts the camera below LOOK_DOWN_THRESHOLD — then the
+// Vance / Fleet Feet pitch fires. One-shot.
+let _awaitingLookDown = false;
+const LOOK_DOWN_THRESHOLD = -1.0;   // ~ 57° below the horizon — feet visible
 const tutorial = {
   active: true,
   stepIdx: 0,
@@ -13138,6 +13143,25 @@ const tutorial = {
 function _updateTutorial() {
   ui.updateTutorialArrow(false);
   _updateHandPointer();
+
+  // Look-down gate: once the "Look at your feet" Feet God dialogue is
+  // dismissed, wait until the player has visibly tilted the camera down
+  // before firing the Vance / Fleet Feet follow-up. Pitch convention:
+  // negative = looking down, capped at -π/2 + 0.01. Threshold ~ -1.0 puts
+  // their bare feet squarely in frame.
+  if (_awaitingLookDown && !ui.isFeetGodDialogueOpen && !ui.isTipOpen
+      && (player.pitch ?? 0) < LOOK_DOWN_THRESHOLD) {
+    _awaitingLookDown = false;
+    ui.openFeetGodDialogue(
+      "Those bare feet need <b>skins</b>. Visit <b>Vance</b> at <b>Fleet Feet</b> — " +
+      "he turns every foot you've collected into a wearable look. " +
+      "Dessert after dinner, though — only worth it once your tools are covered."
+    );
+    _afterTipCallback = () => {
+      ui.showTutorialComplete();
+      Audio.gameWin();
+    };
+  }
   // Walk-to-ESB advances automatically the first time the player gets within
   // a few metres of the front door — it's a "you can move now" check, not a
   // gate on entry. The actual entry is still the next step (enter-esb).
@@ -14769,13 +14793,15 @@ function _flushTutorialFinale() {
           tutorial.finish();
           _revealMissions();
           ui.openFeetGodDialogue(
-            "Look down at your feet, mortal — you walk <b>barefoot</b>. " +
-            "<b>Fleet Feet</b> turns every foot you've collected into a skin you can wear. " +
-            "Dessert after dinner, though — only worth it once your tools are covered."
+            "Look down at your feet, mortal — you walk <b>barefoot</b>."
           );
           _afterTipCallback = () => {
-            ui.showTutorialComplete();
-            Audio.gameWin();
+            // Don't fire the Vance/Fleet Feet pitch until the player has
+            // actually pitched the camera down enough to SEE their bare
+            // feet — the chain dialogue lands flat if they're still
+            // staring at the skyline. Per-frame check in _updateTutorial
+            // promotes _awaitingLookDown → fires the next dialogue.
+            _awaitingLookDown = true;
           };
         };
       };
