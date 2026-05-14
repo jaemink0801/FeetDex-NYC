@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T043841';
+  var BAKED = '20260514T045228';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -7178,7 +7178,7 @@ class UI {
   // Shoebox reveal — `def` is { id, name, icon, desc }. Shows the ? box
   // shaking, then bursts open into the tool reveal. isFirstOpen makes the
   // footer line spell out the take-it-to-Morton's tutorial cue.
-  showShoeboxReveal(def, isFirstOpen, foundCount, totalCount, onOk) {
+  showShoeboxReveal(def, isFirstOpen, foundCount, totalCount, onOk, footerOverride = null) {
     const el     = document.getElementById('shoebox-popup');
     const card   = el?.querySelector('.sb-card');
     const iconEl = document.getElementById('sb-icon');
@@ -7192,9 +7192,10 @@ class UI {
     if (nameEl) nameEl.textContent = def.name || 'Mystery Tool';
     if (descEl) descEl.textContent = '';   // typewriter fills this in
     if (cntEl)  cntEl.textContent  = `${foundCount} / ${totalCount} hidden tools found`;
-    if (footEl) footEl.textContent = isFirstOpen
-      ? "Take it to MORTON'S SHOP to repair it before you can use it!"
-      : "Take it to Morton's to repair.";
+    if (footEl) footEl.textContent = footerOverride
+      ?? (isFirstOpen
+        ? "Take it to MORTON'S SHOP to repair it before you can use it!"
+        : "Take it to Morton's to repair.");
     card.classList.remove('sb-revealed');
     el.classList.add('show');
 
@@ -13868,13 +13869,22 @@ function _openShoebox(sb) {
   // Roll the loot.
   const toolId = feetdex.awardRandomShoeboxTool();
   if (!toolId) {
-    // No new tools left — pay out 30 g as a duplicate-shoebox bonus.
+    // No new tools left — pay out 30 g as a duplicate-shoebox bonus and
+    // route through the SAME shaking-? popup so the player gets the
+    // matching reveal beat instead of just a HUD line.
     feetdex.gold        += SHOEBOX_DUP_GOLD;
     feetdex.totalEarned += SHOEBOX_DUP_GOLD;
     ui.updateGold(feetdex.gold, _nextBoosterTarget());
     Audio.goldKaching?.();
     ui.showGoldToast(SHOEBOX_DUP_GOLD);
-    showHUDMessage(`Bonus shoebox! +${SHOEBOX_DUP_GOLD} ⛂`, 2000);
+    const bonusDef = {
+      id:   '_bonus_gold',
+      icon: '⛂',
+      name: 'BONUS GOLD',
+      desc: `+${SHOEBOX_DUP_GOLD} gold — you've already collected every hidden tool!`,
+    };
+    const total = SHOEBOX_DEFS.length;
+    _showShoeboxRevealForBonus(bonusDef, total);
     return;
   }
   const def = SHOEBOX_DEFS.find(d => d.id === toolId);
@@ -13900,6 +13910,29 @@ function _showShoeboxReveal(def) {
     _stateBeforeTimeAttackPopup = null;
     requestLock();
   });
+}
+
+// Bonus-shoebox variant: every tool already collected — show the same
+// shaking-? animation, then reveal "+30 GOLD" with a "you've collected all
+// 4 hidden tools" footer. Uses the same input-gate so the player walks
+// through the dialogue-style E rhythm.
+function _showShoeboxRevealForBonus(def, total) {
+  if (state !== 'playing' && state !== 'interior') {
+    setTimeout(() => _showShoeboxRevealForBonus(def, total), 400);
+    return;
+  }
+  _stateBeforeTimeAttackPopup = state;
+  state = 'time-attack-popup';
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+  ui.showShoeboxReveal(
+    def, /*isFirstOpen=*/false, /*foundCount=*/total, total,
+    () => {
+      state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
+      _stateBeforeTimeAttackPopup = null;
+      requestLock();
+    },
+    `All ${total} / ${total} hidden tools collected — extra shoeboxes pay you in gold from now on.`,
+  );
 }
 
 // ── UI callbacks ──────────────────────────────────────────────────────────────
