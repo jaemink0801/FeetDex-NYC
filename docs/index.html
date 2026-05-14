@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T041805';
+  var BAKED = '20260514T042055';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -7481,16 +7481,80 @@ class UI {
     if (theme === 'ancient')   el.classList.add('theme-ancient');
     if (theme === 'feetgod')   el.classList.add('theme-feetgod');
     if (tEl) tEl.textContent = title;
-    if (bEl) bEl.innerHTML   = body;
     el.classList.add('active');
+    // Dialogue-style typewriter: emit one HTML-aware token at a time. The
+    // body can contain inline tags (<b>, <span class="...">, <br/>); the
+    // tokenizer keeps tags atomic so partial output is always valid HTML.
+    this._tipFull   = body || '';
+    this._tipTokens = this._tokenizeHtml(this._tipFull);
+    this._tipIdx    = 0;
+    this._tipTyping = true;
+    if (bEl) bEl.innerHTML = '';
+    if (this._tipTimer) clearInterval(this._tipTimer);
+    const SPEED_MS = 22;
+    this._tipTimer = setInterval(() => {
+      if (this._tipIdx >= this._tipTokens.length) {
+        clearInterval(this._tipTimer);
+        this._tipTimer = null;
+        this._tipTyping = false;
+        return;
+      }
+      this._tipIdx++;
+      if (bEl) bEl.innerHTML = this._tipTokens.slice(0, this._tipIdx).join('');
+    }, SPEED_MS);
   }
+
+  // Press-E behavior — mirrors advanceFeetGodDialogue. Returns:
+  //   'typing' — typewriter snapped to end (this press should NOT close)
+  //   'done'   — popup closed (this press dismisses)
+  //   'idle'   — no tip currently visible
+  advanceTip() {
+    const el = document.getElementById('generic-tip');
+    const bEl = document.getElementById('tip-body');
+    if (!el || !el.classList.contains('active')) return 'idle';
+    if (this._tipTyping) {
+      if (this._tipTimer) clearInterval(this._tipTimer);
+      this._tipTimer = null;
+      this._tipTyping = false;
+      if (bEl) bEl.innerHTML = this._tipFull || '';
+      return 'typing';
+    }
+    el.classList.remove('active');
+    return 'done';
+  }
+
+  // Split an HTML string into an array of "atomic" tokens: each entry is
+  // either a single text character or a complete tag like '<b>' / '<br/>'.
+  // We assume well-formed input (no nested unclosed tags, no entities mid-
+  // tag); the inputs we feed in are author-controlled tip bodies, so that's
+  // safe. Emitting these one-at-a-time keeps the partial output valid HTML.
+  _tokenizeHtml(html) {
+    const out = [];
+    let i = 0;
+    while (i < html.length) {
+      if (html[i] === '<') {
+        const end = html.indexOf('>', i);
+        if (end === -1) { out.push(html.slice(i)); break; }
+        out.push(html.slice(i, end + 1));
+        i = end + 1;
+      } else {
+        out.push(html[i++]);
+      }
+    }
+    return out;
+  }
+
   hideTip() {
     const el = document.getElementById('generic-tip');
     if (el) el.classList.remove('active');
+    if (this._tipTimer) clearInterval(this._tipTimer);
+    this._tipTimer = null;
+    this._tipTyping = false;
   }
   get isTipOpen() {
     return document.getElementById('generic-tip')?.classList.contains('active') ?? false;
   }
+  get isTipTyping() { return !!this._tipTyping; }
 
   // ── Feet God dialogue ─────────────────────────────────────────────────────
   // A divine voice — booming, gold-vignetted, typewriter-driven. Uses the
@@ -13420,6 +13484,12 @@ function _celebrateMission(result) {
 //      queued. We don't need to do anything here for that branch.
 function _isPlayerFree() {
   if (state !== 'playing' && state !== 'interior') return false;
+  // Pointer-locked into the canvas means the player is actually IN the
+  // game world. If they pressed ESC into the start / lock overlay, the
+  // pointer is unlocked — the time-attack popup must NOT show on top of
+  // the start menu (looks broken, and clicking OK would re-enter play
+  // without the player's intent).
+  if (document.pointerLockElement !== canvas) return false;
   // Even within 'playing' / 'interior', any UI overlay that takes E-key
   // focus (Feet God, generic tip, legendary hint) means the player is
   // mid-popup. Wait for those to clear before stealing focus.
@@ -13776,12 +13846,17 @@ function _handleE() {
     return;
   }
 
-  // Generic tip overlay (booster how-to, fight tutorial). Dismiss + run
-  // any chained callback (e.g., the countdown into a fight).
+  // Generic tip overlay (booster how-to, fight tutorial). Dialogue-style
+  // press-E rhythm — first [E] snaps the typewriter to the end; second [E]
+  // closes the tip and fires any chained callback. Mirrors how Feet God
+  // dialogues behave so players don't need to learn a separate input rule
+  // for tip overlays.
   if (ui.isTipOpen) {
-    ui.hideTip();
-    const cb = _afterTipCallback; _afterTipCallback = null;
-    if (cb) cb();
+    const r = ui.advanceTip();
+    if (r === 'done') {
+      const cb = _afterTipCallback; _afterTipCallback = null;
+      if (cb) cb();
+    }
     return;
   }
 
