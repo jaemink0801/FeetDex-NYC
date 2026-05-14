@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T041738';
+  var BAKED = '20260514T041805';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -13551,7 +13551,11 @@ const SHOEBOX_FIXED_POSITIONS = [
   [  18, 0,  62],  [ -65, 0, -32],  [   8, 0, -78],
   [  82, 0, -58],  [ -78, 0,  54],
 ];
-const SHOEBOX_PICK_RADIUS = 3.2;
+// Unified radius — whenever the on-screen "[E] Open shoebox" hint shows,
+// pressing E actually opens the box. The previous split (hint at 5 m,
+// pick at 3.2 m) made the prompt appear to lie: players walked into the
+// hint band, pressed E, and nothing happened.
+const SHOEBOX_PICK_RADIUS = 5.0;
 const SHOEBOX_HINT_RADIUS = 5.0;
 const _shoeboxes = [];        // { mesh, group, basePos, t, glow }
 
