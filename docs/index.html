@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T042307';
+  var BAKED = '20260514T042518';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -16958,6 +16958,7 @@ function _doKarateKick() {
     const alreadyCollected = feetdex.has(target.feetId);
     if (!alreadyCollected) {
       const result = feetdex.collect(target.feetId);
+      target.feetCollected = true;
       if (result.isNew) {
         ui.updateCollection(feetdex.count, feetdex.total);
         ui.updateGold(feetdex.gold, _nextBoosterTarget());
@@ -16966,6 +16967,13 @@ function _doKarateKick() {
           ui.showGoldToast(result.goldAwarded);
         }
         _onCharacterCollected(target.feetId);
+        // Unmissable feedback: feet-rain celebration + big HUD message so
+        // the player sees the claim land. The dialogue/discovery popup is
+        // intentionally skipped (the kick is a shortcut) so this is the
+        // ONLY confirmation the player gets — make it loud.
+        ui.spawnFeetRain?.(20);
+        const feetName = feetdex.getEntry?.(target.feetId)?.name || `${target.name}'s feet`;
+        showHUDMessage(`CLAIMED — ${feetName}!`, 2400);
       }
       // Respawn instantly AFTER the defeat animation completes — first-
       // claim rule: feet collected and they're back on their feet.
