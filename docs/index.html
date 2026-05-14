@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T041243';
+  var BAKED = '20260514T041429';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2878,15 +2878,15 @@ class FeetDex {
       if (!this.findActive || this.findActive.target !== feetId) return null;
       const mission = this.findActive;
       this.completedMissions.add(mission.id);
-      const goldAwarded = (mission.reward === 'mystery')
-        ? (20 + Math.floor(Math.random() * 21))
-        : Number(mission.reward) || 0;
-      this.gold        += goldAwarded;
-      this.totalEarned += goldAwarded;
+      // Find missions DO NOT pay an extra mission reward. The collect()
+      // path that runs alongside this resolution already awarded the
+      // character's rarity-based gold (10 / 20 / 50 / ...), so every
+      // character pays the same amount whether the player found them via
+      // time-attack or by simply walking up to them later.
       this.findActive = null;
       this.findEndAt  = 0;
       this.findCooldownUntil = now + FIND_COOLDOWN_MS;
-      return { mission, goldAwarded };
+      return { mission, goldAwarded: 0 };
     }
 
     const idx = this.activeMissions.findIndex(m => m.type === type && m.target === feetId);
