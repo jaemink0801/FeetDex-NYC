@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T002145';
+  var BAKED = '20260514T002422';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -13034,11 +13034,14 @@ function _updateTutorial() {
   // from "movement learned" to "now interact" without having to read both at
   // once during the loading sequence.
   if (tutorial.isStep('walk-to-esb')) {
-    // Don't advance the step while the FIRST Feet God dialogue (the
-    // movement instruction) is still up — otherwise its text gets
-    // overwritten the moment the player walks close to the door, and
-    // the door instruction lands on top of the unread movement intro.
+    // Don't advance the step while ANY intro popup is still showing —
+    // the OBJECTIVE tip, the Welcome Feet God dialogue, OR a queued
+    // tip/dialogue waiting on [E]. The player needs to read the
+    // movement intro first; otherwise the door instruction text
+    // overwrites whatever they haven't dismissed yet.
+    if (ui.isTipOpen)             return;
     if (ui.isFeetGodDialogueOpen) return;
+    if (_afterTipCallback)        return;   // chain in flight
     const dx = player.position.x - ESB_DOOR.x;
     const dz = player.position.z - ESB_DOOR.z;
     if (dx * dx + dz * dz < 5 * 5) {
