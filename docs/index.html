@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T035417';
+  var BAKED = '20260514T035723';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -12924,6 +12924,14 @@ document.getElementById('lock-overlay').addEventListener('click', () => {
 let _firstStartShown = false;
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;
+  // While the time-attack modal is up, refuse any lock that gets acquired —
+  // exiting a UI like Morton's calls requestLock() asynchronously, and by
+  // the time the lock actually engages the popup is already on screen,
+  // re-capturing the mouse and stealing the player's ability to click OK.
+  if (locked && state === 'time-attack-popup') {
+    document.exitPointerLock();
+    return;
+  }
   if (locked) {
     ui.hideLockOverlay();
     // First time the player actually enters the game — pop the objective
@@ -13321,30 +13329,15 @@ function _showTimeAttackPopup(mission) {
     });
   };
 
-  // Wait for pointer-lock release BEFORE showing the modal so the cursor is
-  // already free when the popup paints. The previous "exit + immediately
-  // show" path could leave the player mouse-locked until the next mousemove
-  // tick — looked broken even though the popup was visible.
-  if (document.pointerLockElement) {
-    const onChange = () => {
-      if (!document.pointerLockElement) {
-        document.removeEventListener('pointerlockchange', onChange);
-        reveal();
-      }
-    };
-    document.addEventListener('pointerlockchange', onChange);
-    document.exitPointerLock();
-    // Safety: if pointerlockchange doesn't fire (some embed contexts) show
-    // the popup after a short delay anyway.
-    setTimeout(() => {
-      document.removeEventListener('pointerlockchange', onChange);
-      if (!document.getElementById('time-attack-popup')?.classList.contains('show')) {
-        reveal();
-      }
-    }, 250);
-  } else {
-    reveal();
-  }
+  // Always call exitPointerLock — even if pointerLockElement reads null
+  // right now, a pending requestLock() from a freshly-closed shop / fleet
+  // overlay might engage on the very next event-loop tick. The
+  // pointerlockchange handler above also refuses to keep any lock that
+  // engages while state='time-attack-popup', so this is belt-and-braces.
+  try { document.exitPointerLock(); } catch (_) {}
+  // Short delay so the cursor is visible before the modal paints (some
+  // browsers don't repaint the cursor until the next animation frame).
+  setTimeout(reveal, 60);
 }
 
 function _renderTimeAttackRow() {
@@ -13652,6 +13645,19 @@ function _handleE() {
       // grab one over picking an NPC behind it.
       const sb = _nearestShoebox(player.position);
       if (sb) { _openShoebox(sb); return; }
+
+      // Subway by PROXIMITY (not cursor-aim) — the on-screen hint
+      // "[E] Ride subway" is proximity-based, so the action should match.
+      // Before, pressing E only rode if the cursor was specifically aimed
+      // at the station dot, which contradicted the hint and confused
+      // players standing right next to a stairwell.
+      const proxStation = _nearestSubway();
+      if (proxStation && feetdex.hasBooster('metrocard')) {
+        Audio.interact();
+        _subwayMarkersBlink = true;
+        _openMap();
+        return;
+      }
       // Cursor-aim interaction. Two pickers:
       //
       //   _measure(x,y,z)   — point test, used for doors and subway stations
