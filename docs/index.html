@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T040715';
+  var BAKED = '20260514T041243';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1214,8 +1214,10 @@
       color:#ffe6c8; font-family:"Press Start 2P","Courier New",monospace;
       animation:tap-pop .45s cubic-bezier(.2,1.5,.4,1); }
     .sb-title { font-size:20px; color:#ffd060; letter-spacing:4px;
-      text-shadow:0 0 14px rgba(255,200,80,.7); margin-bottom:18px; }
-    .sb-stage { position:relative; height:170px; margin-bottom:14px; }
+      text-shadow:0 0 14px rgba(255,200,80,.7); margin-bottom:24px; }
+    /* Stage is tall enough to host the icon (64) + name (18) + 2-line desc
+       (~38) + their margins (~24) without ever overlapping the title. */
+    .sb-stage { position:relative; height:210px; margin-bottom:10px; }
     .sb-box, .sb-reveal { position:absolute; left:50%; top:50%;
       transform:translate(-50%, -50%); }
     .sb-box { width:120px; height:120px; background:#ff8a3d;
@@ -1243,11 +1245,15 @@
       60%  { opacity:1; transform:translate(-50%, -50%) scale(1.15) rotateY(0); }
       100% { opacity:1; transform:translate(-50%, -50%) scale(1) rotateY(0); }
     }
-    .sb-icon { font-size:64px; line-height:1; }
-    .sb-name { font-size:18px; color:#ffd060; letter-spacing:3px;
+    .sb-icon { font-size:56px; line-height:1; }
+    .sb-name { font-size:17px; color:#ffd060; letter-spacing:2.5px;
       margin-top:8px; text-shadow:0 0 10px rgba(255,200,80,.6); }
-    .sb-desc { font-size:12px; color:#ffe6c8; line-height:1.45;
-      margin-top:10px; max-width:340px; }
+    .sb-desc { font-size:11px; color:#ffe6c8; line-height:1.4;
+      margin-top:8px; max-width:340px; }
+    .sb-reveal { width:90%; }
+    .sb-count { font-size:12px; color:#ffd060; letter-spacing:2px;
+      margin-bottom:10px; opacity:0; transition:opacity .3s; }
+    .sb-card.sb-revealed .sb-count { opacity:1; transition-delay:.65s; }
     .sb-foot { font-size:13px; color:#ffb060; margin-bottom:14px;
       letter-spacing:1px; opacity:0; transition:opacity .3s; }
     .sb-card.sb-revealed .sb-foot { opacity:1; transition-delay:.7s; }
@@ -1425,6 +1431,7 @@
           <div class="sb-desc" id="sb-desc"></div>
         </div>
       </div>
+      <div class="sb-count" id="sb-count">1 / 4 hidden tools found</div>
       <div class="sb-foot" id="sb-foot">Take it to Morton's to repair!</div>
       <button id="sb-ok" class="sb-ok">CLICK ANYWHERE</button>
     </div>
@@ -1460,7 +1467,7 @@
       <div class="tap-title">⏱ TIME ATTACK!</div>
       <div class="tap-sub">A hidden character has appeared.</div>
       <div class="tap-body" id="tap-body">Find the character before time runs out to discover hidden characters!</div>
-      <button id="tap-ok" class="tap-ok">START — 40 SECONDS</button>
+      <button id="tap-ok" class="tap-ok">START — 60 SECONDS</button>
     </div>
   </div>
 
@@ -2557,10 +2564,10 @@ const MISSIONS_ACTIVE_MAX = 3;
 // despawns, and that character is locked out for the remainder of the run
 // (until a future "time machine" tool restores it). After completion OR
 // expiry, the next find mission queues 90s later.
-const TIME_ATTACK_MS  = 40_000;
-// Time-machine retries get a longer (60 s) search window — the player is
-// re-attempting a mission they already failed, and the warp animation costs
-// them a few seconds of attention before the timer starts.
+// 60-second standard search window. Time-machine retries currently use the
+// same duration (was bumped above the old 40s default to match the player's
+// pacing — most missions are several blocks away).
+const TIME_ATTACK_MS  = 60_000;
 const TIME_ATTACK_RETRY_MS = 60_000;
 const FIND_COOLDOWN_MS = 90_000;
 
@@ -7067,18 +7074,20 @@ class UI {
   // Shoebox reveal — `def` is { id, name, icon, desc }. Shows the ? box
   // shaking, then bursts open into the tool reveal. isFirstOpen makes the
   // footer line spell out the take-it-to-Morton's tutorial cue.
-  showShoeboxReveal(def, isFirstOpen, onOk) {
+  showShoeboxReveal(def, isFirstOpen, foundCount, totalCount, onOk) {
     const el     = document.getElementById('shoebox-popup');
     const card   = el?.querySelector('.sb-card');
     const iconEl = document.getElementById('sb-icon');
     const nameEl = document.getElementById('sb-name');
     const descEl = document.getElementById('sb-desc');
+    const cntEl  = document.getElementById('sb-count');
     const footEl = document.getElementById('sb-foot');
     const btn    = document.getElementById('sb-ok');
     if (!el || !card || !btn) { onOk?.(); return; }
     if (iconEl) iconEl.textContent = def.icon || '🎁';
     if (nameEl) nameEl.textContent = def.name || 'Mystery Tool';
     if (descEl) descEl.textContent = def.desc || '';
+    if (cntEl)  cntEl.textContent  = `${foundCount} / ${totalCount} hidden tools found`;
     if (footEl) footEl.textContent = isFirstOpen
       ? "Take it to MORTON'S SHOP to repair it before you can use it!"
       : "Take it to Morton's to repair.";
@@ -13502,12 +13511,16 @@ function _renderTimeAttackRow() {
 // to avoid placing them at the WTC, far Brooklyn Bridge, etc.). Walk near
 // one, press [E], and it grants a random unowned shoebox tool which has to
 // be repaired at Morton's before use.
+// Spread across the main blocks of the city — wider than before but still
+// clustered around the central streets so the player can find them all
+// without trekking to the outskirts (WTC / fences / parks edges).
 const SHOEBOX_FIXED_POSITIONS = [
-  [  25, 0,  -8],  [ -25, 0,  22],  [  55, 0,   8],
-  [  15, 0,  38],  [ -42, 0, -18],  [   6, 0, -52],
-  [  62, 0, -55],  [ -52, 0,  38],
+  [  35, 0,  -8],  [ -42, 0,  26],  [  78, 0,  16],
+  [  18, 0,  62],  [ -65, 0, -32],  [   8, 0, -78],
+  [  82, 0, -58],  [ -78, 0,  54],
 ];
-const SHOEBOX_PICK_RADIUS = 2.6;
+const SHOEBOX_PICK_RADIUS = 3.2;
+const SHOEBOX_HINT_RADIUS = 5.0;
 const _shoeboxes = [];        // { mesh, group, basePos, t, glow }
 
 function _spawnShoeboxes() {
@@ -13526,41 +13539,40 @@ function _spawnShoeboxes() {
 
 function _makeShoebox(x, y, z) {
   const group = new THREE.Group();
-  group.position.set(x, y + 1.0, z);
-  // Body — small orange box with a brown stripe (sneaker-shoebox vibe)
+  group.position.set(x, y + 1.2, z);
+  // Body — bigger orange box so the player can spot it across a street.
   const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.95, 0.45, 0.60),
+    new THREE.BoxGeometry(1.6, 0.78, 1.0),
     new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0x4a1a00, emissiveIntensity: 0.6, roughness: 0.55 }),
   );
-  body.castShadow = false;
   group.add(body);
   const lid = new THREE.Mesh(
-    new THREE.BoxGeometry(1.02, 0.10, 0.66),
+    new THREE.BoxGeometry(1.72, 0.18, 1.10),
     new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0x7a3500, emissiveIntensity: 0.5, roughness: 0.5 }),
   );
-  lid.position.y = 0.26;
+  lid.position.y = 0.46;
   group.add(lid);
-  // Big white "?" mark
+  // Big white "?" mark — scaled up to match the new body size.
   const qMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const q1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.20, 0.02), qMat);
-  q1.position.set(0, 0.08, 0.305);
-  const q2 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.02), qMat);
-  q2.position.set(0, 0.16, 0.305);
-  const q3 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.02), qMat);
-  q3.position.set(0, -0.10, 0.305);
+  const q1 = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.36, 0.04), qMat);
+  q1.position.set(0, 0.14, 0.515);
+  const q2 = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.10, 0.04), qMat);
+  q2.position.set(0, 0.28, 0.515);
+  const q3 = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.08, 0.04), qMat);
+  q3.position.set(0, -0.18, 0.515);
   group.add(q1, q2, q3);
   // Halo glow — additive sphere that pulses
   const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(0.95, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.18, depthWrite: false }),
+    new THREE.SphereGeometry(1.5, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.22, depthWrite: false }),
   );
   group.add(glow);
   // Point light so the box actually lights nearby ground/buildings
-  const light = new THREE.PointLight(0xffc070, 1.4, 6.0, 2.0);
-  light.position.set(0, 0.2, 0);
+  const light = new THREE.PointLight(0xffc070, 2.2, 9.0, 2.0);
+  light.position.set(0, 0.3, 0);
   group.add(light);
   scene.add(group);
-  return { group, glow, light, basePos: new THREE.Vector3(x, y + 1.0, z), t: Math.random() * Math.PI * 2 };
+  return { group, glow, light, basePos: new THREE.Vector3(x, y + 1.2, z), t: Math.random() * Math.PI * 2 };
 }
 
 function _updateShoeboxes(elapsed, dt) {
@@ -13585,6 +13597,15 @@ function _nearestShoebox(playerPos) {
     if (d < bestD) { bestD = d; best = sb; }
   }
   return best;
+}
+
+// Wider radius used by the [E] hint so the prompt shows before the player
+// is actually close enough to grab — gives them a heads-up to step in.
+function _nearestShoeboxInRange(radius) {
+  for (const sb of _shoeboxes) {
+    if (player.position.distanceTo(sb.group.position) < radius) return sb;
+  }
+  return null;
 }
 
 const SHOEBOX_DUP_GOLD = 30;
@@ -13621,7 +13642,9 @@ function _showShoeboxReveal(def) {
   _stateBeforeTimeAttackPopup = state;
   state = 'time-attack-popup';        // reuse the same input-gate state
   if (document.pointerLockElement === canvas) document.exitPointerLock();
-  ui.showShoeboxReveal(def, feetdex.shoeboxesOpened === 1, () => {
+  const found = feetdex.unrepairedTools.size + SHOEBOX_DEFS.filter(d => feetdex.hasBooster(d.id)).length;
+  const total = SHOEBOX_DEFS.length;
+  ui.showShoeboxReveal(def, feetdex.shoeboxesOpened === 1, found, total, () => {
     state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
     _stateBeforeTimeAttackPopup = null;
     requestLock();
@@ -16593,6 +16616,12 @@ function _updateHint() {
     ui.setInteractHint(`[E] Talk to ${npc.name}`);
     return;
   }
+  // Shoebox proximity hint — the [E] open path takes priority over door /
+  // subway so a shoebox sitting next to a stairwell still reads correctly.
+  if (_nearestShoeboxInRange(SHOEBOX_HINT_RADIUS)) {
+    ui.setInteractHint('[E] Open shoebox');
+    return;
+  }
   const door = world.checkDoorProximity(player.position);
   if (door) {
     // Entry hint: always show when proximity passes — entry is forgiving
@@ -16734,7 +16763,7 @@ function _adaptDpr(dt) {
 //     30 s — flavour.
 //   • Bosses (mythic/legendary/secret) and shopkeepers: kick is refused;
 //     bosses require the sword combat flow, shopkeepers are off-limits.
-const KICK_RANGE          = 3.0;
+const KICK_RANGE          = 4.5;
 const KICK_RESPAWN_MS     = 30_000;
 const KICK_ANIM_MS        = 600;       // duration of the fall-back animation
 const _kickedRespawns     = [];        // { npc, at }
@@ -16763,7 +16792,13 @@ function _doKarateKick() {
   if (!feetdex.hasBooster('karate_kick')) return;
   if (state !== 'playing' && state !== 'interior') return;
   const target = _nearestKickTarget();
-  if (!target) return;
+  if (!target) {
+    // Visible feedback: confirm the left-click IS bound to the kick, the
+    // player just doesn't have a target within range. Without this the
+    // input looks like it does nothing and players think the bind is wrong.
+    showHUDMessage('No one in range to kick!', 1000);
+    return;
+  }
 
   // Mark this NPC as "in defeat animation" so further kicks / interactions
   // can't touch them until the animation completes.
