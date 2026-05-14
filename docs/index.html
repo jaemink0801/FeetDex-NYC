@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T042518';
+  var BAKED = '20260514T043200';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1230,6 +1230,14 @@
     .tsk-btn-yes { background:linear-gradient(180deg,#5fa86a,#2f6638);
       border-color:#a6e0ad; }
     .tsk-btn-no  { background:linear-gradient(180deg,#a07050,#5a3520); }
+    .tsk-btn-insane { background:linear-gradient(180deg,#a83030,#581515);
+      border-color:#ffa0a0;
+      animation:ms-card-pulse 1.6s ease-in-out infinite; }
+
+    #difficulty-picker { position:fixed; inset:0; display:none;
+      background:rgba(0,0,0,.72); z-index:240;
+      align-items:center; justify-content:center; }
+    #difficulty-picker.show { display:flex; }
 
     /* ── Shoebox reveal popup ─────────────────────────────────────────── */
     #shoebox-popup { position:fixed; inset:0; display:none; cursor:pointer;
@@ -1435,6 +1443,23 @@
     <div id="mission-rows"></div>
   </div>
 
+  <!-- Difficulty picker — shown BEFORE the tutorial-skip prompt on cold
+       load. Sets a multiplier applied to every boss's HP / damage. -->
+  <div id="difficulty-picker">
+    <div class="tsk-card">
+      <div class="tsk-title">CHOOSE DIFFICULTY</div>
+      <div class="tsk-sub">
+        Affects boss HP &amp; damage.<br/>
+        You can replay with a different setting any time.
+      </div>
+      <div class="tsk-buttons">
+        <button id="diff-easy"   class="tsk-btn tsk-btn-yes">EASY</button>
+        <button id="diff-hard"   class="tsk-btn tsk-btn-no">HARD &nbsp;(+20%)</button>
+        <button id="diff-insane" class="tsk-btn tsk-btn-insane">INSANE&nbsp;(+40%)</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Tutorial skip prompt — first thing the player sees on cold load. -->
   <div id="tutorial-skip">
     <div class="tsk-card">
@@ -1465,7 +1490,7 @@
       </div>
       <div class="sb-count" id="sb-count">1 / 4 hidden tools found</div>
       <div class="sb-foot" id="sb-foot">Take it to Morton's to repair!</div>
-      <button id="sb-ok" class="sb-ok">CLICK ANYWHERE</button>
+      <button id="sb-ok" class="sb-ok">PRESS [E] TO CONTINUE</button>
     </div>
   </div>
 
@@ -3669,12 +3694,13 @@ class Player {
     this._saber.add(blade);
     this._saberBladeMat = bladeMat;
 
-    // Halo — slightly fatter additive-looking cylinder for the glow.
+    // Halo — matches the blade/hilt radius (0.020) so the blade reads as
+    // a slim glowing rod rather than a thick beam. Was 0.030.
     const haloMat = new THREE.MeshBasicMaterial({
       color: 0x88eeff, transparent: true, opacity: 0.22,
     });
     const halo = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.030, 0.030, 1.0, 18),
+      new THREE.CylinderGeometry(0.022, 0.022, 1.0, 18),
       haloMat,
     );
     halo.position.y = 0.630;
@@ -3682,12 +3708,13 @@ class Player {
     this._saberHaloMat = haloMat;
 
     // Wide motion-trail — invisible at rest, briefly blooms during a
-    // swing so the chop reads at a glance.
+    // swing so the chop reads at a glance. Trimmed (0.085 → 0.028) so it
+    // doesn't make the slim blade look fat between swings.
     const trailMat = new THREE.MeshBasicMaterial({
       color: 0xbbf2ff, transparent: true, opacity: 0,
     });
     const trail = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.085, 0.085, 1.04, 16),
+      new THREE.CylinderGeometry(0.028, 0.028, 1.04, 16),
       trailMat,
     );
     trail.position.y = 0.620;
@@ -3879,7 +3906,10 @@ class Player {
     // TIP outward (see _setSaberLength: base position is fixed at the
     // hilt's forward edge while the far end advances).
     if (!this._saberSheathed && this._saberIgniteT < 1) {
-      this._saberIgniteT = Math.min(1, this._saberIgniteT + dt / 2.7);
+      // 2.2 s ignite — finishes BEFORE the 2.75 s countdown wraps so the
+      // blade is fully extended and bright by the time "FIGHT!" appears,
+      // and stays at full extension for the rest of combat.
+      this._saberIgniteT = Math.min(1, this._saberIgniteT + dt / 2.2);
       this._setSaberLength(this._saberIgniteT);
       // Brief ignition flash that builds with the blade's growth
       if (this._saberBladeMat) {
@@ -5939,7 +5969,14 @@ class CombatEncounter {
     const bodyMult   = (npc.rarity === 'legendary' && npc.group?.scale?.x)
                        ? npc.group.scale.x : 1;
     this._sizeMult   = bodyMult;
-    this._npcHP      = Math.round((_NPC_HP[npc.rarity] ?? PLAYER_MAX) * bodyMult);
+    // Difficulty multiplier — picked at game start. easy=1.0, hard=1.2,
+    // insane=1.4. Affects only boss tiers (epic/mythic/legendary/secret).
+    // Commons / rares keep their numbers so the early game is unchanged.
+    const diffMult = (this._isElite || npc.rarity === 'epic')
+                     ? (window.BOSS_STAT_MULT ?? 1.0)
+                     : 1.0;
+    this._diffMult = diffMult;
+    this._npcHP      = Math.round((_NPC_HP[npc.rarity] ?? PLAYER_MAX) * bodyMult * diffMult);
     this._npcMaxHP   = this._npcHP;
 
     // Per-rarity attack-speed multiplier. Bosses (epic/mythic/legendary)
@@ -6107,7 +6144,7 @@ class CombatEncounter {
           this._swingStart = 0;
 
           if (dist <= NPC_HIT_RANGE * 1.15) {     // slightly longer kick reach
-            let dmg = (_NPC_DMG[npc.rarity] ?? 25) * (this._sizeMult || 1);
+            let dmg = (_NPC_DMG[npc.rarity] ?? 25) * (this._sizeMult || 1) * (this._diffMult || 1);
             if (this._hasArmor) dmg = Math.round(dmg * 0.70);
             this._playerHP = Math.max(0, this._playerHP - dmg);
             // Holy-gold tint + giant foot flash on the player's screen.
@@ -6143,7 +6180,7 @@ class CombatEncounter {
             // Armor reduces incoming damage by 30%; legendary damage
             // also scales with body size (Bigfoot hits harder than
             // Margot because he's actually bigger).
-            let dmg = (_NPC_DMG[npc.rarity] ?? 25) * (this._sizeMult || 1);
+            let dmg = (_NPC_DMG[npc.rarity] ?? 25) * (this._sizeMult || 1) * (this._diffMult || 1);
             if (this._hasArmor) dmg = Math.round(dmg * 0.70);
             this._playerHP = Math.max(0, this._playerHP - dmg);
             this._flashScreen('rgba(220,0,0,0.32)');
@@ -7090,6 +7127,32 @@ class UI {
     return !!(el && el.classList.contains('show'));
   }
 
+  hideTimeAttackPopup() {
+    const el = document.getElementById('time-attack-popup');
+    if (el) el.classList.remove('show');
+  }
+
+  // Difficulty picker — shown ONCE at game start before the tutorial-skip
+  // prompt. onPick is called with 'easy' | 'hard' | 'insane'.
+  showDifficultyPicker(onPick) {
+    const el = document.getElementById('difficulty-picker');
+    if (!el) { onPick?.('easy'); return; }
+    const close = (pick) => {
+      el.classList.remove('show');
+      onPick?.(pick);
+    };
+    const wire = (id, pick) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      const h = () => { btn.removeEventListener('click', h); close(pick); };
+      btn.addEventListener('click', h);
+    };
+    wire('diff-easy',   'easy');
+    wire('diff-hard',   'hard');
+    wire('diff-insane', 'insane');
+    el.classList.add('show');
+  }
+
   // Tutorial skip prompt — shown once at game start. Two buttons.
   showTutorialSkipPrompt(onPlay, onSkip) {
     const el  = document.getElementById('tutorial-skip');
@@ -7134,22 +7197,23 @@ class UI {
     el.classList.add('show');
     // Shake for ~900ms, then flip reveal.
     setTimeout(() => card.classList.add('sb-revealed'), 950);
-    // Wire up dismiss: any click on the backdrop OR the button.
+    // Dismiss with the [E] key (matches the rest of the game's E-to-
+    // continue rhythm). Button click still works too, but no longer
+    // dismisses on backdrop-click since the player explicitly asked
+    // for keyboard parity with dialogues.
     const handler = () => {
       btn.removeEventListener('click', handler);
-      el.removeEventListener('click', handler);
       document.removeEventListener('keydown', keyHandler, true);
       el.classList.remove('show');
       card.classList.remove('sb-revealed');
       onOk?.();
     };
     const keyHandler = (e) => {
-      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+      if (e.key === 'e' || e.key === 'E' || e.key === 'Enter') {
         e.preventDefault(); handler();
       }
     };
     btn.addEventListener('click', handler);
-    el.addEventListener('click', handler);
     document.addEventListener('keydown', keyHandler, true);
     setTimeout(() => btn.focus(), 0);
   }
@@ -13128,17 +13192,52 @@ document.addEventListener('pointerlockchange', () => {
     document.exitPointerLock();
     return;
   }
+  // Pointer lock just EXITED while the popup was up — the player pressed
+  // ESC to the start menu. Tear the popup down (keep findPending intact so
+  // it re-opens when the player clicks back in), restore the play state
+  // so the lock overlay can show.
+  if (!locked && state === 'time-attack-popup') {
+    ui.hideTimeAttackPopup?.();
+    _timeAttackPopupShown = false;
+    state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
+    _stateBeforeTimeAttackPopup = null;
+    // Re-render the row so the timer/cooldown still reflects the truth.
+    _renderTimeAttackRow?.();
+    // Fall through to the normal "lock just exited" branch below to bring
+    // up the lock overlay.
+  }
   if (locked) {
     ui.hideLockOverlay();
     // First time the player actually enters the game — pop the objective
     // tip, then chain into the tutorial's follow-the-arrow hint.
     if (!_firstStartShown) {
       _firstStartShown = true;
-      // Release the lock first so the player can click the skip-prompt
-      // buttons with a real cursor.
+      // Release the lock first so the player can click the difficulty +
+      // skip-prompt buttons with a real cursor.
       document.exitPointerLock();
       setTimeout(() => {
-        ui.showTutorialSkipPrompt(
+        ui.showDifficultyPicker((pick) => {
+          window.DIFFICULTY = pick;
+          window.BOSS_STAT_MULT =
+            pick === 'insane' ? 1.4 :
+            pick === 'hard'   ? 1.2 : 1.0;
+          _showSkipPromptAfterDifficulty();
+        });
+      }, 250);
+    }
+  } else if (!_mapOpen
+             && state !== 'shop' && state !== 'fleet'
+             && state !== 'minigame' && state !== 'feetdex'
+             && state !== 'time-attack-popup'
+             && !document.getElementById('tutorial-skip')?.classList.contains('show')
+             && !document.getElementById('difficulty-picker')?.classList.contains('show')) {
+    ui.showLockOverlay();
+  }
+});
+
+function _showSkipPromptAfterDifficulty() {
+  setTimeout(() => {
+    ui.showTutorialSkipPrompt(
           // PLAY TUTORIAL — the original objective + Feet God intro chain.
           () => {
             requestLock();
@@ -13181,24 +13280,7 @@ document.addEventListener('pointerlockchange', () => {
           },
         );
       }, 250);
-    }
-  } else if (!_mapOpen
-             && state !== 'shop' && state !== 'fleet'
-             && state !== 'minigame' && state !== 'feetdex'
-             && state !== 'time-attack-popup'
-             && !document.getElementById('tutorial-skip')?.classList.contains('show')) {
-    // Show the start/lock overlay any time pointer-lock exits and we're
-    // not already inside a non-pointer-locked UI screen (shop, fleet,
-    // minigame, feetdex, time-attack-popup). The body.lock-overlay-up
-    // class on showLockOverlay hides every game-side widget (dialogue
-    // panel, Feet God overlay, tutorial hand, missions, HUD, etc.) so
-    // the player sees ONLY the start screen, not the tutorial state
-    // behind it. Pre-fix this branch was gated to 'playing' / 'interior'
-    // only, so ESC during a dialogue or tutorial popup left those
-    // overlays floating in front of the canvas.
-    ui.showLockOverlay();
-  }
-});
+}
 
 // ── Tutorial ──────────────────────────────────────────────────────────────────
 // Per-session 6-step linear FSM. Drives the side checklist, the guiding
