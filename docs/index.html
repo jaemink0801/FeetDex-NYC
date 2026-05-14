@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T035244';
+  var BAKED = '20260514T035417';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2696,16 +2696,16 @@ class FeetDex {
 
   // ── Missions ───────────────────────────────────────────────────────────────
 
-  // Populate the talk-mission slate and queue the first find mission as
-  // PENDING (so main.js can pop the modal as soon as the player is free).
+  // Populate the talk-mission slate. The first time-attack mission is NOT
+  // queued here — main.js sets a 60 s cooldown when missions are revealed
+  // (i.e. after the tutorial), so the player gets a quiet ramp before the
+  // first popup interrupts their free-play exploration.
   initMissions() {
     this.activeMissions = [];
     for (let i = 0; i < MISSIONS_ACTIVE_MAX; i++) {
       const m = this._drawNextTalkMission();
       if (m) this.activeMissions.push(m);
     }
-    // Queue the first time-attack mission immediately — no initial cooldown.
-    this._tryDrawFindPending();
   }
 
   // Pick the next TALK mission for the slate (visit_fleetfeet bootstrap
@@ -13193,8 +13193,17 @@ function _initMissions() {
   if (_missionsRevealed) ui.renderMissions(feetdex.activeMissions);
 }
 
+// One-minute warm-up between tutorial and the first time-attack popup, so
+// the player can explore freely before the first interrupt. The cooldown is
+// only applied if no find mission has already been resolved — restoring from
+// a reset / fresh game start.
+const FIRST_FIND_DELAY_MS = 60_000;
 function _revealMissions() {
   _missionsRevealed = true;
+  if (!feetdex.findActive && !feetdex.findPending
+      && feetdex.completedMissions.size === 0) {
+    feetdex.findCooldownUntil = performance.now() + FIRST_FIND_DELAY_MS;
+  }
   ui.renderMissions(feetdex.activeMissions);
 }
 
@@ -13537,7 +13546,12 @@ ui.onResetProgress = () => {
   ui.updateGold(feetdex.gold, _nextBoosterTarget());
   _applyEquippedCosmetic();
   feetdex.initMissions();
-  if (_missionsRevealed) ui.renderMissions(feetdex.activeMissions);
+  // Reset path mirrors the post-tutorial flow — give a 60 s warm-up before
+  // the first time-attack mission queues again.
+  if (_missionsRevealed) {
+    feetdex.findCooldownUntil = performance.now() + FIRST_FIND_DELAY_MS;
+    ui.renderMissions(feetdex.activeMissions);
+  }
   ui.closePause();
   state = 'playing';
   requestLock();
