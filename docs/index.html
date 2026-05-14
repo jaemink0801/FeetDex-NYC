@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T042235';
+  var BAKED = '20260514T042307';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -7057,7 +7057,9 @@ class UI {
     const btn  = document.getElementById('tap-ok');
     if (!el || !btn) { onOk?.(); return; }
     if (body) body.innerHTML =
-      `Find the hidden character before time runs out!`;
+      `A <b>hidden character</b> can <b>only be discovered NOW</b>, during this mission.<br/><br/>` +
+      `If the timer runs out, they <b>vanish from the city</b> and stay gone — ` +
+      `until something brings them back.`;
     el.classList.add('show');
     // Autofocus so Enter / Space dismiss without any mouse movement — and
     // also so screen readers announce the button. The pointer is already
