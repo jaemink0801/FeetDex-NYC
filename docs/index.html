@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T042055';
+  var BAKED = '20260514T042235';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2556,8 +2556,10 @@ const COSMETIC_PRICES = {
 // Shoe color the player wears when they equip a given cosmetic. Mirrors the
 // NPC's own shoe color so "wearing Messi's feet" actually looks like Messi.
 const COSMETIC_SHOE_COLORS = {
-  common_samurai:    0x7a5533,
-  common_bill:       0x999999,
+  // Swapped to match the APPEARANCE_CONFIGS swap in npc.js — wearing the
+  // "Lost Samurai's Feet" cosmetic now puts Bill's gray shoe on the player.
+  common_samurai:    0x999999,
+  common_bill:       0x7a5533,
   common_gymrat:     0x39ff14,
   common_50shades:   0x555555,
   common_happyfeet:  0xf5a623,
@@ -4304,8 +4306,11 @@ const LEGENDARY_PRESETS = [
 // Optional `extras` array adds geometry on top (bowties, hats, accents) so the
 // 18 collectible characters never visually blend with the unified grey crowd.
 const APPEARANCE_CONFIGS = {
-  common_samurai:   { shirt: 0x1a1a3e, pants: 0x1a1a40, shoes: 0x7a5533, skin: 0xffcc99 },
-  common_bill:      { shirt: 0xb5785a, pants: 0xc4a97d, shoes: 0x999999, skin: 0xffe0cc },
+  // Visuals swapped: common_samurai now wears Bill Beister's gingery palette,
+  // common_bill now wears the samurai's deep-indigo robe. Names and costs
+  // (FEET_NAMES, COSMETIC_PRICES) are unchanged.
+  common_samurai:   { shirt: 0xb5785a, pants: 0xc4a97d, shoes: 0x999999, skin: 0xffe0cc },
+  common_bill:      { shirt: 0x1a1a3e, pants: 0x1a1a40, shoes: 0x7a5533, skin: 0xffcc99 },
   common_gymrat:    { shirt: 0x666666, pants: 0x222222, shoes: 0x39ff14, skin: 0xcc9966 },
   // Grey — corporate-thriller bit. Pure black tuxedo, silver tie, pale skin.
   // Distinct from grey NPCs by deep black contrast + reflective silver accent.
