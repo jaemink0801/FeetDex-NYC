@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T045228';
+  var BAKED = '20260514T045628';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -2896,9 +2896,13 @@ class FeetDex {
   //   { kind: 'expired', mission }              find mission ran out of time
   //   { kind: 'queued',  mission }              new find drawn as pending
   tickMissions(now = performance.now(), playerFree = true, dtMs = 0) {
-    if (this.findActive && !playerFree) {
-      // Pause: roll the deadline forward so the displayed timeLeft is stable.
-      this.findEndAt += dtMs;
+    // When the player is at the start menu / mid-dialogue / mid-combat /
+    // anywhere not free, BOTH the active-mission timer AND the inter-
+    // mission cooldown freeze. We slide their deadlines forward by dt so
+    // their displayed time stays stable and no popup queues while paused.
+    if (!playerFree && dtMs > 0) {
+      if (this.findActive && this.findEndAt > 0) this.findEndAt += dtMs;
+      if (this.findCooldownUntil > now) this.findCooldownUntil += dtMs;
     }
     if (this.findActive && now >= this.findEndAt) {
       const m = this.findActive;
@@ -15756,12 +15760,12 @@ function _radarBlinkOn() {
   return (Math.floor(performance.now() / 200) % 2) === 0;
 }
 
-// Radar dot colour by rarity — common/rare/epic only. Mythics & legendaries
-// belong to the compass; secret belongs to the Ancient Tracker.
+// Radar dot colour by rarity — commons + rares only. Epics, mythics, and
+// legendaries are all "bosses" now and belong to the compass; secret
+// belongs to the Ancient Tracker.
 const RADAR_DOT_COLORS = {
   common: '#6699cc',
   rare:   '#55cc66',
-  epic:   '#aa55cc',
 };
 function _isRadarVisibleNpc(npc) {
   if (!npc.feetId) return false;
@@ -16571,7 +16575,9 @@ function _findNearestBoss(from) {
   const npcs = window.ALL_NPCS || [];
   let best = null, bestDist = Infinity;
   for (const npc of npcs) {
-    if (npc.rarity !== 'mythic' && npc.rarity !== 'legendary') continue;
+    // Bosses = epic / mythic / legendary. Secret (Ancient One) has its
+    // own tracker. Commons & rares are the radar's job now.
+    if (npc.rarity !== 'epic' && npc.rarity !== 'mythic' && npc.rarity !== 'legendary') continue;
     if (npc.feetCollected) continue;
     // For legendaries, track the same NPC across the 3-encounter arc — only
     // hide once the feet are fully collected (feetCollected handles that).
@@ -16587,48 +16593,76 @@ function _findNearestBoss(from) {
 // of the player, pointing at the nearest mythic/legendary. The dim
 // shaft was dropped so the glow IS the pointer; the cone tip itself is
 // emissive, and a soft halo wraps it for the "magic-orb" look.
+// Arrow built so the GLOWING TIP is at the group's local -Z. `lookAt(boss)`
+// orients the group so -Z faces the boss, so the tip lights up the boss
+// direction. A clearly visible darker shaft trails behind, plus optional
+// fletching at the +Z end, so the player reads "this is an arrow pointing
+// over there", not "a glowing orb".
 const _compassArrow = (() => {
   const g = new THREE.Group();
-  // Bright glowing arrow tip (points at -Z = where lookAt sends "forward")
-  const tip = new THREE.Mesh(
-    new THREE.ConeGeometry(0.18, 0.45, 16),
+
+  // ── Shaft ────────────────────────────────────────────────────────────
+  // Brown/gold metallic shaft, length 0.80, oriented along Z. Centered
+  // at z=0 so its forward end meets the cone base at z=-0.40.
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, 0.80, 14),
     new THREE.MeshStandardMaterial({
-      color: 0xfff8d0, emissive: 0xffc24d, emissiveIntensity: 2.4,
+      color: 0x9b6a2c, metalness: 0.6, roughness: 0.4,
+      emissive: 0x4a2a08, emissiveIntensity: 0.5,
     }),
   );
+  shaft.rotation.x = Math.PI / 2;     // cylinder default Y → align with Z
+  shaft.position.z = 0;
+  g.add(shaft);
+
+  // ── Glowing tip (cone) — lives at -Z, points toward the boss ─────────
+  const tip = new THREE.Mesh(
+    new THREE.ConeGeometry(0.16, 0.40, 18),
+    new THREE.MeshStandardMaterial({
+      color: 0xfff8d0, emissive: 0xffc24d, emissiveIntensity: 3.0,
+    }),
+  );
+  // Default cone tip is +Y. Rotate so tip is at -Z, and offset so the cone
+  // BASE meets the shaft end at z=-0.40, with the tip out at z=-0.80.
   tip.rotation.x = -Math.PI / 2;
-  tip.position.z = -0.32;
+  tip.position.z = -0.60;
   g.add(tip);
-  // Inner core glow — additive so it reads as a light source
-  const core = new THREE.Mesh(
-    new THREE.SphereGeometry(0.10, 14, 10),
-    new THREE.MeshBasicMaterial({
-      color: 0xffffe0, transparent: true, opacity: 0.85,
-      depthWrite: false, blending: THREE.AdditiveBlending,
-    }),
-  );
-  core.position.z = -0.32;
-  g.add(core);
-  // Soft halo around the whole thing
+
+  // Bright halo wrapped around the tip — the "compass glow" the player tracks.
   const halo = new THREE.Mesh(
-    new THREE.SphereGeometry(0.32, 16, 12),
+    new THREE.SphereGeometry(0.28, 18, 12),
     new THREE.MeshBasicMaterial({
-      color: 0xfff2c8, transparent: true, opacity: 0.32,
+      color: 0xfff2c8, transparent: true, opacity: 0.45,
       depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
-  halo.position.z = -0.30;
+  halo.position.z = -0.60;
   g.add(halo);
-  // Outermost shimmer
+
+  // Outer shimmer — wider but fainter, helps the tip stand out at distance.
   const shim = new THREE.Mesh(
-    new THREE.SphereGeometry(0.50, 14, 10),
+    new THREE.SphereGeometry(0.55, 16, 10),
     new THREE.MeshBasicMaterial({
-      color: 0xffe6a0, transparent: true, opacity: 0.12,
+      color: 0xffe6a0, transparent: true, opacity: 0.16,
       depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
-  shim.position.z = -0.28;
+  shim.position.z = -0.62;
   g.add(shim);
+
+  // ── Fletching (back end) — four small fins arranged in a +, gives the
+  // arrow an unambiguous back-end so the player knows which end is forward.
+  const finMat = new THREE.MeshStandardMaterial({
+    color: 0xc41e3a, emissive: 0x3a0810, emissiveIntensity: 0.4,
+    roughness: 0.6,
+  });
+  const finGeom = new THREE.BoxGeometry(0.02, 0.16, 0.20);
+  for (let i = 0; i < 4; i++) {
+    const fin = new THREE.Mesh(finGeom, finMat);
+    fin.rotation.z = (i / 4) * Math.PI * 2;
+    fin.position.z = 0.36;            // back end of the shaft
+    g.add(fin);
+  }
 
   g.visible = false;
   scene.add(g);
