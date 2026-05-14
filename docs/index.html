@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260513T235022';
+  var BAKED = '20260514T001431';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -124,7 +124,48 @@
        getting clipped by the scroll container's edges — the user's
        "top of the box cut off" was the 4 px padding losing fight with
        the 22 px glow + a few px of scale expansion. */
-    #ms-cards { display:flex; gap:20px; flex-wrap:wrap; justify-content:center;
+    /* Two-pane body: tools on the left, repair station on the right. */
+    #ms-body { display:flex; gap:28px; flex:1 1 auto; width:100%;
+      max-width:1500px; padding:18px 14px 6px; overflow:hidden; }
+    #ms-tools-pane, #ms-repair-pane { display:flex; flex-direction:column;
+      flex:1 1 0; min-width:0; overflow:hidden; }
+    #ms-tools-pane  { flex:1.4 1 0; }
+    #ms-repair-pane { flex:1 1 0; border-left:2px solid rgba(255,180,80,.25);
+      padding-left:24px; }
+    .ms-pane-title { font-size:18px; letter-spacing:4px; color:#FFD27A;
+      margin:0 0 14px; text-shadow:0 0 8px rgba(255,180,80,.4); }
+    .ms-repair-help { font-size:13px; color:#cdb285; line-height:1.45;
+      margin-bottom:14px; max-width:420px; }
+    #ms-cards { display:flex; gap:18px; flex-wrap:wrap;
+      flex:1 1 auto; overflow-y:auto;
+      align-content:flex-start; padding:8px 8px 12px; }
+    #ms-repair-cards { display:flex; flex-direction:column; gap:14px;
+      flex:1 1 auto; overflow-y:auto; padding:8px 8px 12px; }
+    .ms-repair-card { background:rgba(40,28,16,.9);
+      border:2px solid rgba(160,120,60,.5); border-radius:8px;
+      padding:14px 16px; display:flex; align-items:center; gap:14px; }
+    .ms-repair-card.broken { border-color:#ffa040;
+      animation:ms-card-pulse 1.4s ease-in-out infinite; }
+    .ms-repair-card.ready  { border-color:rgba(80,200,120,.7);
+      background:rgba(20,40,28,.85); }
+    .ms-repair-card .rc-icon { font-size:42px; line-height:1; flex-shrink:0; }
+    .ms-repair-card .rc-body { flex:1; min-width:0; }
+    .ms-repair-card .rc-name { font-size:15px; font-weight:bold;
+      color:#FFD27A; letter-spacing:1.5px; margin-bottom:4px; }
+    .ms-repair-card .rc-desc { font-size:12px; color:#bba98a;
+      line-height:1.4; }
+    .ms-repair-card .rc-btn { background:rgba(120,80,40,.7);
+      border:1px solid rgba(255,210,120,.6); color:#fff;
+      font-family:'Courier New',monospace; font-size:13px;
+      letter-spacing:2px; padding:8px 14px; cursor:pointer; border-radius:4px;
+      flex-shrink:0; }
+    .ms-repair-card .rc-btn:hover { background:rgba(180,120,60,.85); }
+    .ms-repair-card.ready .rc-btn { background:rgba(60,120,80,.6);
+      border-color:rgba(120,200,140,.7); }
+    .ms-repair-card.ready .rc-btn:hover { background:rgba(80,160,100,.8); }
+    .ms-repair-empty { font-size:13px; color:#8a7a5a; font-style:italic;
+      padding:14px 0; line-height:1.5; }
+    .ms-cards-orig { display:flex; gap:20px; flex-wrap:wrap; justify-content:center;
       max-width:1300px; flex:1 1 auto; overflow-y:auto;
       align-content:flex-start; padding:24px 14px 18px; }
     .ms-card { width:230px; background:rgba(40,28,16,.9);
@@ -1130,6 +1171,92 @@
     .tap-ok:hover { transform:translateY(-1px);
       box-shadow:0 6px 18px rgba(255,80,40,.6); }
     .tap-ok:active { transform:translateY(1px); }
+
+    /* ── Shoebox reveal popup ─────────────────────────────────────────── */
+    #shoebox-popup { position:fixed; inset:0; display:none; cursor:pointer;
+      background:rgba(0,0,0,.7); z-index:210;
+      align-items:center; justify-content:center;
+      animation:tap-fade .25s ease-out; }
+    #shoebox-popup.show { display:flex; }
+    .sb-card { background:linear-gradient(180deg,#2a1a08,#10080c);
+      border:3px solid #ffaa40; border-radius:14px;
+      box-shadow:0 0 50px rgba(255,180,60,.6), 0 10px 28px rgba(0,0,0,.7);
+      padding:24px 38px 22px; max-width:480px; text-align:center;
+      color:#ffe6c8; font-family:"Press Start 2P","Courier New",monospace;
+      animation:tap-pop .45s cubic-bezier(.2,1.5,.4,1); }
+    .sb-title { font-size:20px; color:#ffd060; letter-spacing:4px;
+      text-shadow:0 0 14px rgba(255,200,80,.7); margin-bottom:18px; }
+    .sb-stage { position:relative; height:170px; margin-bottom:14px; }
+    .sb-box, .sb-reveal { position:absolute; left:50%; top:50%;
+      transform:translate(-50%, -50%); }
+    .sb-box { width:120px; height:120px; background:#ff8a3d;
+      border:5px solid #ffc070; border-radius:10px;
+      display:flex; align-items:center; justify-content:center;
+      font-size:78px; color:#fff; font-weight:bold;
+      box-shadow:0 0 36px rgba(255,180,60,.7), inset 0 0 18px rgba(255,255,255,.15);
+      animation:sb-shake .12s linear infinite; }
+    @keyframes sb-shake {
+      0%, 100% { transform:translate(-50%, -50%) rotate(-4deg); }
+      50%      { transform:translate(-50%, -50%) rotate(4deg); }
+    }
+    .sb-reveal { opacity:0; transform:translate(-50%, -50%) scale(0.4) rotateY(180deg);
+      pointer-events:none; }
+    .sb-card.sb-revealed .sb-box { animation:sb-burst .55s ease-out forwards; }
+    .sb-card.sb-revealed .sb-reveal { animation:sb-flipin .55s .25s
+      cubic-bezier(.2,1.6,.4,1) forwards; }
+    @keyframes sb-burst {
+      0%   { transform:translate(-50%, -50%) rotate(0); opacity:1; }
+      40%  { transform:translate(-50%, -50%) rotate(15deg) scale(1.25); opacity:1; }
+      100% { transform:translate(-50%, -50%) rotate(360deg) scale(0); opacity:0; }
+    }
+    @keyframes sb-flipin {
+      0%   { opacity:0; transform:translate(-50%, -50%) scale(0.3) rotateY(180deg); }
+      60%  { opacity:1; transform:translate(-50%, -50%) scale(1.15) rotateY(0); }
+      100% { opacity:1; transform:translate(-50%, -50%) scale(1) rotateY(0); }
+    }
+    .sb-icon { font-size:64px; line-height:1; }
+    .sb-name { font-size:18px; color:#ffd060; letter-spacing:3px;
+      margin-top:8px; text-shadow:0 0 10px rgba(255,200,80,.6); }
+    .sb-desc { font-size:12px; color:#ffe6c8; line-height:1.45;
+      margin-top:10px; max-width:340px; }
+    .sb-foot { font-size:13px; color:#ffb060; margin-bottom:14px;
+      letter-spacing:1px; opacity:0; transition:opacity .3s; }
+    .sb-card.sb-revealed .sb-foot { opacity:1; transition-delay:.7s; }
+    .sb-ok { background:linear-gradient(180deg,#ffa040,#c06010);
+      border:2px solid #ffd090; border-radius:8px;
+      color:#fff; font-family:inherit; font-size:11px; letter-spacing:2px;
+      padding:10px 18px; cursor:pointer;
+      box-shadow:0 4px 14px rgba(255,140,40,.45);
+      opacity:0; transition:opacity .3s; }
+    .sb-card.sb-revealed .sb-ok { opacity:1; transition-delay:.9s; }
+
+    /* ── Time machine picker ──────────────────────────────────────────── */
+    #tm-picker { position:fixed; inset:0; display:none;
+      background:rgba(0,0,0,.7); z-index:230;
+      align-items:center; justify-content:center; }
+    #tm-picker.show { display:flex; }
+    .tm-card { background:linear-gradient(180deg,#0a1830,#050810);
+      border:3px solid #60c0ff; border-radius:14px;
+      box-shadow:0 0 40px rgba(80,160,255,.55), 0 10px 28px rgba(0,0,0,.7);
+      padding:24px 34px; max-width:520px; text-align:center;
+      color:#cce8ff; font-family:"Press Start 2P","Courier New",monospace; }
+    .tm-title { font-size:20px; color:#90d0ff; letter-spacing:4px;
+      text-shadow:0 0 14px rgba(80,160,255,.6); margin-bottom:6px; }
+    .tm-sub   { font-size:11px; color:#9ec0e0; letter-spacing:2px;
+      margin-bottom:16px; }
+    #tm-list { display:flex; flex-direction:column; gap:8px;
+      margin-bottom:16px; max-height:360px; overflow-y:auto; }
+    .tm-row { background:rgba(20,40,70,.85); border:2px solid rgba(120,180,255,.5);
+      border-radius:6px; padding:10px 14px; font-size:13px;
+      cursor:pointer; color:#e8f4ff; transition:transform .12s, border-color .15s; }
+    .tm-row:hover { border-color:#90d0ff; transform:translateY(-1px); }
+    .tm-row.tm-empty { cursor:default; color:#9ec0e0;
+      border-color:rgba(120,180,255,.25); }
+    .tm-row.tm-empty:hover { transform:none; border-color:rgba(120,180,255,.25); }
+    .tm-cancel { background:rgba(40,60,90,.7); border:2px solid rgba(120,180,255,.5);
+      color:#cce8ff; font-family:inherit; font-size:12px; letter-spacing:2px;
+      padding:8px 18px; cursor:pointer; border-radius:6px; }
+    .tm-cancel:hover { background:rgba(60,90,140,.8); }
   </style>
 </head>
 <body>
@@ -1205,6 +1332,34 @@
     <div id="mission-rows"></div>
   </div>
 
+  <!-- Shoebox reveal popup. Modal: shaking ? box that flips into a tool
+       icon + name. Cleared by clicking anywhere on the backdrop. -->
+  <div id="shoebox-popup">
+    <div class="sb-card">
+      <div class="sb-title">A SHOEBOX!</div>
+      <div class="sb-stage">
+        <div class="sb-box" id="sb-box">?</div>
+        <div class="sb-reveal" id="sb-reveal">
+          <div class="sb-icon" id="sb-icon">🛡</div>
+          <div class="sb-name" id="sb-name">Armor</div>
+          <div class="sb-desc" id="sb-desc"></div>
+        </div>
+      </div>
+      <div class="sb-foot" id="sb-foot">Take it to Morton's to repair!</div>
+      <button id="sb-ok" class="sb-ok">CLICK ANYWHERE</button>
+    </div>
+  </div>
+
+  <!-- Time machine target picker -->
+  <div id="tm-picker">
+    <div class="tm-card">
+      <div class="tm-title">⏳ TIME MACHINE</div>
+      <div class="tm-sub">Choose a missed mission to retry</div>
+      <div id="tm-list"></div>
+      <button id="tm-cancel" class="tm-cancel">Cancel</button>
+    </div>
+  </div>
+
   <!-- Time-attack mission popup. Modal: blocks input until the player clicks
        OK. Shown only when the player is in a free state (no dialogue, boss,
        shop, minigame, etc.) — main.js defers showing it otherwise. -->
@@ -1247,7 +1402,20 @@
     <h2>MORTON'S SHOP</h2>
     <div class="ms-sub">SMART SPENDERS WIN</div>
     <div class="ms-gold" id="ms-gold-display">Your gold: 0 ⛂</div>
-    <div id="ms-cards"></div>
+    <div id="ms-body">
+      <div id="ms-tools-pane">
+        <h3 class="ms-pane-title">TOOLS FOR SALE</h3>
+        <div id="ms-cards"></div>
+      </div>
+      <div id="ms-repair-pane">
+        <h3 class="ms-pane-title">REPAIR STATION</h3>
+        <div class="ms-repair-help">
+          Bring me <b>hidden items</b> you find in <b>shoeboxes</b> scattered
+          across the map — I'll patch them up free of charge.
+        </div>
+        <div id="ms-repair-cards"></div>
+      </div>
+    </div>
     <div id="ms-morton-line"></div>
     <span id="ms-close-hint">[E] or [ESC] — leave shop</span>
   </div>
@@ -2363,6 +2531,11 @@ const MISSION_POOL = [
 // Boosters available at Morton's Shop. ID matches the FeetDex.boosters set.
 // Ordered cheapest-first so the HUD "next target" hint always points at the
 // most affordable unowned tool.
+//
+// NOTE: Armor and MetroCard were moved OUT of the shop pool — they now drop
+// from shoeboxes scattered around the city and have to be repaired at
+// Morton's before they can be used. They still live in BOOSTER_DEFS so the
+// repair UI can render their icon / description.
 const BOOSTER_DEFS = [
   { id:'sprint_feet',    name:'Sprint Feet',    price:20,
     desc:'Hold SHIFT to sprint.' },
@@ -2370,15 +2543,27 @@ const BOOSTER_DEFS = [
     desc:'Common, rare, and epic characters show as red dots on the map and minimap.' },
   { id:'compass',        name:'Compass',        price:50,
     desc:'Hold [C] for a 3D arrow that points to the nearest mythic or legendary.' },
-  { id:'metrocard',      name:'MetroCard',      price:50,
-    desc:'At any subway entrance, press [E] then click a blue dot on the map to ride.' },
-  { id:'armor',          name:'Armor',          price:80,
-    desc:'Doubles your HP and softens hits from mythics and legendaries.' },
   { id:'lightsaber',     name:'Sword',          price:80,
     desc:'REQUIRED to fight mythics and legendaries. 4× damage, 3× speed vs. bosses.' },
   { id:'ancient_tracker',name:'Ancient Tracker',price:300,
     desc:'A gold ★ in the sky leads you to The Ancient One.' },
 ];
+
+// Shoebox loot pool — players cannot buy these, only find them in the
+// glowing shoeboxes scattered through the city blocks. Each requires a free
+// repair at Morton's before it can be used.
+const SHOEBOX_DEFS = [
+  { id:'armor',         name:'Armor',         icon:'🛡',
+    desc:'Doubles your HP and softens hits from mythics and legendaries.' },
+  { id:'metrocard',     name:'MetroCard',     icon:'🚇',
+    desc:'At any subway entrance, press [E] then click a blue dot on the map to ride.' },
+  { id:'time_machine',  name:'Time Machine',  icon:'⏳',
+    desc:'Retry a missed time-attack mission. Use it from Morton\'s repair station.' },
+  { id:'karate_kick',   name:'Karate Kick',   icon:'🦵',
+    desc:'RIGHT-CLICK to kick nearby characters. Skips dialogue and instantly claims their feet.' },
+];
+
+const SHOEBOX_TOOL_IDS = new Set(SHOEBOX_DEFS.map(d => d.id));
 
 const FEET_CATALOG = [
   // Common (5)
@@ -2442,6 +2627,13 @@ class FeetDex {
     // we can drive their timer + cooldown independently from the talk slate.
     this.activeMissions    = [];        // talk-mission slate (size ≤ 3)
     this.completedMissions = new Set(); // mission ids (talk + find)
+
+    // Shoebox loot — items the player has popped open but not yet repaired.
+    // Repairing at Morton's moves the id from unrepairedTools → boosters.
+    // shoeboxesOpened counts opens this run (drives the "take to Morton's"
+    // tutorial cue which only fires once).
+    this.unrepairedTools  = new Set();
+    this.shoeboxesOpened  = 0;
 
     // ── Time-attack find missions ────────────────────────────────────────
     // findActive:   mission running RIGHT NOW. findEndAt is performance.now()
@@ -2641,6 +2833,27 @@ class FeetDex {
   hasBooster(id) { return this.boosters.has(id); }
   giveBooster(id) { this.boosters.add(id); }
 
+  // ── Shoebox loot / repair ───────────────────────────────────────────────
+  // Award a random unowned shoebox tool. Returns the id awarded, or null if
+  // the player has already collected every shoebox tool this run.
+  awardRandomShoeboxTool() {
+    const pool = SHOEBOX_DEFS
+      .map(d => d.id)
+      .filter(id => !this.unrepairedTools.has(id) && !this.boosters.has(id));
+    if (pool.length === 0) return null;
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    this.unrepairedTools.add(id);
+    this.shoeboxesOpened++;
+    return id;
+  }
+  hasUnrepairedTool(id) { return this.unrepairedTools.has(id); }
+  repairTool(id) {
+    if (!this.unrepairedTools.has(id)) return false;
+    this.unrepairedTools.delete(id);
+    this.boosters.add(id);
+    return true;
+  }
+
   hasCosmetic(id) { return this.cosmetics.has(id); }
   giveCosmetic(id) { this.cosmetics.add(id); }
   equipCosmetic(id) { this.equippedCosmetic = id; }
@@ -2681,6 +2894,8 @@ class FeetDex {
     this.findPending       = null;
     this.findCooldownUntil = 0;
     this.missedFinds.clear();
+    this.unrepairedTools.clear();
+    this.shoeboxesOpened = 0;
     _safeClearStorage();
   }
 
@@ -5125,6 +5340,9 @@ class NPCManager {
     const INTERACT_RANGE_SHOP    = 5.5;
 
     for (const npc of this.npcs) {
+      // Defeated NPCs (karate-kicked, awaiting respawn) — skip interactions
+      // and skip the animation update (their pose is frozen by _kod).
+      if (npc._defeated) continue;
       const d = playerPos.distanceTo(npc.group.position);
       if (d < 60 || npc.rarity === 'legendary') npc.update(elapsedTime);
       const isShop = npc.feetId === 'shopkeeper_morton' ||
@@ -6728,6 +6946,83 @@ class UI {
     return !!(el && el.classList.contains('show'));
   }
 
+  // Shoebox reveal — `def` is { id, name, icon, desc }. Shows the ? box
+  // shaking, then bursts open into the tool reveal. isFirstOpen makes the
+  // footer line spell out the take-it-to-Morton's tutorial cue.
+  showShoeboxReveal(def, isFirstOpen, onOk) {
+    const el     = document.getElementById('shoebox-popup');
+    const card   = el?.querySelector('.sb-card');
+    const iconEl = document.getElementById('sb-icon');
+    const nameEl = document.getElementById('sb-name');
+    const descEl = document.getElementById('sb-desc');
+    const footEl = document.getElementById('sb-foot');
+    const btn    = document.getElementById('sb-ok');
+    if (!el || !card || !btn) { onOk?.(); return; }
+    if (iconEl) iconEl.textContent = def.icon || '🎁';
+    if (nameEl) nameEl.textContent = def.name || 'Mystery Tool';
+    if (descEl) descEl.textContent = def.desc || '';
+    if (footEl) footEl.textContent = isFirstOpen
+      ? "Take it to MORTON'S SHOP to repair it before you can use it!"
+      : "Take it to Morton's to repair.";
+    card.classList.remove('sb-revealed');
+    el.classList.add('show');
+    // Shake for ~900ms, then flip reveal.
+    setTimeout(() => card.classList.add('sb-revealed'), 950);
+    // Wire up dismiss: any click on the backdrop OR the button.
+    const handler = () => {
+      btn.removeEventListener('click', handler);
+      el.removeEventListener('click', handler);
+      document.removeEventListener('keydown', keyHandler, true);
+      el.classList.remove('show');
+      card.classList.remove('sb-revealed');
+      onOk?.();
+    };
+    const keyHandler = (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+        e.preventDefault(); handler();
+      }
+    };
+    btn.addEventListener('click', handler);
+    el.addEventListener('click', handler);
+    document.addEventListener('keydown', keyHandler, true);
+    setTimeout(() => btn.focus(), 0);
+  }
+
+  // Time-machine target picker. `missedList` is an array of
+  // { id, label, target, name }. onPick(id) is called when the player picks
+  // a row. onCancel() if they back out.
+  showTimeMachinePicker(missedList, onPick, onCancel) {
+    const el     = document.getElementById('tm-picker');
+    const listEl = document.getElementById('tm-list');
+    const cancel = document.getElementById('tm-cancel');
+    if (!el || !listEl) { onCancel?.(); return; }
+    listEl.innerHTML = '';
+    if (missedList.length === 0) {
+      const row = document.createElement('div');
+      row.className = 'tm-row tm-empty';
+      row.textContent = 'No missed missions to retry — get out there!';
+      listEl.appendChild(row);
+    } else {
+      for (const m of missedList) {
+        const row = document.createElement('div');
+        row.className = 'tm-row';
+        row.innerHTML = `<b>${m.name}</b> — ${m.label}`;
+        row.addEventListener('click', () => {
+          el.classList.remove('show');
+          onPick?.(m.id);
+        });
+        listEl.appendChild(row);
+      }
+    }
+    const close = () => {
+      cancel.removeEventListener('click', close);
+      el.classList.remove('show');
+      onCancel?.();
+    };
+    cancel.addEventListener('click', close);
+    el.classList.add('show');
+  }
+
   // Mission completion: tick the box, run a quick check + slide-out
   // animation, then re-render so the replacement mission slides in
   // smoothly underneath.
@@ -6766,14 +7061,16 @@ class UI {
   // Renders the booster cards. `feetdex` is needed for current gold + owned set.
   // `boosterDefs` is the array from feetdex.js. `onBuy(id)` is called on a
   // valid purchase. `mortonLine` is the flavor text shown beneath the cards.
-  openShop(feetdex, boosterDefs, onBuy, mortonLine, highlightId = null) {
+  openShop(feetdex, boosterDefs, onBuy, mortonLine, highlightId = null, opts = {}) {
     const overlay = document.getElementById('morton-shop');
     const cards   = document.getElementById('ms-cards');
     const goldEl  = document.getElementById('ms-gold-display');
     const lineEl  = document.getElementById('ms-morton-line');
     if (!overlay || !cards) return;
 
-    const ICONS = { sprint_feet:'👟', metrocard:'🚇', radar:'📡', compass:'🧭', armor:'🛡', lightsaber:'🗡', ancient_tracker:'⭐' };
+    const ICONS = { sprint_feet:'👟', metrocard:'🚇', radar:'📡', compass:'🧭',
+                    armor:'🛡', lightsaber:'🗡', ancient_tracker:'⭐',
+                    time_machine:'⏳', karate_kick:'🦵' };
     const render = () => {
       goldEl.textContent = `Your gold: ${feetdex.gold} ⛂`;
       cards.innerHTML = '';
@@ -6796,10 +7093,57 @@ class UI {
         if (canBuy) btn.addEventListener('click', () => { onBuy(b.id); render(); });
         cards.appendChild(card);
       }
+      this._renderRepairPane(feetdex, opts.shoeboxDefs || [], opts.onRepair,
+                             opts.onUseTimeMachine, ICONS);
     };
+    this._shopRender = render;
     render();
     this._typeShopLine('morton', mortonLine ?? '');
     overlay.classList.add('active');
+  }
+
+  refreshShop() { if (this._shopRender) this._shopRender(); }
+
+  _renderRepairPane(feetdex, shoeboxDefs, onRepair, onUseTimeMachine, ICONS) {
+    const wrap = document.getElementById('ms-repair-cards');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+    const hasAny = shoeboxDefs.some(d =>
+      feetdex.hasUnrepairedTool(d.id) || feetdex.hasBooster(d.id));
+    if (!hasAny) {
+      const empty = document.createElement('div');
+      empty.className = 'ms-repair-empty';
+      empty.textContent = "Nothing to repair yet. Search the city for glowing shoeboxes!";
+      wrap.appendChild(empty);
+      return;
+    }
+    for (const d of shoeboxDefs) {
+      const broken = feetdex.hasUnrepairedTool(d.id);
+      const ready  = feetdex.hasBooster(d.id);
+      if (!broken && !ready) continue;       // not found yet — hide
+      const card = document.createElement('div');
+      card.className = 'ms-repair-card ' + (broken ? 'broken' : 'ready');
+      card.innerHTML = `
+        <div class="rc-icon">${d.icon || ICONS[d.id] || '?'}</div>
+        <div class="rc-body">
+          <div class="rc-name">${d.name}</div>
+          <div class="rc-desc">${d.desc}</div>
+        </div>`;
+      const btn = document.createElement('button');
+      btn.className = 'rc-btn';
+      if (broken) {
+        btn.textContent = 'REPAIR — FREE';
+        btn.addEventListener('click', () => onRepair?.(d.id));
+      } else if (d.id === 'time_machine') {
+        btn.textContent = 'USE TIME MACHINE';
+        btn.addEventListener('click', () => onUseTimeMachine?.());
+      } else {
+        btn.textContent = 'REPAIRED';
+        btn.style.cursor = 'default';
+      }
+      card.appendChild(btn);
+      wrap.appendChild(card);
+    }
   }
 
   setShopLine(text) {
@@ -12912,6 +13256,132 @@ function _renderTimeAttackRow() {
   });
 }
 
+// ── Shoeboxes ─────────────────────────────────────────────────────────────────
+//
+// Glowing, floating, spinning mystery-loot boxes scattered through the main
+// city blocks (we keep them between approximately x:[-80,80], z:[-80,80]
+// to avoid placing them at the WTC, far Brooklyn Bridge, etc.). Walk near
+// one, press [E], and it grants a random unowned shoebox tool which has to
+// be repaired at Morton's before use.
+const SHOEBOX_FIXED_POSITIONS = [
+  [  25, 0,  -8],  [ -25, 0,  22],  [  55, 0,   8],
+  [  15, 0,  38],  [ -42, 0, -18],  [   6, 0, -52],
+  [  62, 0, -55],  [ -52, 0,  38],
+];
+const SHOEBOX_PICK_RADIUS = 2.6;
+const _shoeboxes = [];        // { mesh, group, basePos, t, glow }
+
+function _spawnShoeboxes() {
+  for (const [x, y, z] of SHOEBOX_FIXED_POSITIONS) {
+    // Skip positions that collide with a building footprint — keep the box
+    // walkable.
+    let blocked = false;
+    for (const box of world.colliders) {
+      if (x > box.min.x - 0.6 && x < box.max.x + 0.6 &&
+          z > box.min.z - 0.6 && z < box.max.z + 0.6) { blocked = true; break; }
+    }
+    if (blocked) continue;
+    _shoeboxes.push(_makeShoebox(x, y, z));
+  }
+}
+
+function _makeShoebox(x, y, z) {
+  const group = new THREE.Group();
+  group.position.set(x, y + 1.0, z);
+  // Body — small orange box with a brown stripe (sneaker-shoebox vibe)
+  const body = new THREE.Mesh(
+    new THREE.BoxGeometry(0.95, 0.45, 0.60),
+    new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0x4a1a00, emissiveIntensity: 0.6, roughness: 0.55 }),
+  );
+  body.castShadow = false;
+  group.add(body);
+  const lid = new THREE.Mesh(
+    new THREE.BoxGeometry(1.02, 0.10, 0.66),
+    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0x7a3500, emissiveIntensity: 0.5, roughness: 0.5 }),
+  );
+  lid.position.y = 0.26;
+  group.add(lid);
+  // Big white "?" mark
+  const qMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const q1 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.20, 0.02), qMat);
+  q1.position.set(0, 0.08, 0.305);
+  const q2 = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.02), qMat);
+  q2.position.set(0, 0.16, 0.305);
+  const q3 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.04, 0.02), qMat);
+  q3.position.set(0, -0.10, 0.305);
+  group.add(q1, q2, q3);
+  // Halo glow — additive sphere that pulses
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(0.95, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.18, depthWrite: false }),
+  );
+  group.add(glow);
+  // Point light so the box actually lights nearby ground/buildings
+  const light = new THREE.PointLight(0xffc070, 1.4, 6.0, 2.0);
+  light.position.set(0, 0.2, 0);
+  group.add(light);
+  scene.add(group);
+  return { group, glow, light, basePos: new THREE.Vector3(x, y + 1.0, z), t: Math.random() * Math.PI * 2 };
+}
+
+function _updateShoeboxes(elapsed, dt) {
+  for (const sb of _shoeboxes) {
+    sb.t += dt;
+    // Float bob (~0.18 m amplitude, 1.3 Hz)
+    const bob = Math.sin(sb.t * 1.3) * 0.18;
+    sb.group.position.y = sb.basePos.y + bob;
+    // Slow spin so the question mark is always visible from some angle
+    sb.group.rotation.y += dt * 1.4;
+    // Pulsing halo
+    const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(sb.t * 2.2));
+    sb.glow.material.opacity = 0.10 + 0.18 * pulse;
+    sb.light.intensity      = 0.8 + 1.6 * pulse;
+  }
+}
+
+function _nearestShoebox(playerPos) {
+  let best = null, bestD = SHOEBOX_PICK_RADIUS;
+  for (const sb of _shoeboxes) {
+    const d = playerPos.distanceTo(sb.group.position);
+    if (d < bestD) { bestD = d; best = sb; }
+  }
+  return best;
+}
+
+function _openShoebox(sb) {
+  // Remove from world FIRST so a quick double-press can't double-claim.
+  const idx = _shoeboxes.indexOf(sb);
+  if (idx !== -1) _shoeboxes.splice(idx, 1);
+  scene.remove(sb.group);
+  // Roll the loot.
+  const toolId = feetdex.awardRandomShoeboxTool();
+  if (!toolId) {
+    showHUDMessage('Empty box — you already have every shoebox tool!', 2200);
+    return;
+  }
+  const def = SHOEBOX_DEFS.find(d => d.id === toolId);
+  Audio.discover?.();
+  // Pop the reveal popup (modal — uses the same defer pattern as the
+  // time-attack popup so player input is gated while it's up).
+  _showShoeboxReveal(def);
+}
+
+function _showShoeboxReveal(def) {
+  if (state !== 'playing' && state !== 'interior') {
+    // Defer briefly until the player is free again.
+    setTimeout(() => _showShoeboxReveal(def), 400);
+    return;
+  }
+  _stateBeforeTimeAttackPopup = state;
+  state = 'time-attack-popup';        // reuse the same input-gate state
+  if (document.pointerLockElement === canvas) document.exitPointerLock();
+  ui.showShoeboxReveal(def, feetdex.shoeboxesOpened === 1, () => {
+    state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
+    _stateBeforeTimeAttackPopup = null;
+    requestLock();
+  });
+}
+
 // ── UI callbacks ──────────────────────────────────────────────────────────────
 ui.onResume = () => {
   state = 'playing';
@@ -13034,6 +13504,11 @@ function _handleE() {
       // strike up a dialogue with whichever NPC happens to be near the
       // crosshair-position.
       if (document.pointerLockElement !== canvas) return;
+
+      // Shoebox proximity check FIRST — they're rare and we want [E] to
+      // grab one over picking an NPC behind it.
+      const sb = _nearestShoebox(player.position);
+      if (sb) { _openShoebox(sb); return; }
       // Cursor-aim interaction. Two pickers:
       //
       //   _measure(x,y,z)   — point test, used for doors and subway stations
@@ -13504,6 +13979,15 @@ function _mortonOnPurchase(boosterId) {
   return lines[boosterId] ?? "Smart pick. Every gold you spend here's a gold doin' work for you out there.";
 }
 
+// Shop opts shared by every ui.openShop call — adds the repair pane wiring.
+function _shopOpts() {
+  return {
+    shoeboxDefs: SHOEBOX_DEFS,
+    onRepair: (id) => _onRepairTool(id),
+    onUseTimeMachine: () => _onUseTimeMachine(),
+  };
+}
+
 function _openShop() {
   // Tutorial path: first time meeting Morton — run a 3-line teaching arc,
   // award a 20g visit bonus, then open the shop with Sprint Feet highlighted.
@@ -13516,7 +14000,58 @@ function _openShop() {
   }
   document.exitPointerLock();
   state = 'shop';
-  ui.openShop(feetdex, BOOSTER_DEFS, _onBuyBooster, _mortonGreeting());
+  ui.openShop(feetdex, BOOSTER_DEFS, _onBuyBooster, _mortonGreeting(),
+              null, _shopOpts());
+}
+
+function _onRepairTool(id) {
+  if (!feetdex.repairTool(id)) return;
+  Audio.goldKaching?.();
+  ui.setShopLine?.("Good as new! Try it out when you head back out.");
+  // Queue the tool's how-to to fire after the player exits the shop — same
+  // queue purchased boosters use, so repairs and purchases feel symmetrical.
+  if (!_pendingBoosterTips.includes(id) && !_shownTips.has(id)) {
+    _pendingBoosterTips.push(id);
+  }
+  ui.refreshShop?.();
+}
+
+function _onUseTimeMachine() {
+  // Build the missed-mission list with display names.
+  const missed = [];
+  for (const m of feetdex_listMissedFinds()) {
+    missed.push({
+      id: m.id,
+      label: m.label,
+      target: m.target,
+      name: TIME_ATTACK_NAMES[m.target] || 'Hidden character',
+    });
+  }
+  ui.showTimeMachinePicker(missed, (id) => {
+    // Restore JUST that one mission to the draw pool by removing it from
+    // missedFinds. Then trigger an immediate cooldown reset so it queues
+    // as the very next time-attack mission.
+    feetdex.missedFinds.delete(id);
+    feetdex.findCooldownUntil = 0;
+    ui.setShopLine?.("Mission slot reshuffled — get out there and chase that lead.");
+    ui.refreshShop?.();
+  }, () => { /* cancelled — no-op */ });
+}
+
+// Iterate the find-mission pool and surface the ones currently marked missed.
+function feetdex_listMissedFinds() {
+  const out = [];
+  for (const mid of feetdex.missedFinds) {
+    // MISSION_POOL is what feetdex draws from — find the matching entry.
+    // We don't want to import the constant just for this — borrow it from
+    // the feetdex module via a tiny helper that already has access.
+    const m = _findMissionById(mid);
+    if (m) out.push(m);
+  }
+  return out;
+}
+function _findMissionById(id) {
+  return MISSION_POOL.find(m => m.id === id) || null;
 }
 
 function _runMortonTutorial() {
@@ -13549,7 +14084,7 @@ function _runMortonTutorial() {
       ui.openShop(
         feetdex, BOOSTER_DEFS, _onBuyBooster,
         "Go on, grab the Sprint Feet — they're glowing for a reason.",
-        'sprint_feet'
+        'sprint_feet', _shopOpts()
       );
       return;
     }
@@ -13884,6 +14419,10 @@ const BOOSTER_TIPS = {
     body: 'Walk up to any <b>subway entrance</b>, press <b>[E]</b>, then click a <b style="color:#0066ff">blue dot</b> on the map to ride there instantly.' },
   ancient_tracker:{ title: 'ANCIENT TRACKER',
     body: 'A gold <b>★</b> in the sky now marks <b>The Ancient One</b>. Walk toward the star to find him.' },
+  time_machine:   { title: 'TIME MACHINE',
+    body: 'Head back to <b>Morton\'s Shop</b> and press <b>USE TIME MACHINE</b> at the repair station to retry any time-attack mission you missed.' },
+  karate_kick:    { title: 'KARATE KICK',
+    body: '<b>RIGHT-CLICK</b> a nearby character to kick them. Skips dialogue and <b>instantly claims their feet</b>. Crowds and mission folks respawn after 30 seconds.' },
 };
 let _shownTips = new Set();
 let _afterTipCallback = null;     // run after the tip is dismissed (countdown chains here)
@@ -15888,6 +16427,124 @@ function _adaptDpr(dt) {
   }
 }
 
+// ── Karate Kick ─────────────────────────────────────────────────────────────
+//
+// Repaired karate_kick booster grants the player a right-click kick that
+// works on any non-boss NPC within range. Effects:
+//   • Collectible characters (common/rare/epic with a feetId): if not yet
+//     collected, instantly claim their feet (skip dialogue) and respawn
+//     them immediately. A second kick (already collected) puts them on a
+//     30 s respawn timer instead.
+//   • Mission talk NPCs (npc_*): resolve their talk mission for the gold
+//     award and respawn after 30 s.
+//   • Crowd citizens (rarity 'none', no feetId): just KO + respawn after
+//     30 s — flavour.
+//   • Bosses (mythic/legendary/secret) and shopkeepers: kick is refused;
+//     bosses require the sword combat flow, shopkeepers are off-limits.
+const KICK_RANGE          = 3.0;
+const KICK_RESPAWN_MS     = 30_000;
+const _kickedRespawns     = [];      // { npc, at, snapshotPos }
+
+function _kickEligible(npc) {
+  if (!npc || npc._defeated) return false;
+  if (npc.feetId === 'shopkeeper_morton' ||
+      npc.feetId === 'shopkeeper_fleetfeet') return false;
+  if (npc.rarity === 'mythic' || npc.rarity === 'legendary' ||
+      npc.rarity === 'secret') return false;
+  return true;
+}
+
+function _nearestKickTarget() {
+  let best = null, bestD = KICK_RANGE;
+  for (const npc of npcMgr.npcs) {
+    if (!_kickEligible(npc)) continue;
+    const d = player.position.distanceTo(npc.group.position);
+    if (d < bestD) { bestD = d; best = npc; }
+  }
+  return best;
+}
+
+function _doKarateKick() {
+  if (!feetdex.hasBooster('karate_kick')) return;
+  if (state !== 'playing' && state !== 'interior') return;
+  const target = _nearestKickTarget();
+  if (!target) return;
+  // Visual KO — tip them onto their back, freeze animation.
+  target._kod = true;
+  target._defeated = true;
+  target.group.rotation.x = -Math.PI / 2;
+  Audio.discover?.();
+  // Branch by NPC kind.
+  const isMissionTalk = MISSION_NPC_IDS.has(target.feetId);
+  const isCollectible = !!target.feetId && !isMissionTalk &&
+    (target.rarity === 'common' || target.rarity === 'rare' || target.rarity === 'epic');
+  if (isMissionTalk) {
+    // Resolve any matching talk mission, then schedule respawn.
+    const result = feetdex.resolveMission('talk', target.feetId);
+    if (result) _celebrateMission(result);
+    showHUDMessage(`${(target.name || 'Citizen').toUpperCase()} got the boot!`, 1500);
+    _scheduleRespawn(target, KICK_RESPAWN_MS);
+    return;
+  }
+  if (isCollectible) {
+    const alreadyCollected = feetdex.has(target.feetId);
+    if (!alreadyCollected) {
+      const result = feetdex.collect(target.feetId);
+      if (result.isNew) {
+        ui.updateCollection(feetdex.count, feetdex.total);
+        ui.updateGold(feetdex.gold, _nextBoosterTarget());
+        if (result.goldAwarded > 0) {
+          Audio.goldKaching?.();
+          ui.showGoldToast(result.goldAwarded);
+        }
+        _onCharacterCollected(target.feetId);
+      }
+      // Respawn IMMEDIATELY after providing feet — first-claim rule.
+      _scheduleRespawn(target, 0);
+      return;
+    }
+    // Second+ kick → 30 s timer.
+    _scheduleRespawn(target, KICK_RESPAWN_MS);
+    return;
+  }
+  // Crowd citizen — flavour kick, 30 s respawn.
+  _scheduleRespawn(target, KICK_RESPAWN_MS);
+}
+
+function _scheduleRespawn(npc, ms) {
+  // Hide the body until respawn.
+  npc.group.visible = false;
+  if (ms <= 0) { _respawnNpc(npc); return; }
+  _kickedRespawns.push({ npc, at: performance.now() + ms });
+}
+
+function _respawnNpc(npc) {
+  npc._kod = false;
+  npc._defeated = false;
+  npc.group.rotation.x = 0;
+  npc.group.visible = true;
+  if (npc.feetId) npc.feetCollected = feetdex.has(npc.feetId);
+}
+
+function _tickKickRespawns() {
+  if (_kickedRespawns.length === 0) return;
+  const now = performance.now();
+  for (let i = _kickedRespawns.length - 1; i >= 0; i--) {
+    if (now >= _kickedRespawns[i].at) {
+      _respawnNpc(_kickedRespawns[i].npc);
+      _kickedRespawns.splice(i, 1);
+    }
+  }
+}
+
+// Right-click → karate kick. preventDefault suppresses the browser menu.
+window.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+document.addEventListener('mousedown', (e) => {
+  if (e.button === 2 && document.pointerLockElement === canvas) {
+    _doKarateKick();
+  }
+});
+
 function gameLoop() {
   requestAnimationFrame(gameLoop);
 
@@ -15943,6 +16600,8 @@ function gameLoop() {
   _animateBeacon(dt);
   _updateTutorial();
   _tickTimeAttack();
+  _updateShoeboxes(elapsed, dt);
+  _tickKickRespawns();
   _drawMinimap(elapsed);
   // Throttle the full-screen map redraw to ~30 Hz — it's the second-most
   // expensive per-frame draw and nothing on it needs 60 Hz precision.
@@ -15958,6 +16617,7 @@ ui.updateGold(feetdex.gold, _nextBoosterTarget());
 _applyEquippedCosmetic();
 tutorial.render();
 _initMissions();
+_spawnShoeboxes();
 gameLoop();
 
 
