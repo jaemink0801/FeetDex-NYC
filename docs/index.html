@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T040231';
+  var BAKED = '20260514T040542';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -138,9 +138,9 @@
       margin-bottom:14px; max-width:420px; }
     /* Side/top padding sized to clear the highlighted card's scale(1.04)
        lift PLUS its 22 px glow without clipping at the pane edge. */
-    #ms-cards { display:flex; gap:14px; flex-wrap:wrap;
+    #ms-cards { display:flex; gap:12px; flex-wrap:wrap;
       flex:1 1 auto; overflow-y:auto;
-      align-content:flex-start; padding:18px 16px 16px; }
+      align-content:flex-start; padding:14px 14px 14px; }
     /* Padding sized to clear the broken-card scale(1.04) lift + 22 px glow
        without clipping at the pane's left border or right edge. */
     #ms-repair-cards { display:flex; flex-direction:column; gap:16px;
@@ -172,9 +172,9 @@
     .ms-cards-orig { display:flex; gap:20px; flex-wrap:wrap; justify-content:center;
       max-width:1300px; flex:1 1 auto; overflow-y:auto;
       align-content:flex-start; padding:24px 14px 18px; }
-    .ms-card { width:192px; background:rgba(40,28,16,.9);
+    .ms-card { width:178px; background:rgba(40,28,16,.9);
       border:2px solid rgba(160,120,60,.5); border-radius:8px;
-      padding:14px 12px; display:flex; flex-direction:column; align-items:center;
+      padding:11px 10px; display:flex; flex-direction:column; align-items:center;
       text-align:center; transition:border-color .15s, transform .15s; }
     /* Tutorial highlight ring on the recommended card */
     .ms-card.ms-highlight { border-color:#FFD700;
@@ -186,16 +186,16 @@
     .ms-card:hover { border-color:rgba(255,210,120,.85); transform:translateY(-3px); }
     .ms-card.owned { border-color:rgba(80,200,120,.7);
       background:rgba(20,40,28,.85); }
-    .ms-icon { font-size:44px; margin-bottom:8px; line-height:1; }
-    .ms-name { font-size:15px; font-weight:bold; color:#FFD27A;
-      letter-spacing:1.5px; margin-bottom:6px; }
-    .ms-desc { font-size:12px; color:#bba98a; line-height:1.45;
-      min-height:54px; margin-bottom:10px; }
-    .ms-price { font-size:17px; color:#FFD700; font-weight:bold;
-      margin-bottom:8px; }
+    .ms-icon { font-size:38px; margin-bottom:6px; line-height:1; }
+    .ms-name { font-size:14px; font-weight:bold; color:#FFD27A;
+      letter-spacing:1.5px; margin-bottom:5px; }
+    .ms-desc { font-size:11px; color:#bba98a; line-height:1.4;
+      min-height:46px; margin-bottom:8px; }
+    .ms-price { font-size:16px; color:#FFD700; font-weight:bold;
+      margin-bottom:7px; }
     .ms-buy { background:rgba(120,80,40,.7); border:1px solid rgba(255,210,120,.6);
-      color:#fff; font-family:'Courier New',monospace; font-size:12px;
-      letter-spacing:1.5px; padding:8px 12px; cursor:pointer; border-radius:4px;
+      color:#fff; font-family:'Courier New',monospace; font-size:11px;
+      letter-spacing:1.5px; padding:7px 10px; cursor:pointer; border-radius:4px;
       width:100%; }
     .ms-buy:hover { background:rgba(180,120,60,.85); }
     .ms-buy.owned { background:rgba(60,120,80,.6); border-color:rgba(120,200,140,.7);
@@ -13939,6 +13939,13 @@ function _handleE() {
             : feetdex.getLegendaryCount(_activeNPC.name);
         }
 
+        // Tutorial: talking to Sonion (the ESB lobby anchor) checks off the
+        // find-sonion step immediately. Previously the step only advanced
+        // after a full discovery resolution; players who chatted but didn't
+        // run through the FeetDex flow stayed stuck on the checklist.
+        if (_activeNPC.feetId === 'epic_sonion' && tutorial.isStep('find-sonion')) {
+          tutorial.advance('find-sonion');
+        }
         ui.openDialogue(_activeNPC, dlgCount);
         state = 'dialogue';
         _activeNPC.isInDialogue = true;
@@ -16703,10 +16710,12 @@ function _adaptDpr(dt) {
 //     bosses require the sword combat flow, shopkeepers are off-limits.
 const KICK_RANGE          = 3.0;
 const KICK_RESPAWN_MS     = 30_000;
-const _kickedRespawns     = [];      // { npc, at, snapshotPos }
+const KICK_ANIM_MS        = 600;       // duration of the fall-back animation
+const _kickedRespawns     = [];        // { npc, at }
+const _kickAnims          = [];        // { npc, t0, dur, fromRotX, fromPos, knockDir, respawnAt }
 
 function _kickEligible(npc) {
-  if (!npc || npc._defeated) return false;
+  if (!npc || npc._defeated || npc._defeating) return false;
   if (npc.feetId === 'shopkeeper_morton' ||
       npc.feetId === 'shopkeeper_fleetfeet') return false;
   if (npc.rarity === 'mythic' || npc.rarity === 'legendary' ||
@@ -16729,24 +16738,31 @@ function _doKarateKick() {
   if (state !== 'playing' && state !== 'interior') return;
   const target = _nearestKickTarget();
   if (!target) return;
-  // Visual KO — tip them onto their back, freeze animation.
+
+  // Mark this NPC as "in defeat animation" so further kicks / interactions
+  // can't touch them until the animation completes.
+  target._defeating = true;
   target._kod = true;
-  target._defeated = true;
-  target.group.rotation.x = -Math.PI / 2;
   Audio.discover?.();
-  // Branch by NPC kind.
+
+  // Knockback direction = away from the player along the ground plane.
+  const knock = new THREE.Vector3()
+    .copy(target.group.position).sub(player.position);
+  knock.y = 0;
+  if (knock.lengthSq() < 0.01) knock.set(0, 0, 1); // safety
+  knock.normalize();
+
+  // Branch by NPC kind for rewards/respawn timing. The animation always
+  // plays; respawnDelay decides what happens AFTER it completes.
   const isMissionTalk = MISSION_NPC_IDS.has(target.feetId);
   const isCollectible = !!target.feetId && !isMissionTalk &&
     (target.rarity === 'common' || target.rarity === 'rare' || target.rarity === 'epic');
+  let respawnDelay = KICK_RESPAWN_MS;
   if (isMissionTalk) {
-    // Resolve any matching talk mission, then schedule respawn.
     const result = feetdex.resolveMission('talk', target.feetId);
     if (result) _celebrateMission(result);
     showHUDMessage(`${(target.name || 'Citizen').toUpperCase()} got the boot!`, 1500);
-    _scheduleRespawn(target, KICK_RESPAWN_MS);
-    return;
-  }
-  if (isCollectible) {
+  } else if (isCollectible) {
     const alreadyCollected = feetdex.has(target.feetId);
     if (!alreadyCollected) {
       const result = feetdex.collect(target.feetId);
@@ -16759,28 +16775,116 @@ function _doKarateKick() {
         }
         _onCharacterCollected(target.feetId);
       }
-      // Respawn IMMEDIATELY after providing feet — first-claim rule.
-      _scheduleRespawn(target, 0);
-      return;
+      // Respawn instantly AFTER the defeat animation completes — first-
+      // claim rule: feet collected and they're back on their feet.
+      respawnDelay = 0;
     }
-    // Second+ kick → 30 s timer.
-    _scheduleRespawn(target, KICK_RESPAWN_MS);
-    return;
   }
-  // Crowd citizen — flavour kick, 30 s respawn.
-  _scheduleRespawn(target, KICK_RESPAWN_MS);
+
+  // Spawn a quick impact burst at the target position.
+  _spawnKickBurst(target.group.position);
+
+  // Queue the rotation + knockback tween.
+  _kickAnims.push({
+    npc:       target,
+    t0:        performance.now(),
+    dur:       KICK_ANIM_MS,
+    fromRotX:  target.group.rotation.x,
+    fromPos:   target.group.position.clone(),
+    knockDir:  knock,
+    respawnDelay,
+  });
 }
 
-function _scheduleRespawn(npc, ms) {
-  // Hide the body until respawn.
-  npc.group.visible = false;
-  if (ms <= 0) { _respawnNpc(npc); return; }
-  _kickedRespawns.push({ npc, at: performance.now() + ms });
+// Small star-burst particles flung outward from the kick impact point.
+const _kickBursts = [];   // { meshes:[{mesh, vel, life, max}], }
+function _spawnKickBurst(at) {
+  const COUNT = 10;
+  const meshes = [];
+  for (let i = 0; i < COUNT; i++) {
+    const m = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.12, 0.12),
+      new THREE.MeshBasicMaterial({ color: 0xffd040, transparent: true, opacity: 1 }),
+    );
+    m.position.set(at.x, at.y + 1.3, at.z);
+    const ang = (i / COUNT) * Math.PI * 2;
+    const speed = 3 + Math.random() * 2;
+    const vel = new THREE.Vector3(
+      Math.cos(ang) * speed,
+      2 + Math.random() * 2,
+      Math.sin(ang) * speed,
+    );
+    scene.add(m);
+    meshes.push({ mesh: m, vel, life: 0, max: 0.5 });
+  }
+  _kickBursts.push({ meshes });
+}
+
+function _tickKickBursts(dt) {
+  for (let i = _kickBursts.length - 1; i >= 0; i--) {
+    const burst = _kickBursts[i];
+    let allDone = true;
+    for (const p of burst.meshes) {
+      p.life += dt;
+      if (p.life >= p.max) {
+        if (p.mesh.parent) scene.remove(p.mesh);
+        p.mesh.geometry.dispose?.();
+        p.mesh.material.dispose?.();
+        continue;
+      }
+      allDone = false;
+      p.mesh.position.x += p.vel.x * dt;
+      p.mesh.position.y += p.vel.y * dt;
+      p.mesh.position.z += p.vel.z * dt;
+      p.vel.y -= 9 * dt;             // gravity
+      const k = 1 - (p.life / p.max);
+      p.mesh.material.opacity = k;
+      p.mesh.rotation.x += dt * 8;
+      p.mesh.rotation.y += dt * 6;
+    }
+    if (allDone) _kickBursts.splice(i, 1);
+  }
+}
+
+function _tickKickAnims() {
+  const now = performance.now();
+  for (let i = _kickAnims.length - 1; i >= 0; i--) {
+    const a = _kickAnims[i];
+    const t = Math.min(1, (now - a.t0) / a.dur);
+    // ease-out cubic — heavy at the start, settles slow.
+    const k = 1 - Math.pow(1 - t, 3);
+    // Rotate onto back.
+    a.npc.group.rotation.x = a.fromRotX + (-Math.PI / 2 - a.fromRotX) * k;
+    // Drift backward + slight upward arc.
+    const arcY = Math.sin(k * Math.PI) * 0.4;
+    a.npc.group.position.x = a.fromPos.x + a.knockDir.x * k * 1.4;
+    a.npc.group.position.y = a.fromPos.y + arcY;
+    a.npc.group.position.z = a.fromPos.z + a.knockDir.z * k * 1.4;
+    if (t >= 1) {
+      // Animation done — settle final pose, mark fully defeated, queue
+      // respawn at the rule-specific delay.
+      a.npc._defeating = false;
+      a.npc._defeated  = true;
+      a.npc.group.visible = false;     // hide until respawn
+      if (a.respawnDelay <= 0) {
+        // First-time collect rule — respawn the same frame.
+        a.npc.group.position.copy(a.fromPos);
+        _respawnNpc(a.npc);
+      } else {
+        // Snap back to the original spot so the respawn re-appearance
+        // happens where the player remembers them.
+        a.npc.group.position.copy(a.fromPos);
+        _kickedRespawns.push({ npc: a.npc, at: now + a.respawnDelay });
+      }
+      _kickAnims.splice(i, 1);
+    }
+  }
 }
 
 function _respawnNpc(npc) {
   npc._kod = false;
   npc._defeated = false;
+  npc._defeating = false;
   npc.group.rotation.x = 0;
   npc.group.visible = true;
   if (npc.feetId) npc.feetCollected = feetdex.has(npc.feetId);
@@ -16797,12 +16901,17 @@ function _tickKickRespawns() {
   }
 }
 
-// Right-click → karate kick. preventDefault suppresses the browser menu.
+// LEFT-click → karate kick (when held & not in combat). Left-click in combat
+// continues to trigger sword swings via interaction.js's listener. Right-
+// click no longer triggers the kick; we keep contextmenu suppressed so
+// accidental right-clicks don't pop the browser menu over the canvas.
 window.addEventListener('contextmenu', (e) => { e.preventDefault(); });
 document.addEventListener('mousedown', (e) => {
-  if (e.button === 2 && document.pointerLockElement === canvas) {
-    _doKarateKick();
-  }
+  if (e.button !== 0) return;
+  if (document.pointerLockElement !== canvas) return;
+  if (state === 'combat' || state === 'pre-combat') return;   // sword path
+  if (state !== 'playing' && state !== 'interior') return;
+  _doKarateKick();
 });
 
 function gameLoop() {
@@ -16861,6 +16970,8 @@ function gameLoop() {
   _updateTutorial();
   _tickTimeAttack();
   _updateShoeboxes(elapsed, dt);
+  _tickKickAnims();
+  _tickKickBursts(dt);
   _tickKickRespawns();
   _drawMinimap(elapsed);
   // Throttle the full-screen map redraw to ~30 Hz — it's the second-most
