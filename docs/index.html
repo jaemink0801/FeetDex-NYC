@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T002422';
+  var BAKED = '20260514T034924';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -12949,6 +12949,17 @@ document.addEventListener('pointerlockchange', () => {
                   "Welcome to the <b>Feet World</b>, mortal. Use <b>WASD</b> or the <b>ARROW KEYS</b> to walk forward — " +
                   "approach the <b style=\"color:#ffd700\">yellow door</b> of the Empire State Building."
                 );
+                // Chain ONE more step: when the Welcome dialogue is
+                // dismissed with [E], arm the walk-to-ESB door check and
+                // snapshot the player's current position. The door
+                // dialogue won't fire until they take a noticeable step
+                // from that baseline — so even if they were already at
+                // the door while reading, they still get a clean "move
+                // forward → trigger" beat.
+                _afterTipCallback = () => {
+                  _walkToEsbArmed = true;
+                  _walkToEsbBaseline.copy(player.position);
+                };
               };
             }, 200);
           },
@@ -12996,6 +13007,12 @@ const TUTORIAL_STEPS = [
   { id: 'buy-sprint',  label: 'Buy your first tool' },
 ];
 const ESB_DOOR = { x: 0, z: 8.2 };
+// Walk-to-ESB step gates: door dialogue fires only after BOTH intro popups
+// (OBJECTIVE tip + Welcome FG) have been dismissed AND the player has
+// moved at least a step from the moment the second dialogue closed.
+let _walkToEsbArmed = false;
+const _walkToEsbBaseline = new THREE.Vector3();
+const WALK_TO_ESB_DELTA = 0.8;     // metres of post-dismiss movement required
 const tutorial = {
   active: true,
   stepIdx: 0,
@@ -13034,14 +13051,15 @@ function _updateTutorial() {
   // from "movement learned" to "now interact" without having to read both at
   // once during the loading sequence.
   if (tutorial.isStep('walk-to-esb')) {
-    // Don't advance the step while ANY intro popup is still showing —
-    // the OBJECTIVE tip, the Welcome Feet God dialogue, OR a queued
-    // tip/dialogue waiting on [E]. The player needs to read the
-    // movement intro first; otherwise the door instruction text
-    // overwrites whatever they haven't dismissed yet.
+    // Require the FULL intro chain to be dismissed AND a fresh step of
+    // walking after that dismissal — that way the third dialogue feels
+    // earned by the player moving forward, not by sitting at the threshold
+    // while they were reading the second.
+    if (!_walkToEsbArmed)         return;
     if (ui.isTipOpen)             return;
     if (ui.isFeetGodDialogueOpen) return;
     if (_afterTipCallback)        return;   // chain in flight
+    if (player.position.distanceTo(_walkToEsbBaseline) < WALK_TO_ESB_DELTA) return;
     const dx = player.position.x - ESB_DOOR.x;
     const dz = player.position.z - ESB_DOOR.z;
     if (dx * dx + dz * dz < 5 * 5) {
