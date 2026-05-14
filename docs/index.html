@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T001431';
+  var BAKED = '20260514T001804';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1172,6 +1172,31 @@
       box-shadow:0 6px 18px rgba(255,80,40,.6); }
     .tap-ok:active { transform:translateY(1px); }
 
+    /* ── Tutorial skip prompt ─────────────────────────────────────────── */
+    #tutorial-skip { position:fixed; inset:0; display:none;
+      background:rgba(0,0,0,.72); z-index:240;
+      align-items:center; justify-content:center; }
+    #tutorial-skip.show { display:flex; }
+    .tsk-card { background:linear-gradient(180deg,#1a2820,#0a140e);
+      border:3px solid #FFD27A; border-radius:14px;
+      box-shadow:0 0 40px rgba(255,210,120,.55), 0 10px 28px rgba(0,0,0,.7);
+      padding:30px 40px 26px; max-width:520px; text-align:center;
+      color:#fff5dd; font-family:"Press Start 2P","Courier New",monospace; }
+    .tsk-title { font-size:22px; color:#FFD27A; letter-spacing:5px;
+      text-shadow:0 0 14px rgba(255,210,120,.6); margin-bottom:14px; }
+    .tsk-sub { font-size:13px; line-height:1.55; color:#e6d3a8;
+      margin-bottom:24px; }
+    .tsk-buttons { display:flex; gap:14px; justify-content:center; }
+    .tsk-btn { border:2px solid #FFD27A; border-radius:8px;
+      color:#fff; font-family:inherit; font-size:12px; letter-spacing:2px;
+      padding:12px 20px; cursor:pointer; min-width:160px;
+      transition:transform .12s, box-shadow .15s; }
+    .tsk-btn:hover { transform:translateY(-1px);
+      box-shadow:0 6px 18px rgba(255,210,120,.45); }
+    .tsk-btn-yes { background:linear-gradient(180deg,#5fa86a,#2f6638);
+      border-color:#a6e0ad; }
+    .tsk-btn-no  { background:linear-gradient(180deg,#a07050,#5a3520); }
+
     /* ── Shoebox reveal popup ─────────────────────────────────────────── */
     #shoebox-popup { position:fixed; inset:0; display:none; cursor:pointer;
       background:rgba(0,0,0,.7); z-index:210;
@@ -1330,6 +1355,21 @@
       <div class="ta-label" id="ta-label">No mission queued.</div>
     </div>
     <div id="mission-rows"></div>
+  </div>
+
+  <!-- Tutorial skip prompt — first thing the player sees on cold load. -->
+  <div id="tutorial-skip">
+    <div class="tsk-card">
+      <div class="tsk-title">PLAY TUTORIAL?</div>
+      <div class="tsk-sub">
+        Walks you through movement, the map, and Morton's Shop.<br/>
+        Skipping drops you straight into free play.
+      </div>
+      <div class="tsk-buttons">
+        <button id="tsk-yes" class="tsk-btn tsk-btn-yes">PLAY TUTORIAL</button>
+        <button id="tsk-no"  class="tsk-btn tsk-btn-no">SKIP</button>
+      </div>
+    </div>
   </div>
 
   <!-- Shoebox reveal popup. Modal: shaking ? box that flips into a tool
@@ -6944,6 +6984,26 @@ class UI {
   isTimeAttackPopupOpen() {
     const el = document.getElementById('time-attack-popup');
     return !!(el && el.classList.contains('show'));
+  }
+
+  // Tutorial skip prompt — shown once at game start. Two buttons.
+  showTutorialSkipPrompt(onPlay, onSkip) {
+    const el  = document.getElementById('tutorial-skip');
+    const yes = document.getElementById('tsk-yes');
+    const no  = document.getElementById('tsk-no');
+    if (!el || !yes || !no) { onPlay?.(); return; }
+    const close = (cb) => {
+      yes.removeEventListener('click', y);
+      no.removeEventListener('click', n);
+      el.classList.remove('show');
+      cb?.();
+    };
+    const y = () => close(onPlay);
+    const n = () => close(onSkip);
+    yes.addEventListener('click', y);
+    no.addEventListener('click', n);
+    el.classList.add('show');
+    setTimeout(() => yes.focus(), 0);
   }
 
   // Shoebox reveal — `def` is { id, name, icon, desc }. Shows the ? box
@@ -12868,30 +12928,48 @@ document.addEventListener('pointerlockchange', () => {
     // tip, then chain into the tutorial's follow-the-arrow hint.
     if (!_firstStartShown) {
       _firstStartShown = true;
-      // Defer slightly so the lock-overlay fade doesn't visually race with it
+      // Release the lock first so the player can click the skip-prompt
+      // buttons with a real cursor.
+      document.exitPointerLock();
       setTimeout(() => {
-        ui.showTip('OBJECTIVE',
-          "Collect all <b style=\"color:#FFD700\">18 feet</b> in your FeetDex.<br/><br/>" +
-          "Press <b>[E]</b> to talk to <b>characters</b>. Some give their feet for a quick chat — " +
-          "<b style=\"color:#ffd700\">bosses</b> make you fight for them. " +
-          "Buy the <b>Sword</b> at Morton's Shop before tangling with the tougher ones."
+        ui.showTutorialSkipPrompt(
+          // PLAY TUTORIAL — the original objective + Feet God intro chain.
+          () => {
+            requestLock();
+            setTimeout(() => {
+              ui.showTip('OBJECTIVE',
+                "Collect all <b style=\"color:#FFD700\">18 feet</b> in your FeetDex.<br/><br/>" +
+                "Press <b>[E]</b> to talk to <b>characters</b>. Some give their feet for a quick chat — " +
+                "<b style=\"color:#ffd700\">bosses</b> make you fight for them. " +
+                "Buy the <b>Sword</b> at Morton's Shop before tangling with the tougher ones."
+              );
+              _afterTipCallback = () => {
+                if (!tutorial.active) return;
+                ui.openFeetGodDialogue(
+                  "Welcome to the <b>Feet World</b>, mortal. Use <b>WASD</b> or the <b>ARROW KEYS</b> to walk forward — " +
+                  "approach the <b style=\"color:#ffd700\">yellow door</b> of the Empire State Building."
+                );
+              };
+            }, 200);
+          },
+          // SKIP — mark every tutorial step done, reveal missions, drop the
+          // player straight into free play. The 20g Morton greeting + sprint-
+          // feet purchase are skipped; player can still buy/repair normally.
+          () => {
+            for (const step of TUTORIAL_STEPS) tutorial.completed.add(step.id);
+            tutorial.stepIdx = TUTORIAL_STEPS.length;
+            tutorial.finish();
+            _revealMissions();
+            requestLock();
+          },
         );
-        // After OBJECTIVE is dismissed, show the Feet God's first directive:
-        // teach movement before interaction. The follow-up "press [E]" prompt
-        // chains in when the player reaches the door.
-        _afterTipCallback = () => {
-          if (!tutorial.active) return;
-          ui.openFeetGodDialogue(
-            "Welcome to the <b>Feet World</b>, mortal. Use <b>WASD</b> or the <b>ARROW KEYS</b> to walk forward — " +
-            "approach the <b style=\"color:#ffd700\">yellow door</b> of the Empire State Building."
-          );
-        };
       }, 250);
     }
   } else if (!_mapOpen
              && state !== 'shop' && state !== 'fleet'
              && state !== 'minigame' && state !== 'feetdex'
-             && state !== 'time-attack-popup') {
+             && state !== 'time-attack-popup'
+             && !document.getElementById('tutorial-skip')?.classList.contains('show')) {
     // Show the start/lock overlay any time pointer-lock exits and we're
     // not already inside a non-pointer-locked UI screen (shop, fleet,
     // minigame, feetdex, time-attack-popup). The body.lock-overlay-up
