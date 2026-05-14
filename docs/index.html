@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T035723';
+  var BAKED = '20260514T040231';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -130,8 +130,8 @@
     #ms-tools-pane, #ms-repair-pane { display:flex; flex-direction:column;
       flex:1 1 0; min-width:0; overflow:hidden; }
     #ms-tools-pane  { flex:1.4 1 0; }
-    #ms-repair-pane { flex:1 1 0; border-left:2px solid rgba(255,180,80,.25);
-      padding-left:24px; }
+    #ms-repair-pane { flex:1.05 1 0; border-left:2px solid rgba(255,180,80,.25);
+      padding-left:24px; padding-right:8px; }
     .ms-pane-title { font-size:18px; letter-spacing:4px; color:#FFD27A;
       margin:0 0 14px; text-shadow:0 0 8px rgba(255,180,80,.4); }
     .ms-repair-help { font-size:13px; color:#cdb285; line-height:1.45;
@@ -141,8 +141,10 @@
     #ms-cards { display:flex; gap:14px; flex-wrap:wrap;
       flex:1 1 auto; overflow-y:auto;
       align-content:flex-start; padding:18px 16px 16px; }
-    #ms-repair-cards { display:flex; flex-direction:column; gap:14px;
-      flex:1 1 auto; overflow-y:auto; padding:8px 8px 12px; }
+    /* Padding sized to clear the broken-card scale(1.04) lift + 22 px glow
+       without clipping at the pane's left border or right edge. */
+    #ms-repair-cards { display:flex; flex-direction:column; gap:16px;
+      flex:1 1 auto; overflow-y:auto; padding:18px 14px 18px 14px; }
     .ms-repair-card { background:rgba(40,28,16,.9);
       border:2px solid rgba(160,120,60,.5); border-radius:8px;
       padding:14px 16px; display:flex; align-items:center; gap:14px; }
@@ -1257,6 +1259,42 @@
       opacity:0; transition:opacity .3s; }
     .sb-card.sb-revealed .sb-ok { opacity:1; transition-delay:.9s; }
 
+    /* ── Time warp animation ──────────────────────────────────────────── */
+    #time-warp { position:fixed; inset:0; display:none;
+      background:radial-gradient(circle at center, #0a1830 0%, #02040a 70%, #000 100%);
+      z-index:235; align-items:center; justify-content:center;
+      overflow:hidden; }
+    #time-warp.show { display:flex; }
+    .tw-portal { position:absolute; left:50%; top:50%;
+      width:560px; height:560px; margin:-280px 0 0 -280px;
+      border-radius:50%;
+      background:conic-gradient(from 0deg, transparent 0%, #60c0ff 25%,
+        transparent 50%, #90d0ff 75%, transparent 100%);
+      filter:blur(12px); opacity:.85;
+      animation:tw-spin 1.6s linear infinite; }
+    .tw-portal-2 { width:340px; height:340px; margin:-170px 0 0 -170px;
+      animation:tw-spin 0.9s linear infinite reverse;
+      background:conic-gradient(from 0deg, transparent 0%, #ffd060 30%,
+        transparent 55%, #b080ff 80%, transparent 100%); }
+    @keyframes tw-spin { to { transform:rotate(360deg); } }
+    .tw-msg { position:relative; z-index:2; text-align:center;
+      color:#cce8ff; font-family:"Press Start 2P","Courier New",monospace; }
+    .tw-title { font-size:22px; color:#90d0ff; letter-spacing:5px;
+      text-shadow:0 0 18px rgba(80,160,255,.8); margin-bottom:10px;
+      animation:tw-pulse 0.8s ease-in-out infinite alternate; }
+    .tw-sub { font-size:12px; color:#a8c8e8; letter-spacing:2px;
+      margin-bottom:32px; }
+    .tw-count { font-size:120px; color:#ffd060;
+      text-shadow:0 0 30px rgba(255,200,80,.85), 0 0 60px rgba(180,120,255,.6);
+      font-weight:bold; line-height:1;
+      animation:tw-count-pop 1s ease-out; }
+    @keyframes tw-pulse { from { opacity:.7; } to { opacity:1; } }
+    @keyframes tw-count-pop {
+      0%   { transform:scale(.3); opacity:0; }
+      40%  { transform:scale(1.4); opacity:1; }
+      100% { transform:scale(1); opacity:1; }
+    }
+
     /* ── Time machine picker ──────────────────────────────────────────── */
     #tm-picker { position:fixed; inset:0; display:none;
       background:rgba(0,0,0,.7); z-index:230;
@@ -1389,6 +1427,18 @@
       </div>
       <div class="sb-foot" id="sb-foot">Take it to Morton's to repair!</div>
       <button id="sb-ok" class="sb-ok">CLICK ANYWHERE</button>
+    </div>
+  </div>
+
+  <!-- Time-warp overlay (plays after a time-machine pick, before the
+       time-attack popup appears). Spinning blue portal + countdown. -->
+  <div id="time-warp">
+    <div class="tw-portal"></div>
+    <div class="tw-portal tw-portal-2"></div>
+    <div class="tw-msg">
+      <div class="tw-title">⏳ TIME WARP ENGAGED</div>
+      <div class="tw-sub">A mission from the past is materializing…</div>
+      <div class="tw-count" id="tw-count">3</div>
     </div>
   </div>
 
@@ -2508,6 +2558,10 @@ const MISSIONS_ACTIVE_MAX = 3;
 // (until a future "time machine" tool restores it). After completion OR
 // expiry, the next find mission queues 90s later.
 const TIME_ATTACK_MS  = 40_000;
+// Time-machine retries get a longer (60 s) search window — the player is
+// re-attempting a mission they already failed, and the warp animation costs
+// them a few seconds of attention before the timer starts.
+const TIME_ATTACK_RETRY_MS = 60_000;
 const FIND_COOLDOWN_MS = 90_000;
 
 // Mission name shown in the popup — derived from feetId because we deliberately
@@ -2752,14 +2806,16 @@ class FeetDex {
     return next;
   }
 
-  // Called by the popup OK click — promote pending → active and start the 40s
-  // timer NOW. Caller is responsible for spawning the NPC.
+  // Called by the popup OK click — promote pending → active and start the
+  // timer NOW. Time-machine retries get a longer window via the
+  // `_isTimeMachineRetry` flag the picker sets on the mission.
   startPendingFind(now = performance.now()) {
     if (!this.findPending) return null;
     const m = this.findPending;
     this.findPending = null;
     this.findActive  = m;
-    this.findEndAt   = now + TIME_ATTACK_MS;
+    const dur = m._isTimeMachineRetry ? TIME_ATTACK_RETRY_MS : TIME_ATTACK_MS;
+    this.findEndAt   = now + dur;
     return m;
   }
 
@@ -7048,6 +7104,34 @@ class UI {
     el.addEventListener('click', handler);
     document.addEventListener('keydown', keyHandler, true);
     setTimeout(() => btn.focus(), 0);
+  }
+
+  // Time-warp animation. Plays a 3-2-1 countdown over a spinning portal,
+  // then fires `onDone`. Used between picking a time-machine target and
+  // popping the time-attack popup, so the player sees the warp instead of
+  // an abrupt teleport-back-to-gameplay.
+  showTimeWarp(onDone) {
+    const el  = document.getElementById('time-warp');
+    const cnt = document.getElementById('tw-count');
+    if (!el || !cnt) { onDone?.(); return; }
+    el.classList.add('show');
+    let n = 3;
+    cnt.textContent = String(n);
+    // Re-trigger the count-pop animation each tick.
+    const tick = () => {
+      n--;
+      if (n <= 0) {
+        el.classList.remove('show');
+        onDone?.();
+        return;
+      }
+      cnt.style.animation = 'none';
+      void cnt.offsetWidth;       // force reflow
+      cnt.style.animation = '';
+      cnt.textContent = String(n);
+      setTimeout(tick, 1000);
+    };
+    setTimeout(tick, 1000);
   }
 
   // Time-machine target picker. `missedList` is an array of
@@ -13479,6 +13563,7 @@ function _nearestShoebox(playerPos) {
   return best;
 }
 
+const SHOEBOX_DUP_GOLD = 30;
 function _openShoebox(sb) {
   // Remove from world FIRST so a quick double-press can't double-claim.
   const idx = _shoeboxes.indexOf(sb);
@@ -13487,7 +13572,13 @@ function _openShoebox(sb) {
   // Roll the loot.
   const toolId = feetdex.awardRandomShoeboxTool();
   if (!toolId) {
-    showHUDMessage('Empty box — you already have every shoebox tool!', 2200);
+    // No new tools left — pay out 30 g as a duplicate-shoebox bonus.
+    feetdex.gold        += SHOEBOX_DUP_GOLD;
+    feetdex.totalEarned += SHOEBOX_DUP_GOLD;
+    ui.updateGold(feetdex.gold, _nextBoosterTarget());
+    Audio.goldKaching?.();
+    ui.showGoldToast(SHOEBOX_DUP_GOLD);
+    showHUDMessage(`Bonus shoebox! +${SHOEBOX_DUP_GOLD} ⛂`, 2000);
     return;
   }
   const def = SHOEBOX_DEFS.find(d => d.id === toolId);
@@ -14177,13 +14268,33 @@ function _onUseTimeMachine() {
     });
   }
   ui.showTimeMachinePicker(missed, (id) => {
-    // Restore JUST that one mission to the draw pool by removing it from
-    // missedFinds. Then trigger an immediate cooldown reset so it queues
-    // as the very next time-attack mission.
+    // Drive the full warp sequence:
+    //   1. restore the mission to the draw pool with a retry flag,
+    //   2. close the shop overlay (skipping the tutorial-finale chain),
+    //   3. play the spinning portal countdown,
+    //   4. queue the find as PENDING so _tickTimeAttack pops the modal.
     feetdex.missedFinds.delete(id);
     feetdex.findCooldownUntil = 0;
-    ui.setShopLine?.("Mission slot reshuffled — get out there and chase that lead.");
-    ui.refreshShop?.();
+    const def = MISSION_POOL.find(m => m.id === id);
+    if (!def) return;
+    // Shallow-clone so the retry flag doesn't mutate the shared pool entry.
+    const retry = { ...def, _isTimeMachineRetry: true };
+    feetdex.findPending = retry;
+    // Suppress the usual auto-popup until the warp animation completes —
+    // we'll fire it manually at the end of the countdown.
+    _timeAttackPopupShown = true;
+    // Close the shop UI directly — bypassing _closeShop avoids firing the
+    // pending booster-tip queue (e.g. the just-repaired time-machine tip)
+    // mid-warp. The warp animation itself explains what's happening.
+    ui.closeShop?.();
+    _pendingBoosterTips.length = 0;
+    // Exit pointer lock so the warp overlay isn't fighting the canvas.
+    try { document.exitPointerLock(); } catch (_) {}
+    state = 'time-attack-popup'; // gate other input until popup is dismissed
+    ui.showTimeWarp(() => {
+      _timeAttackPopupShown = false;
+      _showTimeAttackPopup(retry);
+    });
   }, () => { /* cancelled — no-op */ });
 }
 
