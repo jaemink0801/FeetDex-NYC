@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T001804';
+  var BAKED = '20260514T002145';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -13034,6 +13034,11 @@ function _updateTutorial() {
   // from "movement learned" to "now interact" without having to read both at
   // once during the loading sequence.
   if (tutorial.isStep('walk-to-esb')) {
+    // Don't advance the step while the FIRST Feet God dialogue (the
+    // movement instruction) is still up — otherwise its text gets
+    // overwritten the moment the player walks close to the door, and
+    // the door instruction lands on top of the unread movement intro.
+    if (ui.isFeetGodDialogueOpen) return;
     const dx = player.position.x - ESB_DOOR.x;
     const dz = player.position.z - ESB_DOOR.z;
     if (dx * dx + dz * dz < 5 * 5) {
@@ -13271,20 +13276,43 @@ function _showTimeAttackPopup(mission) {
   _timeAttackPopupShown = true;
   _stateBeforeTimeAttackPopup = state;
   state = 'time-attack-popup';
-  // Release pointer lock so the cursor can click the OK button.
-  if (document.pointerLockElement === canvas) document.exitPointerLock();
 
-  ui.showTimeAttackPopup(null, () => {
-    _timeAttackPopupShown = false;
-    // Start the 40s timer and spawn the NPC into the world.
-    const m = feetdex.startPendingFind();
-    if (m) npcMgr.spawnTimeAttackNpc(m.target);
-    // Restore state. If the player was in an interior, stay there.
-    state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
-    _stateBeforeTimeAttackPopup = null;
-    requestLock();
-    _renderTimeAttackRow();
-  });
+  const reveal = () => {
+    ui.showTimeAttackPopup(null, () => {
+      _timeAttackPopupShown = false;
+      const m = feetdex.startPendingFind();
+      if (m) npcMgr.spawnTimeAttackNpc(m.target);
+      state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
+      _stateBeforeTimeAttackPopup = null;
+      requestLock();
+      _renderTimeAttackRow();
+    });
+  };
+
+  // Wait for pointer-lock release BEFORE showing the modal so the cursor is
+  // already free when the popup paints. The previous "exit + immediately
+  // show" path could leave the player mouse-locked until the next mousemove
+  // tick — looked broken even though the popup was visible.
+  if (document.pointerLockElement) {
+    const onChange = () => {
+      if (!document.pointerLockElement) {
+        document.removeEventListener('pointerlockchange', onChange);
+        reveal();
+      }
+    };
+    document.addEventListener('pointerlockchange', onChange);
+    document.exitPointerLock();
+    // Safety: if pointerlockchange doesn't fire (some embed contexts) show
+    // the popup after a short delay anyway.
+    setTimeout(() => {
+      document.removeEventListener('pointerlockchange', onChange);
+      if (!document.getElementById('time-attack-popup')?.classList.contains('show')) {
+        reveal();
+      }
+    }, 250);
+  } else {
+    reveal();
+  }
 }
 
 function _renderTimeAttackRow() {
