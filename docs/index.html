@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T041429';
+  var BAKED = '20260514T041528';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -132,10 +132,10 @@
     #ms-tools-pane  { flex:1.4 1 0; }
     #ms-repair-pane { flex:1.05 1 0; border-left:2px solid rgba(255,180,80,.25);
       padding-left:24px; padding-right:8px; }
-    .ms-pane-title { font-size:18px; letter-spacing:4px; color:#FFD27A;
-      margin:0 0 14px; text-shadow:0 0 8px rgba(255,180,80,.4); }
-    .ms-repair-help { font-size:13px; color:#cdb285; line-height:1.45;
-      margin-bottom:14px; max-width:420px; }
+    .ms-pane-title { font-size:22px; letter-spacing:5px; color:#FFD27A;
+      margin:0 0 18px; text-shadow:0 0 10px rgba(255,180,80,.45); }
+    .ms-repair-help { font-size:16px; color:#e3cca0; line-height:1.55;
+      margin-bottom:18px; max-width:460px; }
     /* Side/top padding sized to clear the highlighted card's scale(1.04)
        lift PLUS its 22 px glow without clipping at the pane edge. */
     #ms-cards { display:flex; gap:12px; flex-wrap:wrap;
@@ -167,8 +167,10 @@
     .ms-repair-card.ready .rc-btn { background:rgba(60,120,80,.6);
       border-color:rgba(120,200,140,.7); }
     .ms-repair-card.ready .rc-btn:hover { background:rgba(80,160,100,.8); }
-    .ms-repair-empty { font-size:13px; color:#8a7a5a; font-style:italic;
-      padding:14px 0; line-height:1.5; }
+    .ms-repair-empty { font-size:17px; color:#cdb285; font-style:italic;
+      padding:20px 6px; line-height:1.55; text-align:center;
+      background:rgba(40,28,16,.55); border:1px dashed rgba(255,180,80,.35);
+      border-radius:8px; }
     .ms-cards-orig { display:flex; gap:20px; flex-wrap:wrap; justify-content:center;
       max-width:1300px; flex:1 1 auto; overflow-y:auto;
       align-content:flex-start; padding:24px 14px 18px; }
