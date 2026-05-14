@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T041528';
+  var BAKED = '20260514T041738';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1120,15 +1120,43 @@
     .ta-row .ta-bar-fill { height:100%; background:linear-gradient(90deg,#ff3030,#ffb030);
       width:100%; transition:width .15s linear, background-color .25s; }
     .ta-row .ta-label { font-size:13px; line-height:1.3; color:#ffe6e6; }
-    /* Active find mission — pulses red so the player can't miss it */
-    .ta-row.ta-active { border-color:#ff3030;
+    /* Active find mission — BIG red glow so the player can't miss it. */
+    .ta-row.ta-active { border-color:#ff3030; border-width:3px;
       animation:ta-pulse .9s ease-in-out infinite; }
     .ta-row.ta-active.ta-final5 { animation-duration:.4s; }
     .ta-row.ta-active .ta-time { color:#ffe040; }
     .ta-row.ta-active.ta-final5 .ta-time { color:#ff5555; }
     @keyframes ta-pulse {
-      0%,100% { box-shadow:0 0 8px rgba(255,40,40,.30); border-color:#ff6060; }
-      50%     { box-shadow:0 0 20px rgba(255,40,40,.70); border-color:#ff3030; }
+      0%,100% {
+        box-shadow:0 0 28px rgba(255,40,40,.65),
+                   0 0 64px rgba(255,60,60,.45),
+                   0 0 110px rgba(255,80,80,.25);
+        border-color:#ff6060;
+      }
+      50% {
+        box-shadow:0 0 48px rgba(255,40,40,1),
+                   0 0 110px rgba(255,40,40,.7),
+                   0 0 180px rgba(255,60,60,.4);
+        border-color:#ff1010;
+      }
+    }
+    /* Final-5 escalates further — almost a heartbeat halo. */
+    .ta-row.ta-active.ta-final5 {
+      animation-name:ta-pulse-urgent;
+    }
+    @keyframes ta-pulse-urgent {
+      0%,100% {
+        box-shadow:0 0 36px rgba(255,40,40,.9),
+                   0 0 90px rgba(255,40,40,.6),
+                   0 0 160px rgba(255,80,80,.35);
+        border-color:#ff3030;
+      }
+      50% {
+        box-shadow:0 0 64px rgba(255,40,40,1),
+                   0 0 140px rgba(255,40,40,.8),
+                   0 0 230px rgba(255,60,60,.55);
+        border-color:#ff0000;
+      }
     }
     /* Idle (no mission, no cooldown) — dim it down */
     .ta-row.ta-idle { opacity:.55; border-color:rgba(120,120,120,.4);
@@ -1210,16 +1238,17 @@
       animation:tap-fade .25s ease-out; }
     #shoebox-popup.show { display:flex; }
     .sb-card { background:linear-gradient(180deg,#2a1a08,#10080c);
-      border:3px solid #ffaa40; border-radius:14px;
-      box-shadow:0 0 50px rgba(255,180,60,.6), 0 10px 28px rgba(0,0,0,.7);
-      padding:24px 38px 22px; max-width:480px; text-align:center;
+      border:4px solid #ffaa40; border-radius:16px;
+      box-shadow:0 0 90px rgba(255,180,60,.85), 0 0 200px rgba(255,160,40,.5),
+                 0 12px 36px rgba(0,0,0,.75);
+      padding:30px 46px 28px; max-width:560px; text-align:center;
       color:#ffe6c8; font-family:"Press Start 2P","Courier New",monospace;
       animation:tap-pop .45s cubic-bezier(.2,1.5,.4,1); }
-    .sb-title { font-size:20px; color:#ffd060; letter-spacing:4px;
-      text-shadow:0 0 14px rgba(255,200,80,.7); margin-bottom:24px; }
-    /* Stage is tall enough to host the icon (64) + name (18) + 2-line desc
-       (~38) + their margins (~24) without ever overlapping the title. */
-    .sb-stage { position:relative; height:210px; margin-bottom:10px; }
+    .sb-title { font-size:28px; color:#ffd060; letter-spacing:5px;
+      text-shadow:0 0 18px rgba(255,200,80,.85); margin-bottom:28px; }
+    /* Stage is tall enough to host the icon (80) + name (22) + 2-line desc
+       (~48) + their margins (~30) without ever overlapping the title. */
+    .sb-stage { position:relative; height:260px; margin-bottom:12px; }
     .sb-box, .sb-reveal { position:absolute; left:50%; top:50%;
       transform:translate(-50%, -50%); }
     .sb-box { width:120px; height:120px; background:#ff8a3d;
@@ -1247,22 +1276,23 @@
       60%  { opacity:1; transform:translate(-50%, -50%) scale(1.15) rotateY(0); }
       100% { opacity:1; transform:translate(-50%, -50%) scale(1) rotateY(0); }
     }
-    .sb-icon { font-size:56px; line-height:1; }
-    .sb-name { font-size:17px; color:#ffd060; letter-spacing:2.5px;
-      margin-top:8px; text-shadow:0 0 10px rgba(255,200,80,.6); }
-    .sb-desc { font-size:11px; color:#ffe6c8; line-height:1.4;
-      margin-top:8px; max-width:340px; }
+    .sb-icon { font-size:78px; line-height:1; }
+    .sb-name { font-size:22px; color:#ffd060; letter-spacing:3px;
+      margin-top:12px; text-shadow:0 0 14px rgba(255,200,80,.7); }
+    .sb-desc { font-size:14px; color:#ffe6c8; line-height:1.5;
+      margin-top:10px; max-width:400px; }
     .sb-reveal { width:90%; }
-    .sb-count { font-size:12px; color:#ffd060; letter-spacing:2px;
-      margin-bottom:10px; opacity:0; transition:opacity .3s; }
+    .sb-count { font-size:15px; color:#ffd060; letter-spacing:2.5px;
+      margin-bottom:12px; opacity:0; transition:opacity .3s;
+      text-shadow:0 0 8px rgba(255,200,80,.5); }
     .sb-card.sb-revealed .sb-count { opacity:1; transition-delay:.65s; }
-    .sb-foot { font-size:13px; color:#ffb060; margin-bottom:14px;
-      letter-spacing:1px; opacity:0; transition:opacity .3s; }
+    .sb-foot { font-size:16px; color:#ffb060; margin-bottom:16px;
+      letter-spacing:1.5px; opacity:0; transition:opacity .3s; }
     .sb-card.sb-revealed .sb-foot { opacity:1; transition-delay:.7s; }
     .sb-ok { background:linear-gradient(180deg,#ffa040,#c06010);
       border:2px solid #ffd090; border-radius:8px;
-      color:#fff; font-family:inherit; font-size:11px; letter-spacing:2px;
-      padding:10px 18px; cursor:pointer;
+      color:#fff; font-family:inherit; font-size:14px; letter-spacing:2.5px;
+      padding:12px 22px; cursor:pointer;
       box-shadow:0 4px 14px rgba(255,140,40,.45);
       opacity:0; transition:opacity .3s; }
     .sb-card.sb-revealed .sb-ok { opacity:1; transition-delay:.9s; }
@@ -13542,15 +13572,15 @@ function _spawnShoeboxes() {
 function _makeShoebox(x, y, z) {
   const group = new THREE.Group();
   group.position.set(x, y + 1.2, z);
-  // Body — bigger orange box so the player can spot it across a street.
+  // Body — bigger orange box with HEAVY emissive so it glows from inside.
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(1.6, 0.78, 1.0),
-    new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0x4a1a00, emissiveIntensity: 0.6, roughness: 0.55 }),
+    new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0xff5a00, emissiveIntensity: 1.4, roughness: 0.55 }),
   );
   group.add(body);
   const lid = new THREE.Mesh(
     new THREE.BoxGeometry(1.72, 0.18, 1.10),
-    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0x7a3500, emissiveIntensity: 0.5, roughness: 0.5 }),
+    new THREE.MeshStandardMaterial({ color: 0xffb070, emissive: 0xff8030, emissiveIntensity: 1.2, roughness: 0.5 }),
   );
   lid.position.y = 0.46;
   group.add(lid);
@@ -13563,18 +13593,30 @@ function _makeShoebox(x, y, z) {
   const q3 = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.08, 0.04), qMat);
   q3.position.set(0, -0.18, 0.515);
   group.add(q1, q2, q3);
-  // Halo glow — additive sphere that pulses
+  // INNER halo — saturated near the box.
   const glow = new THREE.Mesh(
-    new THREE.SphereGeometry(1.5, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.22, depthWrite: false }),
+    new THREE.SphereGeometry(2.0, 24, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffd060, transparent: true, opacity: 0.45, depthWrite: false }),
   );
   group.add(glow);
-  // Point light so the box actually lights nearby ground/buildings
-  const light = new THREE.PointLight(0xffc070, 2.2, 9.0, 2.0);
+  // OUTER halo — soft falloff to a wider radius. Visible from across the
+  // block so the player spots shoeboxes between buildings.
+  const glow2 = new THREE.Mesh(
+    new THREE.SphereGeometry(3.6, 24, 16),
+    new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, opacity: 0.18, depthWrite: false }),
+  );
+  group.add(glow2);
+  // Point light — much brighter / longer range so the box actually paints
+  // light on the surrounding street and adjacent building walls.
+  const light = new THREE.PointLight(0xffc070, 6.0, 16.0, 1.6);
   light.position.set(0, 0.3, 0);
   group.add(light);
   scene.add(group);
-  return { group, glow, light, basePos: new THREE.Vector3(x, y + 1.2, z), t: Math.random() * Math.PI * 2 };
+  return {
+    group, glow, glow2, light,
+    basePos: new THREE.Vector3(x, y + 1.2, z),
+    t: Math.random() * Math.PI * 2,
+  };
 }
 
 function _updateShoeboxes(elapsed, dt) {
@@ -13585,10 +13627,11 @@ function _updateShoeboxes(elapsed, dt) {
     sb.group.position.y = sb.basePos.y + bob;
     // Slow spin so the question mark is always visible from some angle
     sb.group.rotation.y += dt * 1.4;
-    // Pulsing halo
-    const pulse = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(sb.t * 2.2));
-    sb.glow.material.opacity = 0.10 + 0.18 * pulse;
-    sb.light.intensity      = 0.8 + 1.6 * pulse;
+    // Pulsing halos (both inner and outer breathe in sync).
+    const pulse = 0.5 + 0.5 * Math.sin(sb.t * 2.2);
+    sb.glow.material.opacity  = 0.35 + 0.30 * pulse;
+    if (sb.glow2) sb.glow2.material.opacity = 0.14 + 0.18 * pulse;
+    sb.light.intensity = 4.0 + 4.0 * pulse;
   }
 }
 
