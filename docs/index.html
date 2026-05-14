@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T043523';
+  var BAKED = '20260514T043553';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -5987,8 +5987,10 @@ class CombatEncounter {
                      : npc.rarity === 'mythic'    ? 1.65        * 0.8
                      : npc.rarity === 'epic'      ? 0.825       * 0.8
                      : 1;
-    this._atkCd  = NPC_ATK_CD / speedMult;
-    this._windup = NPC_WINDUP / speedMult;
+    // Difficulty also scales attack speed: hard/insane shrink the windup
+    // and cooldown so the player must dodge faster.
+    this._atkCd  = NPC_ATK_CD / (speedMult * diffMult);
+    this._windup = NPC_WINDUP / (speedMult * diffMult);
 
     this._lastHit       = 0;
     this._swingStart    = 0;        // when current NPC swing started; 0 = idle
@@ -5998,10 +6000,10 @@ class CombatEncounter {
     this._active        = true;
     // Chase speed scales with tier. Legendary reverted from 1.875×
     // back to its prior 1.5× (≈12.15 m/s) — the +25% bump removed.
-    this._chaseSpeed    = npc.rarity === 'secret'    ? 8.1 * 2.0
-                        : npc.rarity === 'legendary' ? 8.1 * 1.5
-                        : npc.rarity === 'epic'      ? 8.1 * 0.5   // half mobility
-                        : 8.1;
+    this._chaseSpeed    = (npc.rarity === 'secret'    ? 8.1 * 2.0
+                        :  npc.rarity === 'legendary' ? 8.1 * 1.5
+                        :  npc.rarity === 'epic'      ? 8.1 * 0.5   // half mobility
+                        :  8.1) * diffMult;
     this._origGroupY    = npc.group.position.y;
     this._origGroupRotX = npc.group.rotation.x;
     this._bodyScale     = npc.group.scale.x;
