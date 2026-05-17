@@ -8,43 +8,55 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260517T155528';
-  try {
+  var BAKED = '20260517T155808';
+  function _hide(){ try { document.documentElement.style.visibility = "hidden"; } catch (e) {} }
+  function _goto(latest){
     var u = new URL(location.href);
-    if (u.searchParams.get("v") === BAKED) return;
+    u.searchParams.set("v", latest);
+    // Add a one-shot cachebreaker so even the redirect target
+    // can't be served stale from disk cache.
+    u.searchParams.set("_cb", Date.now().toString(36));
+    _hide();
+    location.replace(u.toString());
+  }
+  try {
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", "version.txt?t=" + Date.now(), false);
+    // Aggressive cache-bust on version.txt: timestamp + random
+    // suffix means every fetch is a unique URL the browser has
+    // never seen, so it has no choice but to ask the server.
+    var v = "version.txt?t=" + Date.now() + "&r=" + Math.random().toString(36).slice(2);
+    xhr.open("GET", v, false);
+    try { xhr.setRequestHeader("Cache-Control", "no-store, max-age=0"); } catch (e) {}
+    try { xhr.setRequestHeader("Pragma", "no-cache"); } catch (e) {}
     xhr.send();
     var latest = (xhr.responseText || "").trim();
     if (latest && latest !== BAKED) {
-      u.searchParams.set("v", latest);
-      location.replace(u.toString());
-      // Hide the (about to be navigated-away) page so the stale
-      // splash never flashes in front of the user.
-      document.documentElement.style.visibility = "hidden";
+      _goto(latest);
       // Stop parsing/executing the rest of this stale document.
       throw new Error("reloading to " + latest);
     }
-    // No version mismatch — stamp the URL so the user lands on a
-    // version-keyed cache entry next time and we can short-circuit
-    // the XHR via the early-return above.
-    if (!u.searchParams.get("v")) {
-      u.searchParams.set("v", BAKED);
-      history.replaceState(null, "", u.toString());
+    // We ARE the latest version. Strip the one-shot ?_cb= if
+    // present (so the URL stays clean on refresh) and stamp the
+    // canonical ?v=<baked> on the address bar.
+    var u2 = new URL(location.href);
+    var dirty = u2.searchParams.has("_cb")
+             || u2.searchParams.get("v") !== BAKED;
+    if (dirty) {
+      u2.searchParams.delete("_cb");
+      u2.searchParams.set("v", BAKED);
+      history.replaceState(null, "", u2.toString());
     }
   } catch (e) {
     if (e && /reloading to/.test(e.message)) throw e;
-    // XHR blocked (rare extension/CSP case) — fall back to async
-    // fetch. Not as bulletproof but better than nothing.
-    fetch("version.txt?t=" + Date.now(), { cache: "no-store" })
+    // Sync XHR blocked (rare extension / CSP case) — fall back
+    // to async fetch. Not as bulletproof (the stale game may run
+    // briefly before the redirect fires) but better than nothing.
+    fetch("version.txt?t=" + Date.now() + "&r=" + Math.random().toString(36).slice(2),
+          { cache: "no-store" })
       .then(function(r){ return r.ok ? r.text() : ""; })
       .then(function(latest){
         latest = (latest || "").trim();
-        if (latest && latest !== BAKED) {
-          var u2 = new URL(location.href);
-          u2.searchParams.set("v", latest);
-          location.replace(u2.toString());
-        }
+        if (latest && latest !== BAKED) _goto(latest);
       })
       .catch(function(){});
   }
