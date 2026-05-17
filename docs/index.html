@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260517T155259';
+  var BAKED = '20260517T155528';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -13438,7 +13438,17 @@ document.addEventListener('pointerlockchange', () => {
              && state !== 'minigame' && state !== 'feetdex'
              && state !== 'time-attack-popup' && state !== 'shoebox'
              && !document.getElementById('tutorial-skip')?.classList.contains('show')
-             && !document.getElementById('difficulty-picker')?.classList.contains('show')) {
+             && !document.getElementById('difficulty-picker')?.classList.contains('show')
+             // Don't surface the start / lock overlay underneath an active
+             // in-world dialogue. The Feet God speech, generic tips, the
+             // tutorial-complete celebration, and the legendary 3-meeting
+             // hint all unlock the pointer so the player can press [E] —
+             // showing the start menu behind them looks like the game
+             // crashed back to the title screen.
+             && !document.getElementById('feetgod-overlay')?.classList.contains('active')
+             && !document.getElementById('generic-tip')?.classList.contains('active')
+             && !document.getElementById('tutorial-complete')?.classList.contains('active')
+             && !document.getElementById('legendary-hint')?.classList.contains('active')) {
     ui.showLockOverlay();
   }
 });
