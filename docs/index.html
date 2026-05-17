@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260514T045628';
+  var BAKED = '20260517T155259';
   try {
     var u = new URL(location.href);
     if (u.searchParams.get("v") === BAKED) return;
@@ -1206,38 +1206,95 @@
       box-shadow:0 6px 18px rgba(255,80,40,.6); }
     .tap-ok:active { transform:translateY(1px); }
 
-    /* ── Tutorial skip prompt ─────────────────────────────────────────── */
-    #tutorial-skip { position:fixed; inset:0; display:none;
-      background:rgba(0,0,0,.72); z-index:240;
-      align-items:center; justify-content:center; }
-    #tutorial-skip.show { display:flex; }
-    .tsk-card { background:linear-gradient(180deg,#1a2820,#0a140e);
-      border:3px solid #FFD27A; border-radius:14px;
-      box-shadow:0 0 40px rgba(255,210,120,.55), 0 10px 28px rgba(0,0,0,.7);
-      padding:30px 40px 26px; max-width:520px; text-align:center;
-      color:#fff5dd; font-family:"Press Start 2P","Courier New",monospace; }
-    .tsk-title { font-size:22px; color:#FFD27A; letter-spacing:5px;
-      text-shadow:0 0 14px rgba(255,210,120,.6); margin-bottom:14px; }
-    .tsk-sub { font-size:13px; line-height:1.55; color:#e6d3a8;
-      margin-bottom:24px; }
-    .tsk-buttons { display:flex; gap:14px; justify-content:center; }
-    .tsk-btn { border:2px solid #FFD27A; border-radius:8px;
-      color:#fff; font-family:inherit; font-size:12px; letter-spacing:2px;
-      padding:12px 20px; cursor:pointer; min-width:160px;
-      transition:transform .12s, box-shadow .15s; }
-    .tsk-btn:hover { transform:translateY(-1px);
-      box-shadow:0 6px 18px rgba(255,210,120,.45); }
-    .tsk-btn-yes { background:linear-gradient(180deg,#5fa86a,#2f6638);
-      border-color:#a6e0ad; }
-    .tsk-btn-no  { background:linear-gradient(180deg,#a07050,#5a3520); }
-    .tsk-btn-insane { background:linear-gradient(180deg,#a83030,#581515);
-      border-color:#ffa0a0;
-      animation:ms-card-pulse 1.6s ease-in-out infinite; }
+    /* ── Difficulty picker + Tutorial skip prompt ───────────────────────
+       These cold-load modals borrow the Feet God dialogue panel exactly —
+       dark gold-bordered slab with a pulsing glow, big spaced "FEET GOD"
+       name at top, cream body copy, and CTA buttons that match the
+       in-world [E] CONTINUE hint typography. The dim radial vignette
+       behind the panel mirrors #feetgod-overlay so these prompts read
+       as the Feet God speaking BEFORE the game begins — not a separate
+       browser modal. */
+    #tutorial-skip, #difficulty-picker { position:fixed; inset:0; display:none;
+      z-index:240; pointer-events:none;
+      align-items:flex-end; justify-content:center; }
+    #tutorial-skip.show, #difficulty-picker.show { display:flex; }
 
-    #difficulty-picker { position:fixed; inset:0; display:none;
-      background:rgba(0,0,0,.72); z-index:240;
-      align-items:center; justify-content:center; }
-    #difficulty-picker.show { display:flex; }
+    /* Backdrop vignette — same pattern as #feetgod-vignette so the two
+       feel identical when the player triggers either flow. */
+    #tutorial-skip::before, #difficulty-picker::before {
+      content:''; position:absolute; inset:0; pointer-events:none;
+      background:
+        radial-gradient(ellipse at center, rgba(0,0,0,0) 30%, rgba(40,28,4,.55) 70%, rgba(60,42,6,.92) 100%),
+        radial-gradient(ellipse at center, rgba(255,215,0,.10) 0%, rgba(255,215,0,0) 55%);
+      animation:fg-vignette-pulse 3.4s ease-in-out infinite;
+    }
+
+    .tsk-card { position:relative; width:min(880px, 92vw);
+      margin:0 0 38px 0; padding:24px 30px 22px;
+      background:linear-gradient(180deg, rgba(36,22,4,.97) 0%, rgba(14,8,2,.98) 100%);
+      border:3px solid #FFD700; border-radius:10px; pointer-events:auto;
+      box-shadow:0 0 38px rgba(255,215,0,.65),
+                 0 0 80px rgba(255,180,40,.35),
+                 inset 0 0 28px rgba(255,215,0,.18);
+      animation:fg-border-glow 2.2s ease-in-out infinite,
+                tap-pop .5s cubic-bezier(.2,1.5,.4,1);
+      font-family:'Courier New',monospace; }
+
+    /* "FEET GOD" header — identical type-treatment to #feetgod-name. */
+    .tsk-name { font-size:30px; font-weight:bold; letter-spacing:9px;
+      color:#FFD700; line-height:1; margin-bottom:14px;
+      text-shadow:0 0 14px rgba(255,215,0,.9), 0 0 28px rgba(255,140,20,.55),
+                  2px 2px 0 #1a0d00, 4px 4px 0 #0a0500; }
+
+    /* Body copy — cream on dark, matches #feetgod-text. */
+    .tsk-body { font-size:18px; line-height:1.6; color:#FFE9A8;
+      text-shadow:0 0 6px rgba(255,215,0,.4), 1px 1px 2px #000; }
+    .tsk-body b { color:#FFFFFF; text-shadow:0 0 8px rgba(255,255,255,.5); }
+
+    /* CTA row — buttons typed like the in-world [E] CONTINUE hint:
+       gold, spaced caps, glowing on hover. No web-modal-button styling. */
+    .tsk-cta-row { display:flex; gap:18px; flex-wrap:wrap; justify-content:flex-end;
+      margin-top:22px; align-items:flex-end; }
+    .tsk-cta { background:transparent; border:none; cursor:pointer;
+      font-family:inherit; padding:6px 10px; text-align:right;
+      transition:transform .12s, filter .15s; }
+    .tsk-cta-key { font-size:22px; font-weight:900; letter-spacing:3px;
+      color:#FFEC60; text-shadow:0 0 14px rgba(255,236,96,.95), 2px 2px 3px #000; }
+    .tsk-cta-label { display:block; font-size:13px; font-weight:bold;
+      letter-spacing:3px; color:#FFD700;
+      text-shadow:0 0 10px rgba(255,215,0,.7), 1px 1px 2px #000;
+      margin-top:4px; }
+    .tsk-cta-sub { display:block; font-size:10px; letter-spacing:2px;
+      color:#FFE9A8; opacity:.75; margin-top:4px;
+      text-shadow:1px 1px 2px #000; }
+    .tsk-cta:hover { transform:translateY(-2px);
+      filter:drop-shadow(0 0 14px rgba(255,236,96,.65)); }
+    .tsk-cta:hover .tsk-cta-key   { color:#FFFFFF;
+      text-shadow:0 0 18px rgba(255,255,255,1), 0 0 30px rgba(255,236,96,.8), 2px 2px 3px #000; }
+    .tsk-cta:hover .tsk-cta-label { color:#FFEC60; }
+    .tsk-cta:active { transform:translateY(0); }
+    .tsk-cta:focus  { outline:none; }
+
+    /* Variant tints — match the danger ramp of the Feet God overlay's
+       red/orange/gold accent palette. */
+    .tsk-cta-hard  .tsk-cta-key   { color:#FFB060;
+      text-shadow:0 0 14px rgba(255,176,96,.9), 2px 2px 3px #000; }
+    .tsk-cta-hard  .tsk-cta-label { color:#FFB060;
+      text-shadow:0 0 10px rgba(255,176,96,.7), 1px 1px 2px #000; }
+    .tsk-cta-hard:hover  .tsk-cta-key   { color:#FFFFFF;
+      text-shadow:0 0 18px rgba(255,255,255,1), 0 0 30px rgba(255,140,40,.8), 2px 2px 3px #000; }
+    .tsk-cta-insane .tsk-cta-key   { color:#FF6868;
+      text-shadow:0 0 14px rgba(255,80,80,.95), 2px 2px 3px #000;
+      animation:tsk-insane-flicker 1.4s ease-in-out infinite; }
+    .tsk-cta-insane .tsk-cta-label { color:#FF6868;
+      text-shadow:0 0 10px rgba(255,80,80,.75), 1px 1px 2px #000; }
+    .tsk-cta-insane:hover .tsk-cta-key {
+      text-shadow:0 0 20px rgba(255,255,255,1), 0 0 36px rgba(255,40,40,.9), 2px 2px 3px #000; }
+    @keyframes tsk-insane-flicker {
+      0%, 100% { opacity:1;   }
+      48%      { opacity:.85; }
+      52%      { opacity:1;   }
+    }
 
     /* ── Shoebox reveal popup ─────────────────────────────────────────── */
     #shoebox-popup { position:fixed; inset:0; display:none; cursor:pointer;
@@ -1444,33 +1501,57 @@
   </div>
 
   <!-- Difficulty picker — shown BEFORE the tutorial-skip prompt on cold
-       load. Sets a multiplier applied to every boss's HP / damage. -->
+       load. Sets a multiplier applied to every boss's HP / damage.
+       Visually styled like a Feet God dialogue so it slots into the
+       game's voice instead of feeling like a web modal. -->
   <div id="difficulty-picker">
     <div class="tsk-card">
-      <div class="tsk-title">CHOOSE DIFFICULTY</div>
-      <div class="tsk-sub">
-        Affects boss HP &amp; damage.<br/>
-        You can replay with a different setting any time.
+      <div class="tsk-name">FEET GOD</div>
+      <div class="tsk-body">
+        Before you walk my city, mortal — pick how hard my <b>bosses</b> hit.
+        Every coin earned will mean more at the higher tiers.
       </div>
-      <div class="tsk-buttons">
-        <button id="diff-easy"   class="tsk-btn tsk-btn-yes">EASY</button>
-        <button id="diff-hard"   class="tsk-btn tsk-btn-no">HARD &nbsp;(+20%)</button>
-        <button id="diff-insane" class="tsk-btn tsk-btn-insane">INSANE&nbsp;(+40%)</button>
+      <div class="tsk-cta-row">
+        <button id="diff-easy" class="tsk-cta">
+          <span class="tsk-cta-key">[ E ]</span>
+          <span class="tsk-cta-label">EASY</span>
+          <span class="tsk-cta-sub">BOSSES @ 100%</span>
+        </button>
+        <button id="diff-hard" class="tsk-cta tsk-cta-hard">
+          <span class="tsk-cta-key">[ H ]</span>
+          <span class="tsk-cta-label">HARD</span>
+          <span class="tsk-cta-sub">BOSSES +20%</span>
+        </button>
+        <button id="diff-insane" class="tsk-cta tsk-cta-insane">
+          <span class="tsk-cta-key">[ I ]</span>
+          <span class="tsk-cta-label">INSANE</span>
+          <span class="tsk-cta-sub">BOSSES +40%</span>
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Tutorial skip prompt — first thing the player sees on cold load. -->
+  <!-- Tutorial skip prompt — first thing the player sees on cold load.
+       Same Feet-God-dialogue styling as the difficulty picker. -->
   <div id="tutorial-skip">
     <div class="tsk-card">
-      <div class="tsk-title">PLAY TUTORIAL?</div>
-      <div class="tsk-sub">
-        Walks you through movement, the map, and Morton's Shop.<br/>
-        Skipping drops you straight into free play.
+      <div class="tsk-name">FEET GOD</div>
+      <div class="tsk-body">
+        First time in my city, mortal? I can walk you through <b>movement</b>,
+        the <b>map</b>, and <b>Morton's Shop</b> — or set you loose to learn
+        the streets yourself. Either way, Morton has your <b>20 gold</b>.
       </div>
-      <div class="tsk-buttons">
-        <button id="tsk-yes" class="tsk-btn tsk-btn-yes">PLAY TUTORIAL</button>
-        <button id="tsk-no"  class="tsk-btn tsk-btn-no">SKIP</button>
+      <div class="tsk-cta-row">
+        <button id="tsk-yes" class="tsk-cta">
+          <span class="tsk-cta-key">[ Y ]</span>
+          <span class="tsk-cta-label">PLAY TUTORIAL</span>
+          <span class="tsk-cta-sub">RECOMMENDED</span>
+        </button>
+        <button id="tsk-no" class="tsk-cta tsk-cta-hard">
+          <span class="tsk-cta-key">[ N ]</span>
+          <span class="tsk-cta-label">SKIP</span>
+          <span class="tsk-cta-sub">I KNOW THE STREETS</span>
+        </button>
       </div>
     </div>
   </div>
@@ -3882,23 +3963,25 @@ class Player {
       this._saber.position.z = rest.pz - arc * 0.18;  // forward thrust
 
       if (this._saberBladeMat) {
-        this._saberBladeMat.emissiveIntensity = 1.6 + arc * 3.4;
+        this._saberBladeMat.emissiveIntensity = 3.0 + arc * 3.4;
       }
       if (this._saberHaloMat) {
-        this._saberHaloMat.opacity = 0.22 + arc * 0.55;
+        this._saberHaloMat.opacity = 0.55 + arc * 0.40;
       }
       if (this._saberTrailMat) {
         this._saberTrailMat.opacity = arc * 0.65;
       }
     } else {
-      // Idle — drift back to rest.
+      // Idle — drift back to rest. Blade stays brightly lit between
+      // strikes; the lightsaber should read as "on" the whole fight,
+      // not blink to life only during chops.
       this._saber.rotation.x += (rest.rx - this._saber.rotation.x) * 0.20;
       this._saber.rotation.y += (rest.ry - this._saber.rotation.y) * 0.20;
       this._saber.rotation.z += (rest.rz - this._saber.rotation.z) * 0.20;
       this._saber.position.y += (rest.py - this._saber.position.y) * 0.20;
       this._saber.position.z += (rest.pz - this._saber.position.z) * 0.20;
-      if (this._saberBladeMat) this._saberBladeMat.emissiveIntensity = 1.6;
-      if (this._saberHaloMat)  this._saberHaloMat.opacity = 0.22;
+      if (this._saberBladeMat) this._saberBladeMat.emissiveIntensity = 3.0;
+      if (this._saberHaloMat)  this._saberHaloMat.opacity = 0.55;
       if (this._saberTrailMat) this._saberTrailMat.opacity = 0;
     }
 
@@ -6066,26 +6149,39 @@ class CombatEncounter {
     const dz = player.position.z - npc.group.position.z;
     const dist = Math.hypot(dx, dz);
 
+    // Free-space test for the boss body. Checks BOTH collider registries:
+    //   - window.SOLID_COLLIDERS — Box3-format props the world also pushes
+    //   - world.getSolids(interiorId) — minX/maxX/minZ/maxZ AABBs that
+    //     hold every building + sidewalk prop the player itself collides
+    //     against. The boss was previously only checking the first list,
+    //     which is why it phased straight through buildings during fights.
+    const NPC_R = 0.55 * (npc.group?.scale?.x || 1);
+    const _world = window.gameWorld;
+    const _solids = _world ? _world.getSolids(window.gameInteriorId ?? null) : null;
+    const free = (x, z) => {
+      for (const entry of (window.SOLID_COLLIDERS || [])) {
+        const b = entry.box;
+        if (x + NPC_R > b.min.x && x - NPC_R < b.max.x &&
+            z + NPC_R > b.min.z && z - NPC_R < b.max.z) return false;
+      }
+      if (_solids) {
+        for (const s of _solids) {
+          if (x + NPC_R > s.minX && x - NPC_R < s.maxX &&
+              z + NPC_R > s.minZ && z - NPC_R < s.maxZ) return false;
+        }
+      }
+      return true;
+    };
+
     if (dist > NPC_HIT_RANGE * 0.85) {
       const nx = dx / (dist || 1);
       const nz = dz / (dist || 1);
       const step = this._chaseSpeed * dt;
       const targetX = npc.group.position.x + nx * step;
       const targetZ = npc.group.position.z + nz * step;
-      // Honor solid obstacles. If a direct step would clip into a wall
-      // or building, try sliding along just X then just Z (a poor man's
-      // pathing — covers the common case of being on the wrong side of
-      // a building). If both axes are blocked, the NPC stalls for that
-      // frame, which lets the player escape.
-      const NPC_R = 0.55 * (npc.group?.scale?.x || 1);
-      const free = (x, z) => {
-        for (const entry of (window.SOLID_COLLIDERS || [])) {
-          const b = entry.box;
-          if (x + NPC_R > b.min.x && x - NPC_R < b.max.x &&
-              z + NPC_R > b.min.z && z - NPC_R < b.max.z) return false;
-        }
-        return true;
-      };
+      // If a direct step would clip into a wall or building, try sliding
+      // along just X then just Z. If both axes are blocked, the NPC stalls
+      // for the frame, which lets the player exploit corners.
       if (free(targetX, targetZ)) {
         npc.group.position.x = targetX;
         npc.group.position.z = targetZ;
@@ -6099,9 +6195,26 @@ class CombatEncounter {
     npc.group.rotation.y = Math.atan2(dx, dz);
 
     // ── Recoil decay (after the player lands a hit) ──────────────────────
+    // Recoil also has to honor colliders — otherwise a well-timed hit can
+    // launch the boss straight through the side of a building.
     if (this._recoilDx || this._recoilDz) {
-      npc.group.position.x += this._recoilDx;
-      npc.group.position.z += this._recoilDz;
+      const rxTarget = npc.group.position.x + this._recoilDx;
+      const rzTarget = npc.group.position.z + this._recoilDz;
+      if (free(rxTarget, rzTarget)) {
+        npc.group.position.x = rxTarget;
+        npc.group.position.z = rzTarget;
+      } else if (free(rxTarget, npc.group.position.z)) {
+        npc.group.position.x = rxTarget;
+        this._recoilDz = 0;
+      } else if (free(npc.group.position.x, rzTarget)) {
+        npc.group.position.z = rzTarget;
+        this._recoilDx = 0;
+      } else {
+        // Wedged into a corner — kill the recoil so the boss doesn't
+        // tunnel through the wall on the next sub-decay step.
+        this._recoilDx = 0;
+        this._recoilDz = 0;
+      }
       this._recoilDx *= 0.78;
       this._recoilDz *= 0.78;
       if (Math.abs(this._recoilDx) < 0.001) this._recoilDx = 0;
@@ -7139,12 +7252,16 @@ class UI {
   }
 
   // Difficulty picker — shown ONCE at game start before the tutorial-skip
-  // prompt. onPick is called with 'easy' | 'hard' | 'insane'.
+  // prompt. onPick is called with 'easy' | 'hard' | 'insane'. Click OR
+  // press [E] / [H] / [I] to choose (the panel renders the keys as
+  // [E]/[H]/[I] CTAs so the shortcut needs to actually work).
   showDifficultyPicker(onPick) {
     const el = document.getElementById('difficulty-picker');
     if (!el) { onPick?.('easy'); return; }
+    let keyHandler = null;
     const close = (pick) => {
       el.classList.remove('show');
+      if (keyHandler) window.removeEventListener('keydown', keyHandler, true);
       onPick?.(pick);
     };
     const wire = (id, pick) => {
@@ -7156,18 +7273,31 @@ class UI {
     wire('diff-easy',   'easy');
     wire('diff-hard',   'hard');
     wire('diff-insane', 'insane');
+    keyHandler = (ev) => {
+      // Only respond while the picker is up; ignore modifier-key combos.
+      if (!el.classList.contains('show')) return;
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      const k = ev.key.toLowerCase();
+      if      (k === 'e') { ev.preventDefault(); close('easy');   }
+      else if (k === 'h') { ev.preventDefault(); close('hard');   }
+      else if (k === 'i') { ev.preventDefault(); close('insane'); }
+    };
+    window.addEventListener('keydown', keyHandler, true);
     el.classList.add('show');
   }
 
-  // Tutorial skip prompt — shown once at game start. Two buttons.
+  // Tutorial skip prompt — shown once at game start. Click OR press
+  // [Y] / [N] to choose.
   showTutorialSkipPrompt(onPlay, onSkip) {
     const el  = document.getElementById('tutorial-skip');
     const yes = document.getElementById('tsk-yes');
     const no  = document.getElementById('tsk-no');
     if (!el || !yes || !no) { onPlay?.(); return; }
+    let keyHandler = null;
     const close = (cb) => {
       yes.removeEventListener('click', y);
       no.removeEventListener('click', n);
+      if (keyHandler) window.removeEventListener('keydown', keyHandler, true);
       el.classList.remove('show');
       cb?.();
     };
@@ -7175,6 +7305,14 @@ class UI {
     const n = () => close(onSkip);
     yes.addEventListener('click', y);
     no.addEventListener('click', n);
+    keyHandler = (ev) => {
+      if (!el.classList.contains('show')) return;
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      const k = ev.key.toLowerCase();
+      if      (k === 'y') { ev.preventDefault(); close(onPlay); }
+      else if (k === 'n') { ev.preventDefault(); close(onSkip); }
+    };
+    window.addEventListener('keydown', keyHandler, true);
     el.classList.add('show');
     setTimeout(() => yes.focus(), 0);
   }
@@ -13186,9 +13324,10 @@ player.setFloorFn((x, z, cy) => world.getFloorY(x, z, cy));
 const interaction = new InteractionSystem(camera, scene, player);
 
 // ── State ─────────────────────────────────────────────────────────────────────
-// 'playing' | 'dialogue' | 'discovery' | 'feetdex' | 'paused' | 'interior' | 'minigame' | 'combat' | 'transitioning' | 'time-attack-popup'
+// 'playing' | 'dialogue' | 'discovery' | 'feetdex' | 'paused' | 'interior' | 'minigame' | 'combat' | 'transitioning' | 'time-attack-popup' | 'shoebox'
 let state             = 'playing';
 let _stateBeforeTimeAttackPopup = null;
+let _stateBeforeShoebox         = null;
 let _timeAttackPopupShown = false;
 let currentInteriorId = null;
 let _nearestNPC       = null;  // updated each frame — proximity only
@@ -13207,7 +13346,9 @@ let _beaconPulseT = 0;
 window.gameCamera = camera;
 window.gameScene  = scene;
 window.gameFeetDex = feetdex;
+window.gameWorld   = world;
 Object.defineProperty(window, 'gameState', { get: () => state });
+Object.defineProperty(window, 'gameInteriorId', { get: () => currentInteriorId });
 
 // ── Fade overlay (created here — not in index.html) ───────────────────────────
 const fadeDiv = document.createElement('div');
@@ -13244,7 +13385,21 @@ document.addEventListener('pointerlockchange', () => {
   // ESC to the start menu. Tear the popup down (keep findPending intact so
   // it re-opens when the player clicks back in), restore the play state
   // so the lock overlay can show.
+  //
+  // IMPORTANT: only run the tear-down if the popup is ACTUALLY visible.
+  // During setup the popup-opening code sets state='time-attack-popup'
+  // BEFORE calling exitPointerLock; if we tore down on that event we'd
+  // wipe the state and flash the start menu under the popup. Gating on
+  // the .show class differentiates "user ESCed out of an open popup"
+  // (tear down) from "we're mid-setup, popup isn't on screen yet"
+  // (return — leave state alone).
   if (!locked && state === 'time-attack-popup') {
+    const tap = document.getElementById('time-attack-popup');
+    const tapVisible = tap && tap.classList.contains('show');
+    if (!tapVisible) {
+      // Mid-setup — let the popup open in peace.
+      return;
+    }
     ui.hideTimeAttackPopup?.();
     _timeAttackPopupShown = false;
     state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
@@ -13254,6 +13409,11 @@ document.addEventListener('pointerlockchange', () => {
     // Fall through to the normal "lock just exited" branch below to bring
     // up the lock overlay.
   }
+  // Shoebox popup — same setup pattern as the time-attack popup. The popup
+  // unlocks the pointer so its OK button is clickable, but we don't want
+  // the lock overlay flashing on under it. No tear-down here; the popup
+  // dismisses via its own [E] / OK callback.
+  if (!locked && state === 'shoebox') return;
   if (locked) {
     ui.hideLockOverlay();
     // First time the player actually enters the game — pop the objective
@@ -13276,7 +13436,7 @@ document.addEventListener('pointerlockchange', () => {
   } else if (!_mapOpen
              && state !== 'shop' && state !== 'fleet'
              && state !== 'minigame' && state !== 'feetdex'
-             && state !== 'time-attack-popup'
+             && state !== 'time-attack-popup' && state !== 'shoebox'
              && !document.getElementById('tutorial-skip')?.classList.contains('show')
              && !document.getElementById('difficulty-picker')?.classList.contains('show')) {
     ui.showLockOverlay();
@@ -13640,6 +13800,54 @@ function _isPlayerFree() {
   return true;
 }
 
+// Whether the time-attack active-mission timer + cooldown should DECREMENT
+// this frame. Distinct from _isPlayerFree (which gates whether the popup
+// can pop). Design intent:
+//   TICK   during normal play, regular NPC dialogue, and map browsing —
+//          all "actively-playing" moments where the clock keeps pressing.
+//   PAUSE  during start menu, any popup overlay (Morton's shop, shoebox,
+//          Fleet Feet, FeetDex, minigame, generic tips, Feet God speeches,
+//          time-warp, tutorial-complete celebration, the time-attack popup
+//          itself), pre-combat, combat, transitions.
+//   PAUSE  during the discovery cutscene for the time-attack TARGET — the
+//          player just earned the find, the dialogue that resolves it
+//          shouldn't be the thing that runs the clock out.
+function _shouldTickTimeAttack() {
+  // Start menu / pointer not locked — always paused.
+  if (document.pointerLockElement !== canvas) return false;
+  // Map open → tick. (Map is a planning overlay, not a popup that "stops"
+  // the world — the player explicitly chose to keep pressure on.)
+  if (_mapOpen) return true;
+  // Popup / non-play states — always paused.
+  if (state === 'shop'     || state === 'fleet'
+   || state === 'feetdex'  || state === 'minigame'
+   || state === 'shoebox'  || state === 'time-attack-popup'
+   || state === 'pre-combat' || state === 'combat'
+   || state === 'transitioning') return false;
+  // Discovery cutscene — pause only if it's the time-attack target's
+  // first meeting. Otherwise (regular discovery of a non-target), tick.
+  if (state === 'discovery') {
+    if (feetdex.findActive && _activeNPC
+        && _activeNPC.feetId === feetdex.findActive.target) return false;
+    return true;
+  }
+  // Regular NPC dialogue — tick.
+  if (state === 'dialogue') return true;
+  // 'playing' / 'interior' with a popup-style overlay riding on top —
+  // pause. These overlays steal focus the same way a true modal does.
+  if (ui.isTipOpen)             return false;
+  if (ui.isFeetGodDialogueOpen) return false;
+  const tcEl = document.getElementById('tutorial-complete');
+  if (tcEl && tcEl.classList.contains('active')) return false;
+  const sbEl = document.getElementById('shoebox-popup');
+  if (sbEl && sbEl.classList.contains('show'))   return false;
+  const twEl = document.getElementById('time-warp-overlay');
+  if (twEl && twEl.classList.contains('show'))   return false;
+  const lhEl = document.getElementById('legendary-hint');
+  if (lhEl && lhEl.classList.contains('active')) return false;
+  return true;
+}
+
 let _lastTimeAttackTick = performance.now();
 function _tickTimeAttack() {
   if (!_missionsRevealed) return;
@@ -13647,7 +13855,7 @@ function _tickTimeAttack() {
   const now = performance.now();
   const dtMs = now - _lastTimeAttackTick;
   _lastTimeAttackTick = now;
-  const tick = feetdex.tickMissions(now, _isPlayerFree(), dtMs);
+  const tick = feetdex.tickMissions(now, _shouldTickTimeAttack(), dtMs);
 
   // Expiry: the timer just ran out on a find mission this frame.
   if (tick.kind === 'expired') {
@@ -13904,14 +14112,14 @@ function _showShoeboxReveal(def) {
     setTimeout(() => _showShoeboxReveal(def), 400);
     return;
   }
-  _stateBeforeTimeAttackPopup = state;
-  state = 'time-attack-popup';        // reuse the same input-gate state
+  _stateBeforeShoebox = state;
+  state = 'shoebox';
   if (document.pointerLockElement === canvas) document.exitPointerLock();
   const found = feetdex.unrepairedTools.size + SHOEBOX_DEFS.filter(d => feetdex.hasBooster(d.id)).length;
   const total = SHOEBOX_DEFS.length;
   ui.showShoeboxReveal(def, feetdex.shoeboxesOpened === 1, found, total, () => {
-    state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
-    _stateBeforeTimeAttackPopup = null;
+    state = _stateBeforeShoebox === 'interior' ? 'interior' : 'playing';
+    _stateBeforeShoebox = null;
     requestLock();
   });
 }
@@ -13925,14 +14133,14 @@ function _showShoeboxRevealForBonus(def, total) {
     setTimeout(() => _showShoeboxRevealForBonus(def, total), 400);
     return;
   }
-  _stateBeforeTimeAttackPopup = state;
-  state = 'time-attack-popup';
+  _stateBeforeShoebox = state;
+  state = 'shoebox';
   if (document.pointerLockElement === canvas) document.exitPointerLock();
   ui.showShoeboxReveal(
     def, /*isFirstOpen=*/false, /*foundCount=*/total, total,
     () => {
-      state = _stateBeforeTimeAttackPopup === 'interior' ? 'interior' : 'playing';
-      _stateBeforeTimeAttackPopup = null;
+      state = _stateBeforeShoebox === 'interior' ? 'interior' : 'playing';
+      _stateBeforeShoebox = null;
       requestLock();
     },
     `All ${total} / ${total} hidden tools collected — extra shoeboxes pay you in gold from now on.`,
@@ -14576,10 +14784,13 @@ function _shopOpts() {
 }
 
 function _openShop() {
-  // Tutorial path: first time meeting Morton — run a 3-line teaching arc,
-  // award a 20g visit bonus, then open the shop with Sprint Feet highlighted.
-  if (tutorial.isStep('talk-morton')) {
-    tutorial.advance('talk-morton');
+  // First-ever visit ALWAYS runs Morton's 3-line teaching arc + the 20g
+  // free gold + the Sprint Feet highlight — even if the player skipped
+  // the tutorial. Skipping the tutorial means "I know how to play," not
+  // "rob me of the only handout in the game." The tutorial-step advance
+  // only fires if the tutorial is still active.
+  if (_mortonVisits === 0) {
+    if (tutorial.isStep('talk-morton')) tutorial.advance('talk-morton');
     document.exitPointerLock();
     state = 'shop';
     _runMortonTutorial();
@@ -16593,17 +16804,20 @@ function _findNearestBoss(from) {
 // of the player, pointing at the nearest mythic/legendary. The dim
 // shaft was dropped so the glow IS the pointer; the cone tip itself is
 // emissive, and a soft halo wraps it for the "magic-orb" look.
-// Arrow built so the GLOWING TIP is at the group's local -Z. `lookAt(boss)`
-// orients the group so -Z faces the boss, so the tip lights up the boss
-// direction. A clearly visible darker shaft trails behind, plus optional
-// fletching at the +Z end, so the player reads "this is an arrow pointing
-// over there", not "a glowing orb".
+//
+// Orientation note (the previous build had this backwards):
+// THREE.js `Object3D.lookAt` for a non-camera object aligns the local
+// +Z axis TOWARD the target (the matrix is built with eye/target swapped
+// relative to the camera convention). So to make the glowing tip face
+// the boss, the tip + halo live at local +Z and the fletching sits at
+// local -Z. Earlier this was swapped, which is why the glowing side
+// pointed away from legendaries/mythics.
 const _compassArrow = (() => {
   const g = new THREE.Group();
 
   // ── Shaft ────────────────────────────────────────────────────────────
   // Brown/gold metallic shaft, length 0.80, oriented along Z. Centered
-  // at z=0 so its forward end meets the cone base at z=-0.40.
+  // at z=0 so its forward end meets the cone base at z=+0.40.
   const shaft = new THREE.Mesh(
     new THREE.CylinderGeometry(0.045, 0.045, 0.80, 14),
     new THREE.MeshStandardMaterial({
@@ -16615,17 +16829,18 @@ const _compassArrow = (() => {
   shaft.position.z = 0;
   g.add(shaft);
 
-  // ── Glowing tip (cone) — lives at -Z, points toward the boss ─────────
+  // ── Glowing tip (cone) — lives at +Z, points toward the boss ─────────
   const tip = new THREE.Mesh(
     new THREE.ConeGeometry(0.16, 0.40, 18),
     new THREE.MeshStandardMaterial({
       color: 0xfff8d0, emissive: 0xffc24d, emissiveIntensity: 3.0,
     }),
   );
-  // Default cone tip is +Y. Rotate so tip is at -Z, and offset so the cone
-  // BASE meets the shaft end at z=-0.40, with the tip out at z=-0.80.
-  tip.rotation.x = -Math.PI / 2;
-  tip.position.z = -0.60;
+  // Default cone tip is +Y. Rotate so tip points at +Z (boss-ward), and
+  // offset so the cone BASE meets the shaft end at z=+0.40 with the tip
+  // out at z=+0.80.
+  tip.rotation.x = Math.PI / 2;
+  tip.position.z = 0.60;
   g.add(tip);
 
   // Bright halo wrapped around the tip — the "compass glow" the player tracks.
@@ -16636,7 +16851,7 @@ const _compassArrow = (() => {
       depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
-  halo.position.z = -0.60;
+  halo.position.z = 0.60;
   g.add(halo);
 
   // Outer shimmer — wider but fainter, helps the tip stand out at distance.
@@ -16647,7 +16862,7 @@ const _compassArrow = (() => {
       depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
-  shim.position.z = -0.62;
+  shim.position.z = 0.62;
   g.add(shim);
 
   // ── Fletching (back end) — four small fins arranged in a +, gives the
@@ -16660,7 +16875,7 @@ const _compassArrow = (() => {
   for (let i = 0; i < 4; i++) {
     const fin = new THREE.Mesh(finGeom, finMat);
     fin.rotation.z = (i / 4) * Math.PI * 2;
-    fin.position.z = 0.36;            // back end of the shaft
+    fin.position.z = -0.36;            // back end of the shaft (away from target)
     g.add(fin);
   }
 
@@ -16702,7 +16917,8 @@ function _updateCompassPointer(dt) {
     camera.position.y + fwd.y * offset - 0.30,
     camera.position.z + fwd.z * offset,
   );
-  // Orient: the arrow's tip (its -Z) points at the target.
+  // Orient: lookAt aligns local +Z with the target (non-camera convention),
+  // and the glowing tip lives at +Z — so the tip faces the boss.
   _compassArrow.lookAt(
     target.group.position.x,
     camera.position.y - 0.30,
@@ -17316,6 +17532,14 @@ function gameLoop() {
 
   if (locked && (state === 'playing' || state === 'interior' || state === 'combat')) {
     player.update(dt, world.getSolids(currentInteriorId));
+  } else if (state === 'pre-combat') {
+    // Player is frozen during the 3-2-1 countdown — no movement, no
+    // physics — but the lightsaber ignition animation still needs to
+    // tick so the blade grows out of the emitter through the countdown
+    // and is fully extended the moment "FIGHT!" appears. Calling
+    // _animateLightsaber directly skips _move/_look and keeps the
+    // player stationary while the saber sequence plays.
+    player._animateLightsaber?.(dt);
   }
 
   _npcFrame ^= 1;
