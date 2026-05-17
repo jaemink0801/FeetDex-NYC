@@ -8,7 +8,7 @@
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
   <script>(function(){
-  var BAKED = '20260517T155808';
+  var BAKED = '20260517T160119';
   function _hide(){ try { document.documentElement.style.visibility = "hidden"; } catch (e) {} }
   function _goto(latest){
     var u = new URL(location.href);
@@ -13383,6 +13383,13 @@ document.getElementById('lock-overlay').addEventListener('click', () => {
 });
 
 let _firstStartShown = false;
+// True from the moment the player first clicks the start screen until they
+// have chosen BOTH a difficulty and tutorial-skip option. Suppresses the
+// lock overlay during the timed gaps between those modals — pointer lock
+// exits BEFORE each modal shows, and the pointerlockchange handler would
+// otherwise flash the start menu on top of nothing for ~250ms before the
+// next dialog appears.
+let _inStartupFlow = false;
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;
   // While the time-attack modal is up, refuse any lock that gets acquired —
@@ -13432,8 +13439,11 @@ document.addEventListener('pointerlockchange', () => {
     // tip, then chain into the tutorial's follow-the-arrow hint.
     if (!_firstStartShown) {
       _firstStartShown = true;
+      _inStartupFlow   = true;
       // Release the lock first so the player can click the difficulty +
-      // skip-prompt buttons with a real cursor.
+      // skip-prompt buttons with a real cursor. _inStartupFlow gates the
+      // lock-overlay re-show that pointerlockchange would otherwise
+      // trigger before the difficulty picker paints.
       document.exitPointerLock();
       setTimeout(() => {
         ui.showDifficultyPicker((pick) => {
@@ -13445,7 +13455,8 @@ document.addEventListener('pointerlockchange', () => {
         });
       }, 250);
     }
-  } else if (!_mapOpen
+  } else if (!_inStartupFlow
+             && !_mapOpen
              && state !== 'shop' && state !== 'fleet'
              && state !== 'minigame' && state !== 'feetdex'
              && state !== 'time-attack-popup' && state !== 'shoebox'
@@ -13470,6 +13481,7 @@ function _showSkipPromptAfterDifficulty() {
     ui.showTutorialSkipPrompt(
           // PLAY TUTORIAL — the original objective + Feet God intro chain.
           () => {
+            _inStartupFlow = false;
             requestLock();
             setTimeout(() => {
               ui.showTip('OBJECTIVE',
@@ -13499,9 +13511,11 @@ function _showSkipPromptAfterDifficulty() {
             }, 200);
           },
           // SKIP — mark every tutorial step done, reveal missions, drop the
-          // player straight into free play. The 20g Morton greeting + sprint-
-          // feet purchase are skipped; player can still buy/repair normally.
+          // player straight into free play. Morton's 20g greeting still
+          // fires the first time the player walks into the shop (see
+          // _openShop) so the skip doesn't rob them of the handout.
           () => {
+            _inStartupFlow = false;
             for (const step of TUTORIAL_STEPS) tutorial.completed.add(step.id);
             tutorial.stepIdx = TUTORIAL_STEPS.length;
             tutorial.finish();
